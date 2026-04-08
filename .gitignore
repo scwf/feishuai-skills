@@ -1,0 +1,32 @@
+.DS_Store
+.skill-lock.json
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Local outputs and temp files
+.tmp/
+output/
+youtube-[0-9]*/
+x-posts-*/
+
+# Generic local secrets
+.env
+.env.*
+*.env
+*.local
+*.secret
+*.secrets
+secrets.*
+credentials.*
+
+# Known skill-local secret files
+x-scraper/defaults/x.env

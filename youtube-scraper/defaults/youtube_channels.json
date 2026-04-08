@@ -1,0 +1,389 @@
+[
+  {
+    "alias": "YT_OpenAI",
+    "channel_name": "OpenAI",
+    "channel_url": "https://www.youtube.com/@OpenAI",
+    "handle": "@OpenAI",
+    "channel_type": "official/product",
+    "theme": "models, product demos, agent capabilities",
+    "channel_id": "UCXZCJLdBC09xxGZ6gcdrc6A"
+  },
+  {
+    "alias": "YT_anthropic-ai",
+    "channel_name": "Anthropic",
+    "channel_url": "https://www.youtube.com/@anthropic-ai",
+    "handle": "@anthropic-ai",
+    "channel_type": "official/product",
+    "theme": "models, AI products, developer capabilities",
+    "channel_id": "UCrDwWp7EBBv4NwvScIpBDOA"
+  },
+  {
+    "alias": "YT_cursor_ai",
+    "channel_name": "Cursor",
+    "channel_url": "https://www.youtube.com/@cursor_ai",
+    "handle": "@cursor_ai",
+    "channel_type": "tool/developer",
+    "theme": "coding agents, AI programming",
+    "channel_id": "UC6YYHJzM6PhZ2Yey9BQiUaw"
+  },
+  {
+    "alias": "YT_aiexplained-official",
+    "channel_name": "AI Explained",
+    "channel_url": "https://www.youtube.com/@aiexplained-official",
+    "handle": "@aiexplained-official",
+    "channel_type": "commentary/news",
+    "theme": "AI updates, model capabilities, product interpretation",
+    "channel_id": "UCNJ1Ymd5yFuUPtn21xtRbbw"
+  },
+  {
+    "alias": "YT_ColeMedin",
+    "channel_name": "Cole Medin",
+    "channel_url": "https://www.youtube.com/@ColeMedin",
+    "handle": "@ColeMedin",
+    "channel_type": "hands-on/tutorial",
+    "theme": "AI agents, automation, tool practice",
+    "channel_id": "UCMwVTLZIRRUyyVrkjDpn4pA"
+  },
+  {
+    "alias": "YT_LangChain",
+    "channel_name": "LangChain",
+    "channel_url": "https://www.youtube.com/@LangChain",
+    "handle": "@LangChain",
+    "channel_type": "framework/developer",
+    "theme": "agent frameworks, LLM apps",
+    "channel_id": "UCC-lyoTfSrcJzA1ab3APAgw"
+  },
+  {
+    "alias": "YT_HuggingFace",
+    "channel_name": "Hugging Face",
+    "channel_url": "https://www.youtube.com/@HuggingFace",
+    "handle": "@HuggingFace",
+    "channel_type": "platform/developer",
+    "theme": "open models, tools, practice",
+    "channel_id": "UCHlNU7kIZhRgSbhHvFoy72w"
+  },
+  {
+    "alias": "YT_AndrejKarpathy",
+    "channel_name": "Andrej Karpathy",
+    "channel_url": "https://www.youtube.com/@AndrejKarpathy",
+    "handle": "@AndrejKarpathy",
+    "channel_type": "individual/technical",
+    "theme": "AI principles, model understanding, dev practice",
+    "channel_id": "UCXUPKJO5MZQN11PqgIvyuvQ"
+  },
+  {
+    "alias": "YT_googledeepmind",
+    "channel_name": "Google DeepMind",
+    "channel_url": "https://www.youtube.com/@googledeepmind",
+    "handle": "@googledeepmind",
+    "channel_type": "official/research",
+    "theme": "models, research, AI capabilities",
+    "channel_id": "UCP7jMXSY2xbc3KCAE0MHQ-A"
+  },
+  {
+    "alias": "YT_anyscale",
+    "channel_name": "Anyscale",
+    "channel_url": "https://www.youtube.com/@anyscale",
+    "handle": "@anyscale",
+    "channel_type": "framework/platform",
+    "theme": "LLM apps, inference, engineering",
+    "channel_id": "UC7L1tZw52rtgmIB4fr_f40w"
+  },
+  {
+    "alias": "YT_Deeplearningai",
+    "channel_name": "DeepLearningAI",
+    "channel_url": "https://www.youtube.com/@Deeplearningai",
+    "handle": "@Deeplearningai",
+    "channel_type": "education/tutorial",
+    "theme": "AI courses, tools, dev practice",
+    "channel_id": "UCcIXc5mJsHVYTZR1maL5l9w"
+  },
+  {
+    "alias": "YT_deeplearningexplained",
+    "channel_name": "Deep Learning with Yacine",
+    "channel_url": "https://www.youtube.com/@deeplearningexplained",
+    "handle": "@deeplearningexplained",
+    "channel_type": "commentary/tutorial",
+    "theme": "model interpretation, technical explanation",
+    "channel_id": "UCts-XMcexTiPSR8QbyRGFxA"
+  },
+  {
+    "alias": "YT_theaihacker777",
+    "channel_name": "The AI Hacker",
+    "channel_url": "https://www.youtube.com/@theaihacker777",
+    "handle": "@theaihacker777",
+    "channel_type": "hands-on/tutorial",
+    "theme": "AI tools, agents, practical use",
+    "channel_id": "UCYpBgT4riB-VpsBBBQkblqQ"
+  },
+  {
+    "alias": "YT_AIJasonZ",
+    "channel_name": "AI Jason",
+    "channel_url": "https://www.youtube.com/@AIJasonZ",
+    "handle": "@AIJasonZ",
+    "channel_type": "hands-on/tutorial",
+    "theme": "agents, automation, AI tools",
+    "channel_id": "UCrXSVX9a1mj8l0CMLwKgMVw"
+  },
+  {
+    "alias": "YT_YifanBTH",
+    "channel_name": "Yifan - Beyond the Hype",
+    "channel_url": "https://www.youtube.com/@YifanBTH",
+    "handle": "@YifanBTH",
+    "channel_type": "commentary/news",
+    "theme": "AI viewpoints, models, product judgment",
+    "channel_id": "UCJL_hSRHW8414diAIleErnw"
+  },
+  {
+    "alias": "YT_Explaining-AI",
+    "channel_name": "ExplainingAI",
+    "channel_url": "https://www.youtube.com/@Explaining-AI",
+    "handle": "@Explaining-AI",
+    "channel_type": "commentary/tutorial",
+    "theme": "AI principles, papers, concept explanation",
+    "channel_id": "UCLywqeZTOeWNYDy3niClMww"
+  },
+  {
+    "alias": "YT_googleantigravity",
+    "channel_name": "Google Antigravity",
+    "channel_url": "https://www.youtube.com/@googleantigravity",
+    "handle": "@googleantigravity",
+    "channel_type": "official/product",
+    "theme": "Google AI products, experimental capabilities",
+    "channel_id": "UC_eVxIPHFZm7oF_gET0x-8Q"
+  },
+  {
+    "alias": "YT_IBMTechnology",
+    "channel_name": "IBM Technology",
+    "channel_url": "https://www.youtube.com/@IBMTechnology",
+    "handle": "@IBMTechnology",
+    "channel_type": "enterprise/technical",
+    "theme": "AI technology, enterprise applications, trends",
+    "channel_id": "UCKWaEZ-_VweaEx1j62do_vQ"
+  },
+  {
+    "alias": "YT_googlecloudtech",
+    "channel_name": "Google Cloud Tech",
+    "channel_url": "https://www.youtube.com/@googlecloudtech",
+    "handle": "@googlecloudtech",
+    "channel_type": "official/technical",
+    "theme": "cloud AI, engineering practice",
+    "channel_id": "UCJS9pqu9BzkAMNTmzNMNhvg"
+  },
+  {
+    "alias": "YT_Databricks",
+    "channel_name": "Databricks",
+    "channel_url": "https://www.youtube.com/@Databricks",
+    "handle": "@Databricks",
+    "channel_type": "enterprise/technical",
+    "theme": "data, AI platforms, engineering",
+    "channel_id": "UC3q8O3Bh2Le8Rj1-Q-_UUbA"
+  },
+  {
+    "alias": "YT_palantirtech",
+    "channel_name": "Palantir",
+    "channel_url": "https://www.youtube.com/@palantirtech",
+    "handle": "@palantirtech",
+    "channel_type": "enterprise/product",
+    "theme": "AI products, enterprise implementation",
+    "channel_id": "UCwed6_f0WcDIioXvMQfcP2Q"
+  },
+  {
+    "alias": "YT_rileybrownai",
+    "channel_name": "Riley Brown",
+    "channel_url": "https://www.youtube.com/@rileybrownai",
+    "handle": "@rileybrownai",
+    "channel_type": "hands-on/tutorial",
+    "theme": "AI tools, workflows, automation",
+    "channel_id": "UCMcoud_ZW7cfxeIugBflSBw"
+  },
+  {
+    "alias": "YT_Steve8708",
+    "channel_name": "Steve (Builder.io)",
+    "channel_url": "https://www.youtube.com/@Steve8708",
+    "handle": "@Steve8708",
+    "channel_type": "developer/hands-on",
+    "theme": "AI coding, tools, dev workflows",
+    "channel_id": "UCGmR6lhKMlCkvrvb39vPtdA"
+  },
+  {
+    "alias": "YT_ByteByteGo",
+    "channel_name": "ByteByteGo",
+    "channel_url": "https://www.youtube.com/@ByteByteGo",
+    "handle": "@ByteByteGo",
+    "channel_type": "technical/explainer",
+    "theme": "system design, technical principles",
+    "channel_id": "UCZgt6AzoyjslHTC9dz0UoTw"
+  },
+  {
+    "alias": "YT_stanfordonline",
+    "channel_name": "Stanford Online",
+    "channel_url": "https://www.youtube.com/@stanfordonline",
+    "handle": "@stanfordonline",
+    "channel_type": "education/course",
+    "theme": "AI courses, technical education",
+    "channel_id": "UCBa5G_ESCn8Yd4vw5U-gIcg"
+  },
+  {
+    "alias": "YT_YannicKilcher",
+    "channel_name": "Yannic Kilcher",
+    "channel_url": "https://www.youtube.com/@YannicKilcher",
+    "handle": "@YannicKilcher",
+    "channel_type": "commentary/research",
+    "theme": "papers, models, research interpretation",
+    "channel_id": "UCZHmQk67mSJgfCCTn7xBfew"
+  },
+  {
+    "alias": "YT_3blue1brown",
+    "channel_name": "3Blue1Brown",
+    "channel_url": "https://www.youtube.com/@3blue1brown",
+    "handle": "@3blue1brown",
+    "channel_type": "education/visualization",
+    "theme": "math, principle visualization",
+    "channel_id": "UCYO_jab_esuFRV4b17AJtAw"
+  },
+  {
+    "alias": "YT_AWSEventsChannel",
+    "channel_name": "AWS Events",
+    "channel_url": "https://www.youtube.com/@AWSEventsChannel",
+    "handle": "@AWSEventsChannel",
+    "channel_type": "official/events",
+    "theme": "AI events, launches, solutions",
+    "channel_id": "UCdoadna9HFHsxXWhafhNvKw"
+  },
+  {
+    "alias": "YT_MicrosoftFabric",
+    "channel_name": "Microsoft Fabric",
+    "channel_url": "https://www.youtube.com/@MicrosoftFabric",
+    "handle": "@MicrosoftFabric",
+    "channel_type": "official/technical",
+    "theme": "data and AI platforms",
+    "channel_id": "UCH0gDiJ1RSn3kkxRQnQaH1w"
+  },
+  {
+    "alias": "YT_JeffSu",
+    "channel_name": "Jeff Su",
+    "channel_url": "https://www.youtube.com/@JeffSu",
+    "handle": "@JeffSu",
+    "channel_type": "productivity/personal-growth",
+    "theme": "productivity tools, career improvement",
+    "channel_id": "UCwAnu01qlnVg1Ai2AbtTMaA"
+  },
+  {
+    "alias": "YT_AlexTheAnalyst",
+    "channel_name": "Alex The Analyst",
+    "channel_url": "https://www.youtube.com/@AlexTheAnalyst",
+    "handle": "@AlexTheAnalyst",
+    "channel_type": "tutorial/career",
+    "theme": "data analysis, learning paths",
+    "channel_id": "UC7cs8q-gJRlGwj4A8OmCmXg"
+  },
+  {
+    "alias": "YT_vukrosic",
+    "channel_name": "Vuk Rosić",
+    "channel_url": "https://www.youtube.com/@vukrosic",
+    "handle": "@vukrosic",
+    "channel_type": "hands-on/tutorial",
+    "theme": "AI tools, workflows",
+    "channel_id": "UC7XJj9pv_11a11FUxCMz15g"
+  },
+  {
+    "alias": "YT_ycombinator",
+    "channel_name": "Y Combinator",
+    "channel_url": "https://www.youtube.com/@ycombinator",
+    "handle": "@ycombinator",
+    "channel_type": "startup/interview",
+    "theme": "startups, founder viewpoints",
+    "channel_id": "UCcefcZRL2oaA_uBNeo5UOWg"
+  },
+  {
+    "alias": "YT_kedaibiao",
+    "channel_name": "课代表立正",
+    "channel_url": "https://www.youtube.com/@kedaibiao",
+    "handle": "@kedaibiao",
+    "channel_type": "chinese/commentary",
+    "theme": "AI news, knowledge interpretation",
+    "channel_id": "UC_5lJHgnMP_lb_VpIiXV0hQ"
+  },
+  {
+    "alias": "YT_bestpartners",
+    "channel_name": "最佳拍档",
+    "channel_url": "https://www.youtube.com/@bestpartners",
+    "handle": "@bestpartners",
+    "channel_type": "chinese/general",
+    "theme": "pending classification",
+    "channel_id": "UCGWYKICLOE8Wxy7q3eYXmPA"
+  },
+  {
+    "alias": "YT_abdul_bari",
+    "channel_name": "Abdul Bari",
+    "channel_url": "https://www.youtube.com/@abdul_bari",
+    "handle": "@abdul_bari",
+    "channel_type": "education/course",
+    "theme": "algorithms, CS fundamentals",
+    "channel_id": "UCZCFT11CWBi3MHNlGf019nw"
+  },
+  {
+    "alias": "YT_striver_79",
+    "channel_name": "Striver",
+    "channel_url": "https://www.youtube.com/@striver_79",
+    "handle": "@striver_79",
+    "channel_type": "tutorial/programming",
+    "theme": "DSA, programming training",
+    "channel_id": "UCvEKHATlVq84hm1jduTYm8g"
+  },
+  {
+    "alias": "YT_takeUforward",
+    "channel_name": "take U forward",
+    "channel_url": "https://www.youtube.com/@takeUforward",
+    "handle": "@takeUforward",
+    "channel_type": "tutorial/programming",
+    "theme": "algorithms, coding practice",
+    "channel_id": "UCJskGeByzRRSvmOyZOz61ig"
+  },
+  {
+    "alias": "YT_GosuCoder",
+    "channel_name": "GosuCoder",
+    "channel_url": "https://www.youtube.com/@GosuCoder",
+    "handle": "@GosuCoder",
+    "channel_type": "programming/tutorial",
+    "theme": "programming, implementation",
+    "channel_id": "UCQd9wpBDkfQxqxGIBko2fKg"
+  },
+  {
+    "alias": "YT_aliabdaal",
+    "channel_name": "Ali Abdaal",
+    "channel_url": "https://www.youtube.com/@aliabdaal",
+    "handle": "@aliabdaal",
+    "channel_type": "productivity/personal-growth",
+    "theme": "productivity, self-improvement",
+    "channel_id": "UCoOae5nYA7VqaXzerajD0lg"
+  },
+  {
+    "alias": "YT_DanKoeTalks",
+    "channel_name": "Dan Koe",
+    "channel_url": "https://www.youtube.com/@DanKoeTalks",
+    "handle": "@DanKoeTalks",
+    "channel_type": "personal-growth/opinion",
+    "theme": "self-growth, expression",
+    "channel_id": "UCWXYDYv5STLk-zoxMP2I1Lw"
+  },
+  {
+    "alias": "YT_TinaHuang1",
+    "channel_name": "Tina Huang",
+    "channel_url": "https://www.youtube.com/@TinaHuang1",
+    "handle": "@TinaHuang1",
+    "channel_type": "productivity/career",
+    "theme": "AI tools, efficiency, career growth",
+    "channel_id": "UC2UXDak6o7rBm23k3Vv5dww"
+  },
+  {
+    "alias": "YT_SeattleDataGuy",
+    "channel_name": "Seattle Data Guy",
+    "channel_url": "https://www.youtube.com/@SeattleDataGuy",
+    "handle": "@SeattleDataGuy",
+    "channel_type": "legacy/compatibility",
+    "theme": "legacy alias preserved for compatibility",
+    "channel_id": "UCmLGJ3VYBcfRaWbP6JLJcpA"
+  }
+]

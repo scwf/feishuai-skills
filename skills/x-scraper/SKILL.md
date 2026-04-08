@@ -10,7 +10,7 @@ description: Fetch X/Twitter tweets for a specific username or a configured x ac
 Use this skill to fetch tweets from X for either:
 
 - an exact username such as `karpathy` or `@OpenAI`
-- a configured account alias such as `X_OpenAI` from `defaults/x_accounts.json`
+- a configured account alias such as `X_OpenAI` from `defaults/x_target_accounts.json`
 
 *Note:* `{SKILL_ROOT}` in the instructions below refers to the absolute path to the directory containing this `SKILL.md` file. Always resolve `{SKILL_ROOT}` to its true absolute path before executing commands.
 
@@ -18,13 +18,42 @@ Use this skill to fetch tweets from X for either:
 
 Before running the script, ensure the environment has X credentials:
 
-1. **First**, check if `{SKILL_ROOT}/defaults/x.env` exists. If it does, automatically load or inject its variables (e.g., `X_AUTH_CREDENTIALS` or `TWITTER_AUTH_TOKEN` and `TWITTER_CT0`) into the execution environment.
-2. **Second**, if neither the environment variables nor the `x.env` file are present, ask the user to provide them.
+1. **First**, check if `{SKILL_ROOT}/defaults/x.env` exists. If it does, automatically load its numbered credential pairs into the execution environment.
+2. **Second**, if the `x.env` file is missing or incomplete, ask the user to fill it in.
 
 Credential precedence:
 
-- `defaults/x.env` first, then user-provided environment variables for any missing keys
-- if neither source provides usable credentials, fail fast and ask the user for credentials
+- `defaults/x.env` is the standard configuration source for this skill
+- if it does not provide usable numbered credential pairs, fail fast and ask the user to complete it
+
+Recommended setup in `{SKILL_ROOT}/defaults/x.env`:
+
+```bash
+TWITTER_AUTH_TOKEN_1=your_auth_token_here
+TWITTER_CT0_1=your_ct0_here
+```
+
+If you want to keep backup accounts in the same file, continue numbering them:
+
+```bash
+TWITTER_AUTH_TOKEN_2=your_auth_token_here
+TWITTER_CT0_2=your_ct0_here
+```
+
+How to obtain `auth_token` and `ct0` from an active X login session:
+
+1. Open `x.com` in Chrome or Edge and sign in to your account.
+2. Press `F12` to open Developer Tools, then switch to the `Network` tab.
+3. Refresh the page.
+4. Click any request in the network list, commonly `HomeTimeline` or `guide.json`.
+5. In `Headers` -> `Request Headers`, find the `cookie` header.
+6. Copy the values of `auth_token` and `ct0`.
+7. Do not include the trailing semicolon when copying either value.
+
+When the skill reports missing credentials, remind the user to follow the steps above and fill in:
+
+- `TWITTER_AUTH_TOKEN_1` plus `TWITTER_CT0_1`
+- and optionally additional numbered pairs such as `TWITTER_AUTH_TOKEN_2` plus `TWITTER_CT0_2`
 
 Optional dependency:
 
@@ -41,7 +70,7 @@ pip install curl_cffi
 Resolve the user's target in this order:
 
 1. If the user explicitly gives a username or profile URL, normalize it to a bare username.
-2. Otherwise, if the user mentions a configured X account alias, resolve it through `defaults/x_accounts.json`.
+2. Otherwise, if the user mentions a configured X account alias, resolve it through `defaults/x_target_accounts.json`.
 3. If both are present, prefer the explicit username.
 
 Normalization rules:
@@ -149,8 +178,8 @@ The exported JSON now includes run metadata such as:
 
 If the script cannot run:
 
-- if X credentials are missing, ask the user to provide `X_AUTH_CREDENTIALS` or `TWITTER_AUTH_TOKEN` and `TWITTER_CT0`
-- if the target alias is unknown, tell the user and offer nearby alias matches from `defaults/x_accounts.json`
+- if X credentials are missing, ask the user to fill in `defaults/x.env` with `TWITTER_AUTH_TOKEN_1` and `TWITTER_CT0_1`, and include the browser extraction steps from the prerequisites section
+- if the target alias is unknown, tell the user and offer nearby alias matches from `defaults/x_target_accounts.json`
 - if a multi-target run hits `429` or `rate_limit`, stop the entire run immediately, report which target triggered the limit, and recommend resuming after at least 15 minutes instead of continuing the remaining targets or later batches
 
 ## Notes

@@ -36,8 +36,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--alias-file",
-        default=str(Path(__file__).resolve().parents[1] / "defaults" / "x_accounts.json"),
-        help="Alias mapping JSON. Default: defaults/x_accounts.json.",
+        default=str(Path(__file__).resolve().parents[1] / "defaults" / "x_target_accounts.json"),
+        help="Target account list JSON. Default: defaults/x_target_accounts.json.",
     )
     parser.add_argument(
         "--limit",

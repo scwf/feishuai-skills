@@ -135,7 +135,10 @@ class AccountPool:
             return cls([(auth_token, ct0)])
 
         raise ValueError(
-            "Provide X credentials via X_AUTH_CREDENTIALS or TWITTER_AUTH_TOKEN + TWITTER_CT0."
+            "Missing X credentials. Fill in defaults/x.env with TWITTER_AUTH_TOKEN_1 and TWITTER_CT0_1. "
+            "To obtain them, sign in at x.com in Chrome or Edge, open DevTools with F12, go to Network, "
+            "refresh the page, open a request such as HomeTimeline or guide.json, and copy auth_token and ct0 "
+            "from the cookie request header without the trailing semicolon."
         )
 
     def get_next(self) -> Optional[AccountState]:
@@ -1020,8 +1023,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--alias-file",
-        default=str(Path(__file__).resolve().parents[1] / "defaults" / "x_accounts.json"),
-        help="Alias mapping JSON. Default: defaults/x_accounts.json.",
+        default=str(Path(__file__).resolve().parents[1] / "defaults" / "x_target_accounts.json"),
+        help="Target account list JSON. Default: defaults/x_target_accounts.json.",
     )
     parser.add_argument(
         "--limit",

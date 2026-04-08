@@ -36,8 +36,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--alias-file",
-        default=str(Path(__file__).resolve().parents[1] / "defaults" / "x_target_accounts.json"),
-        help="Target account list JSON. Default: defaults/x_target_accounts.json.",
+        default=str(Path(__file__).resolve().parents[1] / "config" / "x_target_accounts.json"),
+        help="Target account list JSON. Default: config/x_target_accounts.json.",
     )
     parser.add_argument(
         "--limit",
@@ -233,7 +233,7 @@ def main() -> int:
     alias_map = x_scrape.load_alias_map(Path(args.alias_file))
     output_dir = build_batch_output_dir(Path(args.output_dir))
     output_dir.mkdir(parents=True, exist_ok=True)
-    env_file_used = bool(load_default_env(Path(__file__).resolve().parents[1] / "defaults" / "x.env"))
+    env_file_used = bool(load_default_env(Path(__file__).resolve().parents[1] / "config" / "x.env"))
 
     account_pool = x_scrape.AccountPool.from_env()
     logger.info(

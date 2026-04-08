@@ -10,7 +10,7 @@ description: Fetch X/Twitter tweets for a specific username or a configured x ac
 Use this skill to fetch tweets from X for either:
 
 - an exact username such as `karpathy` or `@OpenAI`
-- a configured account alias such as `X_OpenAI` from `defaults/x_target_accounts.json`
+- a configured account alias such as `X_OpenAI` from `config/x_target_accounts.json`
 
 *Note:* `{SKILL_ROOT}` in the instructions below refers to the absolute path to the directory containing this `SKILL.md` file. Always resolve `{SKILL_ROOT}` to its true absolute path before executing commands.
 
@@ -18,15 +18,15 @@ Use this skill to fetch tweets from X for either:
 
 Before running the script, ensure the environment has X credentials:
 
-1. **First**, check if `{SKILL_ROOT}/defaults/x.env` exists. If it does, automatically load its numbered credential pairs into the execution environment.
+1. **First**, check if `{SKILL_ROOT}/config/x.env` exists. If it does, automatically load its numbered credential pairs into the execution environment.
 2. **Second**, if the `x.env` file is missing or incomplete, ask the user to fill it in.
 
 Credential precedence:
 
-- `defaults/x.env` is the standard configuration source for this skill
+- `config/x.env` is the standard configuration source for this skill
 - if it does not provide usable numbered credential pairs, fail fast and ask the user to complete it
 
-Recommended setup in `{SKILL_ROOT}/defaults/x.env`:
+Recommended setup in `{SKILL_ROOT}/config/x.env`:
 
 ```bash
 TWITTER_AUTH_TOKEN_1=your_auth_token_here
@@ -70,7 +70,7 @@ pip install curl_cffi
 Resolve the user's target in this order:
 
 1. If the user explicitly gives a username or profile URL, normalize it to a bare username.
-2. Otherwise, if the user mentions a configured X account alias, resolve it through `defaults/x_target_accounts.json`.
+2. Otherwise, if the user mentions a configured X account alias, resolve it through `config/x_target_accounts.json`.
 3. If both are present, prefer the explicit username.
 
 Normalization rules:
@@ -178,8 +178,8 @@ The exported JSON now includes run metadata such as:
 
 If the script cannot run:
 
-- if X credentials are missing, ask the user to fill in `defaults/x.env` with `TWITTER_AUTH_TOKEN_1` and `TWITTER_CT0_1`, and include the browser extraction steps from the prerequisites section
-- if the target alias is unknown, tell the user and offer nearby alias matches from `defaults/x_target_accounts.json`
+- if X credentials are missing, ask the user to fill in `config/x.env` with `TWITTER_AUTH_TOKEN_1` and `TWITTER_CT0_1`, and include the browser extraction steps from the prerequisites section
+- if the target alias is unknown, tell the user and offer nearby alias matches from `config/x_target_accounts.json`
 - if a multi-target run hits `429` or `rate_limit`, stop the entire run immediately, report which target triggered the limit, and recommend resuming after at least 15 minutes instead of continuing the remaining targets or later batches
 
 ## Notes

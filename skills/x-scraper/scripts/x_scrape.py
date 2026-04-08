@@ -135,7 +135,7 @@ class AccountPool:
             return cls([(auth_token, ct0)])
 
         raise ValueError(
-            "Missing X credentials. Fill in defaults/x.env with TWITTER_AUTH_TOKEN_1 and TWITTER_CT0_1. "
+            "Missing X credentials. Fill in config/x.env with TWITTER_AUTH_TOKEN_1 and TWITTER_CT0_1. "
             "To obtain them, sign in at x.com in Chrome or Edge, open DevTools with F12, go to Network, "
             "refresh the page, open a request such as HomeTimeline or guide.json, and copy auth_token and ct0 "
             "from the cookie request header without the trailing semicolon."
@@ -1023,8 +1023,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--alias-file",
-        default=str(Path(__file__).resolve().parents[1] / "defaults" / "x_target_accounts.json"),
-        help="Target account list JSON. Default: defaults/x_target_accounts.json.",
+        default=str(Path(__file__).resolve().parents[1] / "config" / "x_target_accounts.json"),
+        help="Target account list JSON. Default: config/x_target_accounts.json.",
     )
     parser.add_argument(
         "--limit",
@@ -1237,7 +1237,7 @@ def main() -> int:
 
     alias_map = load_alias_map(Path(args.alias_file))
     output_dir = Path(args.output_dir)
-    env_file_used = bool(load_default_env(Path(__file__).resolve().parents[1] / "defaults" / "x.env"))
+    env_file_used = bool(load_default_env(Path(__file__).resolve().parents[1] / "config" / "x.env"))
 
     account_pool = AccountPool.from_env()
     logger.info(

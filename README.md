@@ -19,4 +19,4 @@ All skills live under [`skills/`](./skills).
 
 - Each skill is self-contained and should include its own `SKILL.md` plus any required scripts, references, or assets.
 - Local runtime outputs, caches, and secret environment files are excluded from version control.
-- `x-scraper` requires valid X session cookies. Configure numbered credentials in `skills/x-scraper/defaults/x.env`, such as `TWITTER_AUTH_TOKEN_1` + `TWITTER_CT0_1`. See [`skills/x-scraper/SKILL.md`](./skills/x-scraper/SKILL.md) for setup steps, including how to extract `auth_token` and `ct0` from your browser session.
+- `x-scraper` requires valid X session cookies. Configure numbered credentials in `skills/x-scraper/config/x.env`, such as `TWITTER_AUTH_TOKEN_1` + `TWITTER_CT0_1`. See [`skills/x-scraper/SKILL.md`](./skills/x-scraper/SKILL.md) for setup steps, including how to extract `auth_token` and `ct0` from your browser session.

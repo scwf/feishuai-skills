@@ -29,4 +29,4 @@ secrets.*
 credentials.*
 
 # Known skill-local secret files
-x-scraper/defaults/x.env
+skills/x-scraper/defaults/x.env

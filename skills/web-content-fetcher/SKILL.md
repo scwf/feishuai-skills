@@ -67,6 +67,35 @@ just "text extraction".
 - For WeChat video nodes, the script may return either a direct downloadable media URL,
   an embed/player URL, or only a placeholder note. Report that clearly.
 
+### WeChat video handling policy
+
+Apply these two branches explicitly when reconstructing a WeChat article:
+
+1. Standard in-article video node
+- Identify rendered `<video>` nodes or equivalent nodes that expose a real media URL.
+- Prefer the rendered DOM over raw source HTML.
+- Extract the real media URL from `src` after rendering, then download it with normal HTTP.
+- Send a browser-like `User-Agent` and set `Referer` to the original WeChat article URL.
+- Validate the saved file if needed when the user asks about integrity or playback.
+- Keep the video embedded at its original position in the Markdown or HTML output.
+
+2. Finder or 视频号 card node such as `mp-common-videosnap`
+- Treat this as a card placeholder first, not as a guaranteed downloadable video.
+- Do not promise that the real video can be downloaded from the article page.
+- If the page only exposes card metadata or cover assets, keep a replacement block at the
+  original position instead of pretending the video was localized.
+- Prefer including, when available:
+  - cover or poster image
+  - title or description
+  - author or nickname
+  - duration
+  - embed URL, card URL, or other resolvable reference
+- State clearly that Finder or 视频号 playback may require a separate WeChat client flow,
+  authenticated environment, or private API path, so article-side scraping may stop at
+  metadata plus cover.
+- When `--download-assets DIR` is used and the video itself is not downloadable, still
+  localize the cover image when possible and keep the metadata block in place.
+
 ## Domain Routing
 
 Use this table to pick the right mode on the first call when needed:
@@ -163,7 +192,8 @@ python3 <SKILL_DIR>/scripts/fetch.py --help
 
 - `title`, `selector`, `mode`
 - `assets.images[]`: image inventory with normalized URL, placeholder flag, download state, and local path
-- `assets.videos[]`: video inventory with embed/direct URL info, poster, download state, and local path
+- `assets.videos[]`: video inventory with embed/direct URL info, poster, download state, local path,
+  and any extracted author/duration metadata for WeChat card-style video nodes
 - `asset_count_summary`: image/video totals
 - `fidelity_report`: DOM-vs-Markdown counts and issues
 - `warnings`: blocking or fidelity warnings

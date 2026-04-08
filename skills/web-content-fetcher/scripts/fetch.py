@@ -87,6 +87,8 @@ class AssetRef:
     local_path: str | None = None
     poster_url: str | None = None
     embed_url: str | None = None
+    author: str | None = None
+    duration_text: str | None = None
     notes: list[str] = field(default_factory=list)
 
 
@@ -378,8 +380,14 @@ def build_video_placeholder(asset, rewritten_url_map):
     details = []
     if asset.caption:
         details.append(asset.caption)
+    if asset.author:
+        details.append(f"作者：{asset.author}")
+    if asset.duration_text:
+        details.append(f"时长：{asset.duration_text}")
     if poster:
         details.append(f"封面：{poster}")
+    if asset.local_path:
+        details.append(f"本地文件：{asset.local_path}")
     if asset.embed_url:
         details.append(f"嵌入：{asset.embed_url}")
     if asset.url and asset.url != asset.embed_url:
@@ -491,10 +499,66 @@ def find_video_nodes(soup):
     return nodes
 
 
-def extract_wechat_assets(html_fragment, base_url):
+def get_first_attr(tag, candidate_attrs):
+    for attr in candidate_attrs:
+        value = clean_text(tag.get(attr))
+        if value:
+            return value
+    return ""
+
+
+def normalize_duration_text(value):
+    value = clean_text(value)
+    if not value:
+        return ""
+    if re.fullmatch(r"\d+", value):
+        total_seconds = int(value)
+        minutes, seconds = divmod(total_seconds, 60)
+        hours, minutes = divmod(minutes, 60)
+        if hours:
+            return f"{hours}:{minutes:02d}:{seconds:02d}"
+        return f"{minutes}:{seconds:02d}"
+    return value
+
+
+def resolve_wechat_video_from_full_html(full_soup, base_url, tag, raw_url, embed_url):
+    if full_soup is None:
+        return None, None
+
+    candidates = []
+    vid = clean_text(tag.get("data-mpvid") or tag.get("data-vid") or tag.get("data-videoid") or tag.get("vid"))
+    if not vid and embed_url:
+        parsed = urlparse(embed_url)
+        vid = clean_text(parse_qs(parsed.query).get("vid", [""])[0]) or (embed_url if embed_url.startswith("wxv_") else "")
+
+    if vid:
+        candidates.extend(full_soup.find_all("video", src=re.compile(re.escape(vid))))
+    if raw_url:
+        normalized_raw = normalize_url(base_url, raw_url)
+        if normalized_raw:
+            candidates.extend(full_soup.find_all("video", src=re.compile(re.escape(normalized_raw))))
+    if embed_url and embed_url.startswith(("http://", "https://")):
+        candidates.extend(full_soup.find_all("video", src=re.compile(re.escape(embed_url))))
+
+    seen = set()
+    for candidate in candidates:
+        src = clean_text(candidate.get("src"))
+        if not src or src in seen:
+            continue
+        seen.add(src)
+        normalized_src = normalize_url(base_url, src)
+        if normalized_src and ".mp4" in normalized_src:
+            poster = clean_text(candidate.get("poster"))
+            return normalized_src, normalize_url(base_url, poster)
+
+    return None, None
+
+
+def extract_wechat_assets(html_fragment, base_url, full_html=None):
     from bs4 import BeautifulSoup
 
     soup = BeautifulSoup(html_fragment, "html.parser")
+    full_soup = BeautifulSoup(full_html, "html.parser") if full_html else None
     for noisy in soup.find_all(["script", "style"]):
         noisy.decompose()
 
@@ -530,6 +594,20 @@ def extract_wechat_assets(html_fragment, base_url):
     for index, tag in enumerate(find_video_nodes(soup), start=1):
         raw_url, source_attr = get_candidate_attr(tag, ["src", "data-src"])
         poster_url, _ = get_candidate_attr(tag, ["data-cover", "data-poster", "poster"])
+        author = get_first_attr(tag, [
+            "data-nickname",
+            "data-author",
+            "data-username",
+            "nickname",
+            "author",
+        ])
+        duration_text = normalize_duration_text(get_first_attr(tag, [
+            "data-duration",
+            "data-time",
+            "data-play-length",
+            "data-playtime",
+            "duration",
+        ]))
         embed_url = normalize_url(base_url, raw_url)
         for attr in WECHAT_VIDEO_ATTRS:
             value = clean_text(tag.get(attr))
@@ -551,6 +629,12 @@ def extract_wechat_assets(html_fragment, base_url):
                 source_attr = "src"
                 normalized_url = normalize_url(base_url, raw_url)
                 poster_url = poster_url or clean_text(video_match.get("poster"))
+        resolved_url, resolved_poster = resolve_wechat_video_from_full_html(full_soup, base_url, tag, raw_url, embed_url)
+        if resolved_url:
+            normalized_url = resolved_url
+            if source_attr != "src":
+                source_attr = "resolved_full_html"
+            poster_url = poster_url or resolved_poster
         normalized_poster = normalize_url(base_url, poster_url)
         caption = clean_text(tag.get("data-title") or tag.get("data-desc") or tag.get("aria-label") or "")
         if not caption:
@@ -568,8 +652,12 @@ def extract_wechat_assets(html_fragment, base_url):
             downloadable=bool(normalized_url and normalized_url.startswith(("http://", "https://"))),
             poster_url=normalized_poster,
             embed_url=embed_url,
+            author=author or None,
+            duration_text=duration_text or None,
             notes=[] if normalized_url else ["No direct video URL extracted"],
         )
+        if tag.name == "mp-common-videosnap" and not normalized_url:
+            asset.notes.append("Finder/视频号卡片未暴露可直接下载的视频流，已保留封面和卡片元数据占位")
         token = f"[[[VIDEO_{index}]]]"
         replacement = soup.new_tag("p")
         replacement.string = token
@@ -579,9 +667,9 @@ def extract_wechat_assets(html_fragment, base_url):
     return soup, images, videos
 
 
-def materialize_markdown(html_fragment, url, max_chars):
+def materialize_markdown(html_fragment, url, max_chars, full_html=None):
     if "mp.weixin.qq.com" in url:
-        soup, images, videos = extract_wechat_assets(html_fragment, url)
+        soup, images, videos = extract_wechat_assets(html_fragment, url, full_html=full_html)
     else:
         soup, images, videos = extract_generic_assets(html_fragment, url)
 
@@ -790,7 +878,12 @@ def fetch_fast(url, max_chars=50000, timeout=15):
     _suppress_scrapling_logs()
     page = Fetcher().get(url, timeout=timeout, stealthy_headers=True)
     html_fragment, selector = extract_content_html(page, url)
-    html_fragment, markdown, images, videos = materialize_markdown(html_fragment, url, max_chars)
+    html_fragment, markdown, images, videos = materialize_markdown(
+        html_fragment,
+        url,
+        max_chars,
+        full_html=page.html_content,
+    )
     return html_fragment, markdown, selector, get_title(page, url), images, videos
 
 
@@ -813,7 +906,12 @@ def fetch_stealth(url, max_chars=50000, timeout=30000):
         timeout=timeout,
     )
     html_fragment, selector = extract_content_html(page, url)
-    html_fragment, markdown, images, videos = materialize_markdown(html_fragment, url, max_chars)
+    html_fragment, markdown, images, videos = materialize_markdown(
+        html_fragment,
+        url,
+        max_chars,
+        full_html=page.html_content,
+    )
     return html_fragment, markdown, selector, get_title(page, url), images, videos
 
 

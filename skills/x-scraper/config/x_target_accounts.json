@@ -1,82 +1,326 @@
 {
-  "X_OpenAI": "OpenAI",
-  "X_OpenAIDevs": "OpenAIDevs",
-  "X_Anthropic": "AnthropicAI",
-  "X_DeepSeek": "deepseek_ai",
-  "X_MiniMax": "hailuo_ai",
-  "X_MiniMax-official": "MiniMax_AI",
-  "X_ZhipuAI": "Z_ai",
-  "X_kimi": "Kimi_Moonshot",
-  "X_qwen": "Alibaba_Qwen",
-  "X_Tongyi-Lab": "Ali_TongyiLab",
-  "X_ModelScope": "ModelScope2022",
-  "X_gemini-app": "GeminiApp",
-  "X_GoogleAIStudio": "GoogleAIStudio",
-  "X_google-labs": "GoogleLabs",
-  "X_GoogleAI": "GoogleAI",
-  "X_GoogleDeepMind": "GoogleDeepMind",
-  "X_ai-at-meta": "AIatMeta",
-  "X_NVIDIAAI": "NVIDIAAI",
-  "X_vllm": "vllm_project",
-  "X_openai-ceo": "sama",
-  "X_openai-co-founder": "gdb",
-  "X_ilya-sutskever": "ilyasut",
-  "X_karpathy": "karpathy",
-  "X_andrew-ng": "AndrewYNg",
-  "X_lifeifei": "drfeifei",
-  "X_Demis-Hassabis": "demishassabis",
-  "X_haoailab": "haozhangml",
-  "X_JeffDean": "JeffDean",
-  "X_ElonMusk": "elonmusk",
-  "X_GeoffreyHinton": "geoffreyhinton",
-  "X_stanford-ai-lab": "StanfordAILab",
-  "X_stanfordnlp": "stanfordnlp",
-  "X_berkeley-ai": "berkeley_ai",
-  "X_databricks": "databricks",
-  "X_databricks-ceo": "alighodsi",
-  "X_rxin": "rxin",
-  "X_matei": "matei_zaharia",
-  "X_spark": "ApacheSpark",
-  "X_delta-lake": "DeltaLakeOSS",
-  "X_unity-catalog": "unitycatalog_io",
-  "X_MLflow": "MLflow",
-  "X_anyscale": "anyscalecompute",
-  "X_anyscale-co-founder": "robertnishihara",
-  "X_ray": "raydistributed",
-  "X_daft": "daftengine",
-  "X_daft-PMC": "jaychia_",
-  "X_Arrow-PMC": "andrewlamb1111",
-  "X_eventual-ceo": "Sammy_Sidhu",
-  "X_turbopuffer": "turbopuffer",
-  "X_turbopuffer-ceo": "Sirupsen",
-  "X_neon": "nikitabase",
-  "X_Supabase": "supabase",
-  "X_Cursor": "cursor_ai",
-  "X_Michael-Truell": "mntruell",
-  "X_Claude-code-creator": "bcherny",
-  "X_Qoder": "qoder_ai_ide",
-  "X_kiro": "kirodotdev",
-  "X_TRAE": "Trae_ai",
-  "X_Google-Antigravity": "antigravity",
-  "X_cowork-creator": "felixrieseberg",
-  "X_OpenClaw": "openclaw",
-  "X_Peter-Steinberger": "steipete",
-  "X_alibaba-cloud": "alibaba_cloud",
-  "X_aws-cloud": "awscloud",
-  "X_Azure": "Azure",
-  "X_GoogleCloudTech": "GoogleCloudTech",
-  "X_kubernetesio": "kubernetesio",
-  "X_figma": "figma",
-  "X_vercel-ceo": "rauchg",
-  "X_vercel": "vercel",
-  "X_ai-engineer": "aiDotEngineer",
-  "X_Marktechpost-AI-Dev-News": "Marktechpost",
-  "X_Shubham-Saboo": "Saboo_Shubham_",
-  "X_NanoBanana": "NanoBanana",
-  "X_DeepLearningAI": "DeepLearningAI",
-  "X_HuggingFace": "huggingface",
-  "X_github": "github",
-  "X_LanceDB": "lancedb",
-  "X_DSPy": "DSPyOSS",
-  "X_PyTorch": "PyTorch"
+  "X_OpenAI": {
+    "username": "OpenAI",
+    "categories": ["model_vendor"]
+  },
+  "X_OpenAIDevs": {
+    "username": "OpenAIDevs",
+    "categories": ["model_vendor", "devtools_agent"]
+  },
+  "X_Anthropic": {
+    "username": "AnthropicAI",
+    "categories": ["model_vendor"]
+  },
+  "X_DeepSeek": {
+    "username": "deepseek_ai",
+    "categories": ["model_vendor"]
+  },
+  "X_MiniMax": {
+    "username": "hailuo_ai",
+    "categories": ["model_vendor"]
+  },
+  "X_MiniMax-official": {
+    "username": "MiniMax_AI",
+    "categories": ["model_vendor"]
+  },
+  "X_ZhipuAI": {
+    "username": "Z_ai",
+    "categories": ["model_vendor"]
+  },
+  "X_kimi": {
+    "username": "Kimi_Moonshot",
+    "categories": ["model_vendor"]
+  },
+  "X_qwen": {
+    "username": "Alibaba_Qwen",
+    "categories": ["model_vendor"]
+  },
+  "X_Tongyi-Lab": {
+    "username": "Ali_TongyiLab",
+    "categories": ["model_vendor", "research_org"]
+  },
+  "X_ModelScope": {
+    "username": "ModelScope2022",
+    "categories": ["model_vendor", "open_community"]
+  },
+  "X_gemini-app": {
+    "username": "GeminiApp",
+    "categories": ["model_vendor"]
+  },
+  "X_GoogleAIStudio": {
+    "username": "GoogleAIStudio",
+    "categories": ["model_vendor", "devtools_agent"]
+  },
+  "X_google-labs": {
+    "username": "GoogleLabs",
+    "categories": ["model_vendor", "devtools_agent"]
+  },
+  "X_GoogleAI": {
+    "username": "GoogleAI",
+    "categories": ["model_vendor"]
+  },
+  "X_GoogleDeepMind": {
+    "username": "GoogleDeepMind",
+    "categories": ["model_vendor", "research_org"]
+  },
+  "X_ai-at-meta": {
+    "username": "AIatMeta",
+    "categories": ["model_vendor", "research_org"]
+  },
+  "X_NVIDIAAI": {
+    "username": "NVIDIAAI",
+    "categories": ["model_vendor", "ai_infra"]
+  },
+  "X_vllm": {
+    "username": "vllm_project",
+    "categories": ["ai_infra", "open_community"]
+  },
+  "X_openai-ceo": {
+    "username": "sama",
+    "categories": ["ai_researcher", "model_vendor"]
+  },
+  "X_openai-co-founder": {
+    "username": "gdb",
+    "categories": ["ai_researcher", "model_vendor"]
+  },
+  "X_ilya-sutskever": {
+    "username": "ilyasut",
+    "categories": ["ai_researcher", "research_org"]
+  },
+  "X_karpathy": {
+    "username": "karpathy",
+    "categories": ["ai_researcher"]
+  },
+  "X_andrew-ng": {
+    "username": "AndrewYNg",
+    "categories": ["ai_researcher"]
+  },
+  "X_lifeifei": {
+    "username": "drfeifei",
+    "categories": ["ai_researcher", "research_org"]
+  },
+  "X_Demis-Hassabis": {
+    "username": "demishassabis",
+    "categories": ["ai_researcher", "model_vendor", "research_org"]
+  },
+  "X_haoailab": {
+    "username": "haozhangml",
+    "categories": ["ai_researcher", "research_org"]
+  },
+  "X_JeffDean": {
+    "username": "JeffDean",
+    "categories": ["ai_researcher", "research_org", "model_vendor"]
+  },
+  "X_ElonMusk": {
+    "username": "elonmusk",
+    "categories": ["elon_stream"]
+  },
+  "X_GeoffreyHinton": {
+    "username": "geoffreyhinton",
+    "categories": ["ai_researcher", "research_org"]
+  },
+  "X_stanford-ai-lab": {
+    "username": "StanfordAILab",
+    "categories": ["research_org"]
+  },
+  "X_stanfordnlp": {
+    "username": "stanfordnlp",
+    "categories": ["research_org", "open_community"]
+  },
+  "X_berkeley-ai": {
+    "username": "berkeley_ai",
+    "categories": ["research_org"]
+  },
+  "X_databricks": {
+    "username": "databricks",
+    "categories": ["data_infra", "cloud_platform"]
+  },
+  "X_databricks-ceo": {
+    "username": "alighodsi",
+    "categories": ["data_infra", "cloud_platform"]
+  },
+  "X_rxin": {
+    "username": "rxin",
+    "categories": ["data_infra", "cloud_platform"]
+  },
+  "X_matei": {
+    "username": "matei_zaharia",
+    "categories": ["ai_researcher", "data_infra"]
+  },
+  "X_spark": {
+    "username": "ApacheSpark",
+    "categories": ["data_infra", "open_community"]
+  },
+  "X_delta-lake": {
+    "username": "DeltaLakeOSS",
+    "categories": ["data_infra", "open_community"]
+  },
+  "X_unity-catalog": {
+    "username": "unitycatalog_io",
+    "categories": ["data_infra", "open_community"]
+  },
+  "X_MLflow": {
+    "username": "MLflow",
+    "categories": ["data_infra", "open_community", "ai_infra"]
+  },
+  "X_anyscale": {
+    "username": "anyscalecompute",
+    "categories": ["ai_infra", "cloud_platform"]
+  },
+  "X_anyscale-co-founder": {
+    "username": "robertnishihara",
+    "categories": ["ai_researcher", "ai_infra"]
+  },
+  "X_ray": {
+    "username": "raydistributed",
+    "categories": ["ai_infra", "open_community"]
+  },
+  "X_daft": {
+    "username": "daftengine",
+    "categories": ["data_infra", "open_community"]
+  },
+  "X_daft-PMC": {
+    "username": "jaychia_",
+    "categories": ["data_infra", "open_community"]
+  },
+  "X_Arrow-PMC": {
+    "username": "andrewlamb1111",
+    "categories": ["data_infra", "open_community"]
+  },
+  "X_eventual-ceo": {
+    "username": "Sammy_Sidhu",
+    "categories": ["data_infra", "open_community"]
+  },
+  "X_turbopuffer": {
+    "username": "turbopuffer",
+    "categories": ["data_infra", "ai_infra"]
+  },
+  "X_turbopuffer-ceo": {
+    "username": "Sirupsen",
+    "categories": ["data_infra", "ai_infra"]
+  },
+  "X_neon": {
+    "username": "nikitabase",
+    "categories": ["data_infra", "cloud_platform"]
+  },
+  "X_Supabase": {
+    "username": "supabase",
+    "categories": ["data_infra", "devtools_agent"]
+  },
+  "X_Cursor": {
+    "username": "cursor_ai",
+    "categories": ["devtools_agent"]
+  },
+  "X_Michael-Truell": {
+    "username": "mntruell",
+    "categories": ["devtools_agent"]
+  },
+  "X_Claude-code-creator": {
+    "username": "bcherny",
+    "categories": ["devtools_agent"]
+  },
+  "X_Qoder": {
+    "username": "qoder_ai_ide",
+    "categories": ["devtools_agent"]
+  },
+  "X_kiro": {
+    "username": "kirodotdev",
+    "categories": ["devtools_agent"]
+  },
+  "X_TRAE": {
+    "username": "Trae_ai",
+    "categories": ["devtools_agent"]
+  },
+  "X_Google-Antigravity": {
+    "username": "antigravity",
+    "categories": ["devtools_agent"]
+  },
+  "X_cowork-creator": {
+    "username": "felixrieseberg",
+    "categories": ["super_agent"]
+  },
+  "X_OpenClaw": {
+    "username": "openclaw",
+    "categories": ["super_agent"]
+  },
+  "X_Peter-Steinberger": {
+    "username": "steipete",
+    "categories": ["super_agent"]
+  },
+  "X_alibaba-cloud": {
+    "username": "alibaba_cloud",
+    "categories": ["cloud_platform"]
+  },
+  "X_aws-cloud": {
+    "username": "awscloud",
+    "categories": ["cloud_platform"]
+  },
+  "X_Azure": {
+    "username": "Azure",
+    "categories": ["cloud_platform"]
+  },
+  "X_GoogleCloudTech": {
+    "username": "GoogleCloudTech",
+    "categories": ["cloud_platform"]
+  },
+  "X_kubernetesio": {
+    "username": "kubernetesio",
+    "categories": ["open_community"]
+  },
+  "X_figma": {
+    "username": "figma",
+    "categories": ["devtools_agent"]
+  },
+  "X_vercel-ceo": {
+    "username": "rauchg",
+    "categories": ["devtools_agent"]
+  },
+  "X_vercel": {
+    "username": "vercel",
+    "categories": ["devtools_agent"]
+  },
+  "X_ai-engineer": {
+    "username": "aiDotEngineer",
+    "categories": ["ai_media_community"]
+  },
+  "X_Marktechpost-AI-Dev-News": {
+    "username": "Marktechpost",
+    "categories": ["ai_media_community"]
+  },
+  "X_Shubham-Saboo": {
+    "username": "Saboo_Shubham_",
+    "categories": ["ai_media_community"]
+  },
+  "X_NanoBanana": {
+    "username": "NanoBanana",
+    "categories": ["model_vendor"]
+  },
+  "X_DeepLearningAI": {
+    "username": "DeepLearningAI",
+    "categories": ["ai_media_community"]
+  },
+  "X_HuggingFace": {
+    "username": "huggingface",
+    "categories": ["ai_infra", "open_community"]
+  },
+  "X_github": {
+    "username": "github",
+    "categories": ["open_community"]
+  },
+  "X_LanceDB": {
+    "username": "lancedb",
+    "categories": ["open_community", "data_infra"]
+  },
+  "X_DSPy": {
+    "username": "DSPyOSS",
+    "categories": ["ai_infra", "open_community"]
+  },
+  "X_PyTorch": {
+    "username": "PyTorch",
+    "categories": ["ai_infra", "open_community"]
+  },
+  "X_NousResearch": {
+    "username": "NousResearch",
+    "categories": ["super_agent", "research_org"]
+  }
 }

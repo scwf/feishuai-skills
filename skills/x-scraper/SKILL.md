@@ -135,6 +135,17 @@ python "{SKILL_ROOT}/scripts/x_scrape_batch.py" "X_OpenAI,X_Anthropic,X_DeepSeek
 python "{SKILL_ROOT}/scripts/x_scrape_batch.py" "targets.txt" --days-lookback 3
 ```
 
+Configured account format in `config/x_target_accounts.json`:
+
+```json
+{
+  "X_OpenAI": {
+    "username": "OpenAI",
+    "categories": ["model_vendor"]
+  }
+}
+```
+
 Default output behavior:
 
 - by default, create a timestamped directory in the current project root, such as `x-posts-20260403-113000`
@@ -144,8 +155,11 @@ Default output behavior:
 Batch output behavior:
 
 - by default, create a timestamped directory in the current project root, such as `x-posts-batch-20260403-113000`
-- write each target's JSON and Markdown files directly into that directory without extra per-target subdirectories
+- write each target's JSON and Markdown files into `raw/` inside that batch directory
 - also write `summary.json` and `summary.md` for the whole batch
+- also write `batch_category_index.json` with:
+  - `raw_root`: absolute path to the batch `raw/` directory
+  - `categories`: mapping of category name to the matching JSON filenames relative to `raw_root`
 - use script defaults unless the user explicitly asks to override batch sizing or delay settings
 
 ## Expected Outputs

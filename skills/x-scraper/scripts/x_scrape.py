@@ -908,7 +908,7 @@ def normalize_username(target: str) -> str:
     return value.lstrip("@").strip()
 
 
-def load_alias_map(alias_file: Path) -> Dict[str, str]:
+def load_target_accounts(alias_file: Path) -> Dict[str, Dict[str, Any]]:
     try:
         with alias_file.open("r", encoding="utf-8") as handle:
             data = json.load(handle)
@@ -919,7 +919,43 @@ def load_alias_map(alias_file: Path) -> Dict[str, str]:
 
     if not isinstance(data, dict):
         raise ValueError(f"Alias file must contain a JSON object: {alias_file}")
-    return data
+
+    normalized: Dict[str, Dict[str, Any]] = {}
+    for alias, value in data.items():
+        if not isinstance(alias, str) or not alias.strip():
+            raise ValueError(f"Alias file contains an invalid alias key: {alias_file}")
+        if not isinstance(value, dict):
+            raise ValueError(
+                f"Alias file entry '{alias}' must be an object with username/categories."
+            )
+
+        username = value.get("username")
+        categories = value.get("categories", [])
+        if "categories" in value and not isinstance(categories, list):
+            raise ValueError(
+                f"Alias file entry '{alias}' has invalid categories; expected a JSON array."
+            )
+
+        if not isinstance(username, str) or not username.strip():
+            raise ValueError(f"Alias file entry '{alias}' is missing a valid username.")
+
+        normalized_categories: List[str] = []
+        for category in categories:
+            if not isinstance(category, str) or not category.strip():
+                raise ValueError(f"Alias file entry '{alias}' contains an invalid category value.")
+            normalized_categories.append(category.strip())
+
+        normalized[alias] = {
+            "username": username.strip(),
+            "categories": normalized_categories,
+        }
+
+    return normalized
+
+
+def load_alias_map(alias_file: Path) -> Dict[str, str]:
+    target_accounts = load_target_accounts(alias_file)
+    return {alias: entry["username"] for alias, entry in target_accounts.items()}
 
 
 def resolve_target(target: str, alias_map: Dict[str, str]) -> Tuple[str, Optional[str]]:

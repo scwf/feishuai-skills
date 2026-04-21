@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import random
 import re
 import time
@@ -166,6 +167,86 @@ def build_flat_output_paths(output_dir: Path, username: str) -> tuple[Path, Path
     return output_dir / f"{safe_username}.json", output_dir / f"{safe_username}.md"
 
 
+def get_categories_for_result(
+    *,
+    target_accounts: Dict[str, Dict[str, Any]],
+    resolved_alias: str | None,
+    resolved_username: str,
+) -> List[str]:
+    if resolved_alias and resolved_alias in target_accounts:
+        return list(target_accounts[resolved_alias].get("categories", []))
+
+    lowered_username = resolved_username.lower()
+    for entry in target_accounts.values():
+        username = entry.get("username")
+        if isinstance(username, str) and username.lower() == lowered_username:
+            return list(entry.get("categories", []))
+
+    return []
+
+
+def build_batch_category_index(results: List[Dict[str, Any]], raw_root: Path) -> Dict[str, Any]:
+    grouped: Dict[str, List[str]] = {}
+    for item in results:
+        relative_path = item.get("relative_json_path")
+        if not isinstance(relative_path, str) or not relative_path:
+            continue
+        for category in item.get("categories", []):
+            grouped.setdefault(category, []).append(relative_path)
+
+    normalized_categories = {
+        category: sorted(dict.fromkeys(paths))
+        for category, paths in sorted(grouped.items())
+        if paths
+    }
+    return {
+        "raw_root": str(raw_root.resolve()),
+        "categories": normalized_categories,
+    }
+
+
+def render_agent_readme(*, category_index_path: Path) -> str:
+    lines = [
+        "# Agent Instructions",
+        "",
+        "If you are an AI agent reading this batch output, start with this file.",
+        "",
+        "## Analyze One Category",
+        "",
+        "1. Read `batch_category_index.json` first.",
+        "2. Find the category you need inside the `categories` object.",
+        "3. Read only the filenames listed for that category.",
+        "",
+        "## Resolve File Paths",
+        "",
+        "1. Read `raw_root` from `batch_category_index.json`.",
+        "2. Treat each listed filename as relative to `raw_root`.",
+        "3. Open only those resolved files for analysis.",
+        "",
+        "## Hard Rules",
+        "",
+        "- Do not scan the whole `raw/` directory before choosing a category.",
+        "- Do not load files from categories you were not asked to analyze.",
+        "- The same file may appear in multiple categories. That is expected.",
+        "",
+        "## Example",
+        "",
+        "If you are asked to analyze `super_agent`:",
+        "",
+        "1. Open `batch_category_index.json`.",
+        "2. Read `categories.super_agent` to get the allowed JSON filenames.",
+        "3. Read `raw_root`.",
+        "4. Join each filename with `raw_root`.",
+        "5. Open only those resolved files and analyze them.",
+        "",
+        "## Category Index",
+        "",
+        f"- Path: `{category_index_path.resolve()}`",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def sleep_with_log(kind: str, delay_min: float, delay_max: float) -> None:
     sleep_seconds = random.uniform(delay_min, delay_max)
     logger.info("Sleeping between %s: sleep=%.1fs", kind, sleep_seconds)
@@ -230,9 +311,12 @@ def main() -> int:
     if not targets:
         raise SystemExit("No targets were provided.")
 
-    alias_map = x_scrape.load_alias_map(Path(args.alias_file))
+    target_accounts = x_scrape.load_target_accounts(Path(args.alias_file))
+    alias_map = {alias: entry["username"] for alias, entry in target_accounts.items()}
     output_dir = build_batch_output_dir(Path(args.output_dir))
     output_dir.mkdir(parents=True, exist_ok=True)
+    raw_output_dir = output_dir / "raw"
+    raw_output_dir.mkdir(parents=True, exist_ok=True)
     env_file_used = bool(load_default_env(Path(__file__).resolve().parents[1] / "config" / "x.env"))
 
     account_pool = x_scrape.AccountPool.from_env()
@@ -258,19 +342,27 @@ def main() -> int:
             args=batch_args,
             client=client,
             alias_map=alias_map,
-            output_dir=output_dir,
+            output_dir=raw_output_dir,
             env_file_used=env_file_used,
             path_builder=build_flat_output_paths,
         )
+        categories = get_categories_for_result(
+            target_accounts=target_accounts,
+            resolved_alias=artifacts.resolved_alias,
+            resolved_username=artifacts.resolved_username,
+        )
+        relative_json_path = os.path.relpath(artifacts.json_path, raw_output_dir)
         result = {
             "target": target,
             "resolved_username": artifacts.resolved_username,
             "resolved_alias": artifacts.resolved_alias,
+            "categories": categories,
             "run_status": artifacts.run_result.status,
             "tweet_count": len(artifacts.exports),
             "partial_failure_reason": artifacts.run_result.partial_failure_reason,
             "json_path": str(artifacts.json_path),
             "md_path": str(artifacts.md_path),
+            "relative_json_path": relative_json_path,
         }
         results.append(result)
 
@@ -309,6 +401,8 @@ def main() -> int:
         run_status = "completed_with_failures"
     else:
         run_status = "success"
+    category_index_path = output_dir / "batch_category_index.json"
+    agent_readme_path = output_dir / "AGENT_README.md"
     summary = {
         "run_status": run_status,
         "total_targets": len(targets),
@@ -333,6 +427,15 @@ def main() -> int:
         json.dump(summary, handle, ensure_ascii=False, indent=2)
     with summary_md_path.open("w", encoding="utf-8") as handle:
         handle.write(render_summary_markdown(summary))
+    with category_index_path.open("w", encoding="utf-8") as handle:
+        json.dump(
+            build_batch_category_index(results, raw_output_dir),
+            handle,
+            ensure_ascii=False,
+            indent=2,
+        )
+    with agent_readme_path.open("w", encoding="utf-8") as handle:
+        handle.write(render_agent_readme(category_index_path=category_index_path))
 
     print(f"Batch output directory: {output_dir}")
     print(f"Run status: {run_status}")
@@ -344,6 +447,8 @@ def main() -> int:
         print(f"Next target: {next_target}")
     print(f"Saved summary JSON: {summary_json_path}")
     print(f"Saved summary Markdown: {summary_md_path}")
+    print(f"Saved batch category index: {category_index_path}")
+    print(f"Saved agent README: {agent_readme_path}")
     return 0 if not stop_reason else 1
 
 

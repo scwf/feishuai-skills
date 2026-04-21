@@ -2,6 +2,7 @@ import argparse
 import io
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -113,6 +114,38 @@ class XScrapeTests(unittest.TestCase):
         with self.assertRaises(SystemExit) as exc:
             x_scrape.validate_args(args)
         self.assertIn("--page-delay-min must be <= --page-delay-max.", str(exc.exception))
+
+    def test_load_target_accounts_requires_object_entries(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            alias_file = Path(tmpdir) / "aliases.json"
+            alias_file.write_text('{"X_OpenAI":"OpenAI"}', encoding="utf-8")
+
+            with self.assertRaises(ValueError) as exc:
+                x_scrape.load_target_accounts(alias_file)
+
+        self.assertIn("must be an object with username/categories", str(exc.exception))
+
+    def test_load_target_accounts_parses_username_and_categories(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            alias_file = Path(tmpdir) / "aliases.json"
+            alias_file.write_text(
+                '{"X_OpenAI":{"username":"OpenAI","categories":["model_vendor","devtools_agent"]}}',
+                encoding="utf-8",
+            )
+
+            accounts = x_scrape.load_target_accounts(alias_file)
+            alias_map = x_scrape.load_alias_map(alias_file)
+
+        self.assertEqual(
+            accounts,
+            {
+                "X_OpenAI": {
+                    "username": "OpenAI",
+                    "categories": ["model_vendor", "devtools_agent"],
+                }
+            },
+        )
+        self.assertEqual(alias_map, {"X_OpenAI": "OpenAI"})
 
     def test_compute_since_date_mode_limit_and_max_fetch_for_days_lookback_args(self):
         args = self.make_args(days_lookback=7, limit=30)

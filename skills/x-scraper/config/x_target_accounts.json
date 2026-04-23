@@ -111,9 +111,9 @@
     "username": "JeffDean",
     "categories": ["ai_researcher", "research_org", "model_vendor"]
   },
-  "X_ElonMusk": {
-    "username": "elonmusk",
-    "categories": ["elon_stream"]
+  "X_xAI": {
+    "username": "xai",
+    "categories": ["model_vendor"]
   },
   "X_GeoffreyHinton": {
     "username": "geoffreyhinton",

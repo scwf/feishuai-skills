@@ -168,7 +168,7 @@ If `--output-dir` is omitted, both scripts create a timestamped directory like `
 
 After the script finishes, check all of the following before you trust the result:
 
-- stdout reports `status: ok`
+- the JSON `status` field is `ok` or `ok_with_warnings` (read the JSON file; do not rely only on stdout)
 - JSON and Markdown files both exist
 - `resolved_channel_id` is present
 - `video_count` matches the number of exported items

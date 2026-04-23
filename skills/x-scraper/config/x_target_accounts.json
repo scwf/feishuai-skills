@@ -39,6 +39,10 @@
     "username": "Ali_TongyiLab",
     "categories": ["model_vendor", "research_org"]
   },
+  "X_XiaomiMiMo": {
+    "username": "XiaomiMiMo",
+    "categories": ["model_vendor"]
+  },
   "X_ModelScope": {
     "username": "ModelScope2022",
     "categories": ["model_vendor", "open_community"]

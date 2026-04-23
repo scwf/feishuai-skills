@@ -1,0 +1,258 @@
+Create a vertical 9:16 infographic poster (1080x1920px) in a sophisticated academic blueprint / consulting research brief / light technical whitepaper style.
+
+Overall visual direction:
+clean, bright, premium, rational, executive-readable.
+Use a light background, restrained accents, precise grid layout, and fully legible Chinese + English text.
+All text must be pixel-sharp, fully readable, no blur, no distorted Unicode, no missing Chinese characters.
+
+═══════════════════════════════════════
+[GLOBAL STYLE]
+═══════════════════════════════════════
+Primary background: #F6F8FC  (soft cool white)
+Secondary card background: #FFFFFF
+Section background tint: #EEF3FB
+Primary text: #111827
+Secondary text: #334155
+Muted text: #64748B
+Section headers / accents: #0F3D91  (deep academic blue)
+Highlight numbers / badges: #F59E0B  (amber orange)
+Dividers / borders: #CBD5E1
+Strong emphasis border: #0F3D91
+
+Chart colors:
+- Vera Rubin: #0F3D91  (deep blue)
+- Grace Blackwell: #38BDF8  (sky blue)
+- Hopper (H200): #A78BFA  (soft purple)
+- (Reserved): #14B8A6  (teal)
+
+Font style:
+clean technical sans-serif;
+monospace only for numbers / English technical keywords.
+No decorative handwriting, no cartoon elements, no neon glow.
+
+Overall feel:
+academic blueprint × light terminal × strategy consulting infographic
+precise, premium, restrained, analytical
+
+═══════════════════════════════════════
+[ZONE 1 — HEADER · top 7%]
+═══════════════════════════════════════
+Full-width block. Left-aligned layout.
+
+- Top micro-label in small blue monospace:
+  "GTC KEYNOTE INSIGHTS · APRIL 2026"
+
+- Main title in large bold dark text (2 lines):
+  Line 1: "黄仁勋 GTC 演讲精华" ← extra large, deep blue (#0F3D91)
+  Line 2: "万亿 Token 工厂时代与推理计算拐点" ← dark gray, medium weight
+  (Eng Subtitle: "The Trillion-Token Factory Era & The Inference Inflection")
+
+- Bottom of block:
+  full-width 2px deep blue divider line
+
+Background of header:
+very light blue tint #EEF3FB
+
+═══════════════════════════════════════
+[ZONE 2 — CORE SPEC STRIP · 6%]
+═══════════════════════════════════════
+Single horizontal row of 3 outlined pill / badge cards, equal width, separated by small gaps.
+Each card has thin blue-gray border and subtle shadow.
+
+Card A: icon 💡 + "推理拐点 · Reasoning AI"
+Card B: icon 🏭 + "AI 工厂 · Token Commodity"
+Card C: icon 🤖 + "智能体革命 · OpenClaw OS"
+
+Font:
+small dark text, key numbers/keywords in deep blue or amber.
+Bottom:
+thin 1px #CBD5E1 divider.
+
+═══════════════════════════════════════
+[ZONE 3 — CAPABILITY COLUMNS · 20%]
+═══════════════════════════════════════
+Section label top-left:
+"◆ 核心范式转移拆解" in deep blue caps, small size.
+(Eng: Core Paradigm Shift Breakdown)
+
+3-column grid with thin vertical #CBD5E1 divider lines between columns.
+
+Each column sits in a clean white card with light border and subtle soft shadow.
+
+COLUMN 1 | icon: ⚙ (Gear/Infrastructure) | title: "极致协同设计与架构革新"
+(Eng: Extreme Co-design & Architecture)
+- Blackwell -> Vera Rubin 架构
+- NVLink 72 -> NVLink 144
+- 垂直整合，横向开放
+- 100% 液冷与 Kyber 机架
+
+COLUMN 2 | icon: 🧩 (Puzzle/Algorithm) | title: "算法优化与推理效率飞跃"
+(Eng: Algorithm Optimization & Efficiency)
+- NVFP4 精度推理 (No loss)
+- TensorRT-LLM + Dynamo 调度
+- 每瓦 Token 数 (Token/W) 暴增
+- 2年内生成速率提升 350 倍
+
+COLUMN 3 | icon: 🕸 (Network/Agent) | title: "企业级 Agent 操作系统"
+(Eng: Enterprise Agent OS Ecosystem)
+- OpenClaw & NeMo Claw 框架
+- SaaS -> AaaS (Agentic-as-a-Service)
+- 工程师年度 Token 预算制
+- 物理 AI 与机器人规模化落地
+
+Title color:
+deep blue
+Body text:
+dark gray
+Key keywords:
+amber orange
+
+Bottom:
+2px deep blue full-width accent line.
+
+═══════════════════════════════════════
+[ZONE 4 — METRICS BAR CHART · 28%]
+═══════════════════════════════════════
+ Section label:
+"◆ 跨代性能与经济性验证" deep blue, left-aligned.
+(Eng: Cross-gen Performance & Economics)
+
+Legend row immediately below label (horizontal, small, clearly color-coded):
+■ Vera Rubin [#0F3D91 deep blue]
+■ Grace Blackwell [#38BDF8 sky blue]
+■ Hopper (H200) [#A78BFA soft purple]
+
+Background:
+white card with thin border #CBD5E1 and soft shadow.
+
+3 metric groups, each occupying equal vertical space.
+Each group = metric name label (dark text, left-aligned, bold)
++ 3 horizontal bars stacked with small gap between them.
+
+Bar color assignment (STRICT — must match legend):
+- Vera Rubin bar:     #0F3D91 (slightly thicker)
+- Grace Blackwell bar:#38BDF8
+- Hopper (H200) bar: #A78BFA
+
+Score number displayed at the right end of each bar in matching color.
+
+GROUP 1: "推理性能提升 (同模型基准)"
+(Eng: Inference Performance vs H200)
+Vera Rubin   ████████████████████ 50x   ← add amber tag "BEST (Semi Analysis)"
+Grace Blackwell██████████████  35x
+Hopper (H200)███ 1x (Ref)
+
+GROUP 2: "每美元 Token 产出效率 (Token/Dollar)"
+(Eng: Token/Dollar Efficiency)
+Vera Rubin   ████████████████████ 高 [BEST]
+Grace Blackwell█████████████  中上
+Hopper (H200)█████  低
+
+GROUP 3: "1吉瓦 AI工厂 Token 生成率"
+(Eng: Token Gen Rate (1GW Factory))
+Vera Rubin (2026)████████████████████ 7亿/s [BEST]
+Hopper (2024)  █ 2200万/s
+
+Bar style:
+rounded-end bars, precise spacing, sharp labels.
+Scale reference line at bottom (generic representation):
+"1x ──────── 10x ──────── 30x ──── 50x+"
+
+Bottom:
+thin 1px #CBD5E1 divider.
+
+═══════════════════════════════════════
+[ZONE 5 — ECONOMIC LEVERS · 14%]
+(TWO COLUMNS SIDE BY SIDE, 52% / 48% split)
+═══════════════════════════════════════
+Separated by a thin vertical 1px #CBD5E1 line down the middle.
+
+LEFT COLUMN — "◆ AI 工厂商业模式"
+(Eng: AI Factory Business Model)
+White outlined card (border #0F3D91 1.5px, rounded corners), fills left column.
+Small blue label at top:
+"工厂效率指标" (Eng: Factory Efficiency)
+
+─────────────────────────
+核心指标：
+“每兆瓦营收” (Revenue per MW)
+─────────────────────────
+数据中心属性质变：
+从 文件存储 ➡️ Token 生产
+
+Centered badge at bottom:
+"Token 产线效率"
+(Eng: Token Production Efficiency)
+
+Important:
+keep this card elegant and restrained.
+Key words "每兆瓦营收" should be emphasized in amber orange (#F59E0B).
+
+RIGHT COLUMN — "◆ 未来预测与规模"
+(Eng: Future Predictions & Scale)
+White outlined card (border #CBD5E1 1px, rounded corners), fills right column.
+Small blue label at top:
+"Timeline & Market"
+
+─────────────────────────
+① 2025: 推理之年 (Year of Inference)
+   推理成为最核心工作负载
+
+② 2027: $1 Trillion 基础设施需求
+   AI 基础设施市场翻倍
+
+③ 物理 AI 推理拐点到来
+   具身智能规模化 (机器人)
+
+④ 太空数据中心部署
+   Vera Rubin Space-1 攻关
+
+Formatting:
+- Each number in amber orange (#F59E0B)
+- English technical terms in monospace
+- Explanation text in smaller muted gray
+
+Bottom:
+2px deep blue full-width accent line.
+
+═══════════════════════════════════════
+[ZONE 6 — INSIGHT BLOCK · 20%]
+═══════════════════════════════════════
+Full-width filled rectangle, background #EEF3FB.
+Subtle inner top border: 2px #0F3D91.
+
+Header:
+"💡 关键洞察" ← bold deep blue, medium-large, left-aligned
+(Eng: Key Insights)
+
+4 insight items stacked, each with left 3px #0F3D91 vertical border accent
+and slight white card background.
+
+ 【推理元年】计算核心由“训练”转向“推理拐点”，AI 进化为具备 o1 级推理与执行力的智能体，驱动算力需求万倍跃迁。
+ 【Token工厂定义】数据中心质变为“Token 生产线”，衡量竞争力的不是服务器数量，而是“Token 生产效率”（Token per Watt / Token per Dollar）。 
+ 【全栈护城河策略】垂直整合，“算法层-算子库-系统架构(NVLink)-芯片”极致协同设计；横向开放，整合进任何合作伙伴平台，持续提升装机量。 
+ 【智能体经济趋势】OpenClaw 被定义为智能体时代的操作系统，地位等同于 Linux，Token 预算制将成为企业标配。
+
+Text:
+dark gray, small but sharp, comfortable line height.
+
+═══════════════════════════════════════
+[ZONE 7 — FOOTER · 4%]
+═══════════════════════════════════════
+Thin 1px #CBD5E1 line above.
+Left: small dark text "Data & AI 洞察小分队"
+Right: small muted gray text "NVIDIA GTC Insights · Apr 2026"
+
+═══════════════════════════════════════
+DESIGN RULES
+═══════════════════════════════════════
+- Use a strict vertical grid and strong alignment
+- Keep all cards symmetric and evenly spaced
+- Avoid visual clutter, unnecessary decoration, or noisy gradients
+- No dark cyberpunk style, no neon glow, no heavy shadows
+- The page must feel like a premium consulting infographic, not a gaming poster
+- Prioritize legibility over ornament
+- All Chinese characters must render perfectly
+- All numbers and labels must be easy to scan within 3 seconds
+- The three capability columns must be equally prominent
+- Make the final poster look premium, calm, rational, and executive-ready

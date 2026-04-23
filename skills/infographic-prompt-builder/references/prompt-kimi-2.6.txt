@@ -1,0 +1,267 @@
+Create a vertical 9:16 infographic poster (1080x1920px) in a sophisticated academic blueprint / consulting research brief / light technical whitepaper style.
+
+Overall visual direction:
+clean, bright, premium, rational, executive-readable.
+Use a light background, restrained accents, precise grid layout, and fully legible Chinese + English text.
+All text must be pixel-sharp, fully readable, no blur, no distorted Unicode, no missing Chinese characters.
+
+═══════════════════════════════════════
+[GLOBAL STYLE]
+═══════════════════════════════════════
+Primary background: #F6F8FC  (soft cool white)
+Secondary card background: #FFFFFF
+Section background tint: #EEF3FB
+Primary text: #111827
+Secondary text: #334155
+Muted text: #64748B
+Section headers / accents: #0F3D91  (deep academic blue)
+Highlight numbers / badges: #F59E0B  (amber orange)
+Dividers / borders: #CBD5E1
+Strong emphasis border: #0F3D91
+
+Chart colors:
+- K2.6:    #0F3D91  (deep blue)
+- GPT-5.4: #38BDF8  (sky blue)
+- Opus 4.6:#A78BFA  (soft purple)
+- Gemini:  #14B8A6  (teal)
+
+Font style:
+clean technical sans-serif;
+monospace only for numbers / English technical keywords.
+No decorative handwriting, no cartoon elements, no neon glow.
+
+Overall feel:
+academic blueprint × light terminal × strategy consulting infographic
+precise, premium, restrained, analytical
+
+═══════════════════════════════════════
+[ZONE 1 — HEADER · top 7%]
+═══════════════════════════════════════
+Full-width block. Left-aligned layout.
+
+- Top micro-label in small blue monospace:
+  "MODEL BRIEF · APRIL 2026"
+
+- Main title in large bold dark text (2 lines):
+  Line 1: "Kimi K2.6"  ← extra large, deep blue (#0F3D91)
+  Line 2: "全面精进长程编码、前端生成与多 Agent 协同" ← dark gray, medium weight
+
+- Bottom of block:
+  full-width 2px deep blue divider line
+
+Background of header:
+very light blue tint #EEF3FB
+
+═══════════════════════════════════════
+[ZONE 2 — CORE SPEC STRIP · 6%]
+═══════════════════════════════════════
+Single horizontal row of 3 outlined pill / badge cards, equal width, separated by small gaps.
+Each card has thin blue-gray border and subtle shadow.
+
+Card A: icon 🧠 + "MoE · 1T 总参 · 32B 激活"
+Card B: icon 📐 + "256K Context · 原生多模态"
+Card C: icon 🛠 + "Thinking + Tool Use · Agent Runtime"
+
+Font:
+small dark text, key numbers in deep blue or amber.
+Bottom:
+thin 1px #CBD5E1 divider.
+
+═══════════════════════════════════════
+[ZONE 3 — CAPABILITY COLUMNS · 20%]
+═══════════════════════════════════════
+Section label top-left:
+"◆ 核心能力拆解" in deep blue caps, small size.
+
+3-column grid with thin vertical #CBD5E1 divider lines between columns.
+
+Each column sits in a clean white card with light border and subtle soft shadow.
+
+COLUMN 1 | icon: ⚙ | title: "长程编码能力强"
+- 4,000+ 次工具调用
+- 连续执行 >12 小时
+- 覆盖 Rust / Go / Python
+- 复杂软件工程任务稳定性提升
+
+COLUMN 2 | icon: 🧩 | title: "界面生成与前端实现能力增强"
+- 文本提示驱动生成完整前端
+- 支持视觉输入参与界面生成
+- 可联动图像/视频生成工具补视觉资产
+- 轻量全栈 workflow 一体完成
+
+COLUMN 3 | icon: 🕸 | title: "多 Agent 协同执行能力增强"
+- 最多 300 个子 Agent
+- 4,000 步协同执行
+- 动态任务拆解与并行执行
+- 支持持续运行型 Agent
+
+Title color:
+deep blue
+Body text:
+dark gray
+Key numbers:
+amber orange
+
+Bottom:
+2px deep blue full-width accent line.
+
+═══════════════════════════════════════
+[ZONE 4 — BENCHMARK BAR CHART · 28%]
+═══════════════════════════════════════
+Section label:
+"◆ 公开基准验证" deep blue, left-aligned.
+
+Legend row immediately below label (horizontal, small, clearly color-coded):
+■ K2.6 [#0F3D91 deep blue]
+■ GPT-5.4 [#38BDF8 sky blue]
+■ Opus 4.6 [#A78BFA soft purple]
+■ Gemini 3.1 [#14B8A6 teal]
+
+Background:
+white card with thin border #CBD5E1 and soft shadow.
+
+3 benchmark groups, each occupying equal vertical space.
+Each group = benchmark name label (dark text, left-aligned, bold)
++ 4 horizontal bars stacked with small gap between them.
+
+Bar color assignment (STRICT — must match legend):
+- K2.6 bar:      #0F3D91  (deep blue, slightly thicker)
+- GPT-5.4 bar:   #38BDF8
+- Opus 4.6 bar:  #A78BFA
+- Gemini 3.1 bar:#14B8A6
+
+Score number displayed at the right end of each bar in matching color.
+
+GROUP 1: "SWE-Bench Pro"
+K2.6      ████████████████████ 58.6   ← add amber tag "BEST"
+GPT-5.4   ███████████████████  57.7
+Opus 4.6  █████████████████    53.4
+Gemini    ██████████████████   54.2
+
+GROUP 2: "DeepSearchQA (F1)"
+K2.6      ████████████████████████████████ 92.5   ← add amber tag "BEST"
+GPT-5.4   ██████████████████████████       78.6
+Opus 4.6  ███████████████████████████████  91.3
+Gemini    █████████████████████████        81.9
+
+GROUP 3: "HLE-Full w/ tools"
+K2.6      ████████████████████ 54.0   ← add amber tag "BEST"
+GPT-5.4   ███████████████████  52.1
+Opus 4.6  ███████████████████  53.0
+Gemini    ██████████████████   51.4
+
+Bar style:
+rounded-end bars, precise spacing, sharp labels.
+Scale reference line at bottom:
+"50 ──────── 70 ──────── 90 ──── 100"
+
+Bottom:
+thin 1px #CBD5E1 divider.
+
+═══════════════════════════════════════
+[ZONE 5 — PUBLICLY VISIBLE LEVERS · 14%]
+(TWO COLUMNS SIDE BY SIDE, 52% / 48% split)
+═══════════════════════════════════════
+Separated by a thin vertical 1px #CBD5E1 line down the middle.
+
+LEFT COLUMN — "◆ 成本竞争力"
+White outlined card (border #0F3D91 1.5px, rounded corners), fills left column.
+Small blue label at top:
+"API 定价 / 百万 token"
+
+─────────────────────────
+Input:  $0.60  (缓存后 $0.10)
+Output: $3.00
+─────────────────────────
+vs GPT-5.4: $2.50 in / $15.00 out
+
+Centered badge at bottom:
+"仅为 GPT-5.4 的 1/5"
+
+Important:
+keep this card elegant and restrained.
+Key number "1/5" should be large and amber orange (#F59E0B).
+
+RIGHT COLUMN — "◆ 公开可见技术抓手"
+White outlined card (border #CBD5E1 1px, rounded corners), fills right column.
+Small blue label at top:
+"How it works"
+
+─────────────────────────
+① Preserve Thinking
+   保留多轮推理连续性
+
+② Interleaved Thinking + Multi-Step Tool Call
+   推理与工具调用交错闭环
+
+③ Kimi Code CLI / Agent Framework
+   模型能力与 runtime 联动
+
+④ 256K Context + Context Management
+   长任务上下文治理
+
+Formatting:
+- Each number in amber orange (#F59E0B)
+- English technical terms in monospace
+- Explanation text in smaller muted gray
+
+Bottom:
+2px deep blue full-width accent line.
+
+═══════════════════════════════════════
+[ZONE 6 — INSIGHT BLOCK · 20%]
+═══════════════════════════════════════
+Full-width filled rectangle, background #EEF3FB.
+Subtle inner top border: 2px #0F3D91.
+
+Header:
+"💡 关键洞察" ← bold deep blue, medium-large, left-aligned
+
+Two insight items stacked, each with left 3px #0F3D91 vertical border accent
+and slight white card background.
+
+INSIGHT ①
+Amber micro-label top:
+"能力重心"
+
+Body text in dark gray:
+Kimi K2.6 的优势不是单点刷榜，
+而是把长程编码、界面生成与前端实现、
+多 Agent 协同执行三项能力做成了一个整体。
+这意味着它更像面向复杂任务的 Agent 底座，
+而不只是一个泛聊天模型。
+
+INSIGHT ②
+Amber micro-label top:
+"工程路径"
+
+Body text in dark gray:
+其能力提升公开可见地建立在
+thinking continuity、multi-step tool use、
+agent runtime 与 long-context management 之上。
+真正的竞争力，不只来自模型本体，
+也来自 Agent 运行机制与系统工程。
+
+Text:
+dark gray, small but sharp, comfortable line height.
+
+═══════════════════════════════════════
+[ZONE 7 — FOOTER · 4%]
+═══════════════════════════════════════
+Thin 1px #CBD5E1 line above.
+Left: small dark text "Data & AI 洞察小分队"
+Right: small muted gray text "Kimi K2.6 · Apr 2026"
+
+═══════════════════════════════════════
+DESIGN RULES
+═══════════════════════════════════════
+- Use a strict vertical grid and strong alignment
+- Keep all cards symmetric and evenly spaced
+- Avoid visual clutter, unnecessary decoration, or noisy gradients
+- No dark cyberpunk style, no neon glow, no heavy shadows
+- The page must feel like a premium consulting infographic, not a gaming poster
+- Prioritize legibility over ornament
+- All Chinese characters must render perfectly
+- All numbers and labels must be easy to scan within 3 seconds
+- The three capability columns must be equally prominent
+- Make the final poster look premium, calm, rational, and executive-ready

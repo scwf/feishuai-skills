@@ -297,6 +297,15 @@
     "channel_id": "UCcefcZRL2oaA_uBNeo5UOWg"
   },
   {
+    "alias": "YT_xiaojunpodcast",
+    "channel_name": "張小珺 Xiaojùn",
+    "channel_url": "https://www.youtube.com/@xiaojunpodcast",
+    "handle": "@xiaojunpodcast",
+    "channel_type": "chinese/podcast",
+    "theme": "interviews, technology, business, society",
+    "channel_id": "UC3Sv1JuKpbOx3csUO8FAo5g"
+  },
+  {
     "alias": "YT_kedaibiao",
     "channel_name": "课代表立正",
     "channel_url": "https://www.youtube.com/@kedaibiao",

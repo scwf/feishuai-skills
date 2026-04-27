@@ -188,6 +188,15 @@ The exported JSON now includes run metadata such as:
 - `partial_failure_reason`
 - `env_file_used`
 
+## Monitoring Long-Running Batch Jobs
+
+When running `x_scrape_batch.py` with many targets, treat it as a long-running job:
+
+1. Start the batch in the background when the current environment supports background execution.
+2. Check progress through the job's status or recent log output instead of blocking the session until completion.
+3. Report completion only after the log or output metadata shows `Run status: success`, `Run status: partial_success`, or `Run status: failed`.
+4. If the run is still active, tell the user it is still running and include the latest visible progress or output path.
+
 ## Failure Handling
 
 If the script cannot run:

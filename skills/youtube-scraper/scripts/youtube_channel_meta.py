@@ -382,14 +382,19 @@ def compute_since_date(args: argparse.Namespace) -> Optional[str]:
         return args.since_date
     if args.days_lookback is not None:
         cutoff = datetime.now(timezone.utc) - timedelta(days=args.days_lookback)
-        return cutoff.strftime("%Y-%m-%d")
+        return cutoff.strftime("%Y-%m-%dT%H:%M:%S")
     return None
 
 
 def parse_date_arg(value: Optional[str]) -> Optional[datetime]:
     if not value:
         return None
-    return datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(value, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    raise ValueError(f"Unsupported date format: {value}")
 
 
 def filter_videos(

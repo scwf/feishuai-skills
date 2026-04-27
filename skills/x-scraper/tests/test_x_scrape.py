@@ -160,10 +160,20 @@ class XScrapeTests(unittest.TestCase):
         limit = x_scrape.compute_limit(args, mode)
         max_fetch = x_scrape.compute_max_fetch(args, mode)
 
-        self.assertEqual(since_date, "2026-03-17")
+        self.assertEqual(since_date, "2026-03-17T00:00:00")
         self.assertEqual(mode, "time_range")
         self.assertEqual(limit, 30)
         self.assertEqual(max_fetch, 500)
+
+    def test_parse_optional_date_accepts_dates_and_timestamps(self):
+        self.assertEqual(
+            x_scrape.parse_optional_date("2026-03-17"),
+            x_scrape.datetime(2026, 3, 17, tzinfo=x_scrape.timezone.utc),
+        )
+        self.assertEqual(
+            x_scrape.parse_optional_date("2026-03-17T08:30:45"),
+            x_scrape.datetime(2026, 3, 17, 8, 30, 45, tzinfo=x_scrape.timezone.utc),
+        )
 
     def test_compute_default_limit_and_max_fetch_for_count_mode(self):
         args = self.make_args(limit=None)

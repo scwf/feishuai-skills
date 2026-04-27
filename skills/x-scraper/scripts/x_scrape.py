@@ -759,7 +759,7 @@ class XClient:
         consecutive_no_progress_pages = 0
 
         if since_date:
-            cutoff = datetime.strptime(since_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            cutoff = parse_optional_date(since_date)
 
         while len(all_tweets) < max_fetch:
             page_number = pages_fetched + 1
@@ -971,7 +971,12 @@ def resolve_target(target: str, alias_map: Dict[str, str]) -> Tuple[str, Optiona
 def parse_optional_date(value: Optional[str]) -> Optional[datetime]:
     if not value:
         return None
-    return datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(value, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    raise ValueError(f"Unsupported date format: {value}")
 
 
 def compute_since_date(args: argparse.Namespace) -> Optional[str]:
@@ -979,7 +984,7 @@ def compute_since_date(args: argparse.Namespace) -> Optional[str]:
         return args.since_date
     if args.days_lookback is not None:
         cutoff = datetime.now(timezone.utc) - timedelta(days=args.days_lookback)
-        return cutoff.strftime("%Y-%m-%d")
+        return cutoff.strftime("%Y-%m-%dT%H:%M:%S")
     return None
 
 

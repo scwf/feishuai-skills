@@ -33,20 +33,35 @@ description: X 推文批量数据智能分析师。默认读取 ~/data/x-daily/l
 2. 提取批次日期，优先使用 `meta.json.date`，其次从 batch 目录名或 `summary.json` 中读取
 3. 告知用户：**"将读取 X batch（{date}）：{batch_dir}，共 N 个类别可供分析。"**
 
-### Step 2: 交互式选择
+### Step 2: 选择分析模式
 
-如果用户已经提供类别和视角，直接进入 Step 3。否则用一句简短问题向用户补齐缺失项；不要依赖特定平台的交互工具。
+先判断用户请求是否已经指定类别和视角。
 
-1. **选择类别**：从 `batch_category_index.json` 的 `categories` 键中动态提取列表
-   - 例如：`ai_infra`, `model_vendor`, `devtools_agent`, `data_infra`, `cloud_platform`, `ai_researcher`, `research_org`, `ai_media_community`, `open_community`, `super_agent`
-2. **选择视角**：
-   - **Data & AI 产品经理**：关注市场动态、竞品信号、产品化路径、用户价值
-   - **技术负责人**：关注架构影响、技术上下游、落地成本、工程可行性
-   - **超级个体**：关注个人效率工具、可复用工作流、知识更新、个人竞争力
+**默认规则（重要）**：
+
+必须指定一个类别后才能分析；不做全类别综合分析。
+
+如果用户只说“分析今天的推文”“分析最新 X 日报”“看看今天有什么重要动态”“今天 X 上有什么值得关注”等宽泛请求，先读取 `batch_category_index.json` 的类别列表，然后请用户确认类别和视角。
+
+只要类别或视角任一不明确，都要先让用户确认选择：
+
+1. 类别缺失、类别名称不在 `batch_category_index.json` 中，或用户只描述了宽泛主题但无法映射到唯一类别
+2. 视角缺失，或用户表述无法明确映射到 **Data & AI 产品经理**、**技术负责人**、**超级个体** 之一
+3. 用户同时给出多个类别或多个视角，但没有说明优先级
+
+可选类别：从 `batch_category_index.json` 的 `categories` 键中动态提取列表。
+例如：`ai_infra`, `model_vendor`, `devtools_agent`, `data_infra`, `cloud_platform`, `ai_researcher`, `research_org`, `ai_media_community`, `open_community`, `super_agent`
+
+可选视角：
+- **Data & AI 产品经理**：关注市场动态、竞品信号、产品化路径、用户价值
+- **技术负责人**：关注架构影响、技术上下游、落地成本、工程可行性
+- **超级个体**：关注个人效率工具、可复用工作流、知识更新、个人竞争力
+
+如果用户已经提供类别和视角，直接进入 Step 3。
 
 ### Step 3: 读取与格式化数据
 
-运行辅助脚本提取类别数据：
+运行辅助脚本提取指定类别的数据：
 
 ```bash
 python3 "{SKILL_ROOT}/scripts/extract_posts.py" --category <CATEGORY>

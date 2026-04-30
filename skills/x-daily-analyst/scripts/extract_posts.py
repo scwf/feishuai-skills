@@ -16,7 +16,11 @@ def parse_args() -> argparse.Namespace:
         default="~/data/x-daily/latest",
         help="Path to an x-scraper batch directory, or to a pointer directory with meta.json containing batch_dir.",
     )
-    parser.add_argument("--category", required=True, help="Category key from batch_category_index.json")
+    parser.add_argument(
+        "--category",
+        required=True,
+        help="Category key from batch_category_index.json",
+    )
     parser.add_argument("--output", help="Optional output file path; defaults to stdout")
     return parser.parse_args()
 
@@ -86,6 +90,7 @@ def extract_category(batch_dir: Path, category: str) -> str:
     raw_root = Path(index.get("raw_root", str(batch_dir / "raw")))
     if not raw_root.is_absolute():
         raw_root = batch_dir / raw_root
+
     files = categories[category]
 
     output_lines: List[str] = []
@@ -114,11 +119,9 @@ def extract_category(batch_dir: Path, category: str) -> str:
         account_label = data.get("resolved_username", filename.replace(".json", ""))
         output_lines.append(f"## Account: @{account_label} ({len(items)} posts)")
         output_lines.append("")
-
         for item in items:
             output_lines.append(format_post(item, account_label))
             total_posts += 1
-
         output_lines.append("")
 
     output_lines.insert(3, f"# Total Posts: {total_posts}")

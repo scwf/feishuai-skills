@@ -49,6 +49,12 @@ Optional dependency:
 - `curl_cffi` for browser-like TLS impersonation during handle or URL resolution
 - `yt-dlp` for explicit media downloads
 
+RSS stability behavior:
+
+- The script sends browser-like headers for RSS requests.
+- If the `channel_id` RSS endpoint fails, it retries with short backoff and then falls back to derived playlist RSS variants.
+- The JSON output records the selected feed URL and failed attempts under `rss_fetch` so intermittent YouTube RSS failures can be diagnosed after a run.
+
 ## Boundary Rules
 
 Use this skill for:

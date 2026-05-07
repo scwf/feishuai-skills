@@ -9,6 +9,7 @@ import json
 import logging
 import random
 import re
+import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -34,7 +35,8 @@ class SmartDefaultsFormatter(argparse.ArgumentDefaultsHelpFormatter):
 
 logger = logging.getLogger("youtube_channel_meta_skill")
 
-RSS_BASE = "https://www.youtube.com/feeds/videos.xml?channel_id="
+RSS_CHANNEL_BASE = "https://www.youtube.com/feeds/videos.xml?channel_id="
+RSS_PLAYLIST_BASE = "https://www.youtube.com/feeds/videos.xml?playlist_id="
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
@@ -56,6 +58,24 @@ UA_PROFILES = [
 ATOM_NS = {"atom": "http://www.w3.org/2005/Atom"}
 YT_NS = {"yt": "http://www.youtube.com/xml/schemas/2015"}
 MEDIA_NS = {"media": "http://search.yahoo.com/mrss/"}
+
+
+class FetchTextError(RuntimeError):
+    def __init__(self, url: str, attempts: List[Dict[str, Any]]) -> None:
+        self.url = url
+        self.attempts = attempts
+        summary = "; ".join(
+            f"{attempt['client']}:{attempt['error']}" for attempt in attempts[-4:]
+        )
+        super().__init__(f"Failed to fetch {url}: {summary}")
+
+
+class FeedFetchError(RuntimeError):
+    def __init__(self, channel_id: str, failures: List[Dict[str, Any]]) -> None:
+        self.channel_id = channel_id
+        self.failures = failures
+        attempted_urls = ", ".join(failure["url"] for failure in failures)
+        super().__init__(f"All RSS feed candidates failed for {channel_id}: {attempted_urls}")
 
 
 @dataclass
@@ -125,44 +145,101 @@ def exit_with_error(
     raise SystemExit(1)
 
 
-def fetch_text(url: str, timeout: int) -> str:
-    profile = random.choice(UA_PROFILES)
+def browser_headers(profile: Dict[str, str]) -> Dict[str, str]:
+    return {
+        "User-Agent": profile["user_agent"],
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.youtube.com/",
+    }
+
+
+def fetch_text_with_attempts(
+    url: str,
+    timeout: int,
+    *,
+    retries: int = 3,
+    backoff_seconds: float = 1.0,
+) -> Tuple[str, List[Dict[str, Any]]]:
+    attempts: List[Dict[str, Any]] = []
+    profiles = list(UA_PROFILES)
 
     try:
         from curl_cffi import requests as curl_requests  # type: ignore
-
-        response = curl_requests.get(
-            url,
-            headers={
-                "User-Agent": profile["user_agent"],
-                "Accept-Language": "en-US,en;q=0.9",
-                "Referer": "https://www.youtube.com/",
-            },
-            impersonate=profile["impersonate"],
-            timeout=timeout,
-        )
-        if response.status_code >= 400:
-            raise RuntimeError(f"HTTP {response.status_code} for {url}: {response.text[:200]}")
-        return response.text
     except ImportError:
-        pass
+        curl_requests = None  # type: ignore[assignment]
 
-    request = Request(
-        url,
-        headers={
-            "User-Agent": profile["user_agent"],
-            "Accept-Language": "en-US,en;q=0.9",
-            "Referer": "https://www.youtube.com/",
-        },
-    )
-    try:
-        with urlopen(request, timeout=timeout) as response:
-            return response.read().decode("utf-8", errors="replace")
-    except HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"HTTP {exc.code} for {url}: {body[:200]}") from exc
-    except URLError as exc:
-        raise RuntimeError(f"Network error for {url}: {exc}") from exc
+    for attempt_number in range(1, retries + 1):
+        random.shuffle(profiles)
+        for profile in profiles:
+            if curl_requests is not None:
+                client = f"curl_cffi:{profile['impersonate']}"
+                try:
+                    response = curl_requests.get(
+                        url,
+                        headers=browser_headers(profile),
+                        impersonate=profile["impersonate"],
+                        timeout=timeout,
+                    )
+                    attempts.append(
+                        {
+                            "client": client,
+                            "attempt": attempt_number,
+                            "status_code": response.status_code,
+                        }
+                    )
+                    if response.status_code < 400:
+                        return response.text, attempts
+                    attempts[-1]["error"] = f"HTTP {response.status_code}: {response.text[:160]}"
+                except Exception as exc:  # noqa: BLE001 - preserve all network failure detail
+                    attempts.append(
+                        {
+                            "client": client,
+                            "attempt": attempt_number,
+                            "error": f"{type(exc).__name__}: {exc}",
+                        }
+                    )
+
+            client = "urllib"
+            request = Request(url, headers=browser_headers(profile))
+            try:
+                with urlopen(request, timeout=timeout) as response:
+                    attempts.append(
+                        {
+                            "client": client,
+                            "attempt": attempt_number,
+                            "status_code": response.status,
+                        }
+                    )
+                    return response.read().decode("utf-8", errors="replace"), attempts
+            except HTTPError as exc:
+                body = exc.read().decode("utf-8", errors="replace")
+                attempts.append(
+                    {
+                        "client": client,
+                        "attempt": attempt_number,
+                        "status_code": exc.code,
+                        "error": f"HTTP {exc.code}: {body[:160]}",
+                    }
+                )
+            except URLError as exc:
+                attempts.append(
+                    {
+                        "client": client,
+                        "attempt": attempt_number,
+                        "error": f"Network error: {exc}",
+                    }
+                )
+
+        if attempt_number < retries:
+            time.sleep(backoff_seconds * attempt_number)
+
+    raise FetchTextError(url, attempts)
+
+
+def fetch_text(url: str, timeout: int) -> str:
+    text, _attempts = fetch_text_with_attempts(url, timeout)
+    return text
 
 
 def format_duration(seconds: Optional[int]) -> Optional[str]:
@@ -305,9 +382,41 @@ def extract_channel_id_from_html(html: str) -> Optional[str]:
     return None
 
 
-def fetch_feed(channel_id: str, timeout: int) -> Tuple[str, str]:
-    rss_url = f"{RSS_BASE}{channel_id}"
-    return rss_url, fetch_text(rss_url, timeout)
+def uploads_playlist_id(channel_id: str, prefix: str = "UU") -> str:
+    if not channel_id.startswith("UC"):
+        return f"{prefix}{channel_id}"
+    return f"{prefix}{channel_id[2:]}"
+
+
+def feed_candidates(channel_id: str) -> List[Tuple[str, str]]:
+    return [
+        ("channel_id", f"{RSS_CHANNEL_BASE}{channel_id}"),
+        ("uploads_playlist", f"{RSS_PLAYLIST_BASE}{uploads_playlist_id(channel_id, 'UU')}"),
+        ("videos_playlist", f"{RSS_PLAYLIST_BASE}{uploads_playlist_id(channel_id, 'UULF')}"),
+        ("shorts_playlist", f"{RSS_PLAYLIST_BASE}{uploads_playlist_id(channel_id, 'UUSH')}"),
+    ]
+
+
+def fetch_feed(channel_id: str, timeout: int) -> Tuple[str, str, Dict[str, Any]]:
+    failures: List[Dict[str, Any]] = []
+    for candidate_type, rss_url in feed_candidates(channel_id):
+        try:
+            xml_text, attempts = fetch_text_with_attempts(rss_url, timeout)
+            return rss_url, xml_text, {
+                "selected_feed_type": candidate_type,
+                "selected_feed_url": rss_url,
+                "attempts": attempts,
+                "failures": failures,
+            }
+        except FetchTextError as exc:
+            failures.append(
+                {
+                    "feed_type": candidate_type,
+                    "url": rss_url,
+                    "attempts": exc.attempts,
+                }
+            )
+    raise FeedFetchError(channel_id, failures)
 
 
 def parse_datetime(value: Optional[str]) -> Optional[datetime]:
@@ -641,15 +750,26 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        rss_url, xml_text = fetch_feed(resolved_channel_id, args.request_timeout)
-    except RuntimeError as exc:
+        rss_url, xml_text, feed_fetch = fetch_feed(resolved_channel_id, args.request_timeout)
+    except FeedFetchError as exc:
         exit_with_error(
             error_type="feed_fetch_failed",
             failed_step="fetch_feed",
             message=str(exc),
             retryable=True,
-            suggestion="Retry later or pass a direct channel_id to skip handle resolution.",
-            details={"resolved_channel_id": resolved_channel_id},
+            suggestion=(
+                "Retry later. The script already tried channel_id and playlist_id RSS feed variants "
+                "with browser-like headers."
+            ),
+            details={
+                "resolved_channel_id": resolved_channel_id,
+                "rss_fetch": {
+                    "selected_feed_type": None,
+                    "selected_feed_url": None,
+                    "attempts": [],
+                    "failures": exc.failures,
+                },
+            },
         )
     feed_channel_name, feed_channel_id, items = parse_feed(xml_text, rss_url, resolved_channel_id)
     items = filter_videos(items, since_date=since_date, until_date=args.until_date)
@@ -679,6 +799,7 @@ def main() -> int:
                 "effective_limit": final_limit,
                 "include_duration": include_duration,
                 "target_kind": resolution_source,
+                "rss_fetch": feed_fetch,
                 "video_count": len(exports),
                 "items": exports,
             },
@@ -748,6 +869,8 @@ def main() -> int:
                 "effective_limit": final_limit,
                 "include_duration": include_duration,
                 "video_count": len(exports),
+                "rss_feed_type": feed_fetch["selected_feed_type"],
+                "rss_url": rss_url,
                 "json_path": str(json_path),
                 "markdown_path": str(md_path),
                 "validation": validation,

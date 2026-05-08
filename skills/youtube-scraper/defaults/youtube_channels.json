@@ -18,6 +18,15 @@
     "channel_id": "UCrDwWp7EBBv4NwvScIpBDOA"
   },
   {
+    "alias": "YT_claude",
+    "channel_name": "Claude",
+    "channel_url": "https://www.youtube.com/@claude",
+    "handle": "@claude",
+    "channel_type": "official/product",
+    "theme": "Claude product updates, AI assistant capabilities, model usage",
+    "channel_id": "UCV03SRZXJEz-hchIAogeJOg"
+  },
+  {
     "alias": "YT_cursor_ai",
     "channel_name": "Cursor",
     "channel_url": "https://www.youtube.com/@cursor_ai",

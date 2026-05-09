@@ -1,6 +1,6 @@
 ---
 name: youtube-scraper
-description: Fetch recent YouTube channel publications from a configured alias, channel URL, video URL, @handle, or channel ID, and save raw video metadata plus description text. Use when an agent needs channel-level YouTube updates such as latest uploads, recent channel videos, publishing activity, or a bounded time/count scrape for a channel. If given a YouTube video URL, resolve its owning channel first and then scrape that channel's publications. This skill may also download a YouTube video or an audio-only media file, but only when the user explicitly asks to save or extract media. Do not use for transcription, subtitle generation, subtitle optimization, subtitle translation, dubbing, or general YouTube analysis that does not require publication metadata or explicit media download.
+description: Fetch recent YouTube channel publications from one or more configured aliases, channel URLs, video URLs, @handles, or channel IDs, and save raw video metadata plus description text. Use when an agent needs channel-level YouTube updates such as latest uploads, recent channel videos, publishing activity, or a bounded time/count scrape for a channel or a batch of channels. If given a YouTube video URL, resolve its owning channel first and then scrape that channel's publications. This skill may also download a YouTube video or an audio-only media file, but only when the user explicitly asks to save or extract media. Do not use for transcription, subtitle generation, subtitle optimization, subtitle translation, dubbing, or general YouTube analysis that does not require publication metadata or explicit media download.
 ---
 
 # YouTube Scraper
@@ -14,6 +14,14 @@ Default flow:
 3. Validate that outputs were written and the result is coherent.
 4. Summarize the result without pasting long descriptions into the chat.
 5. If no output directory was provided, expect the script to create a timestamped directory like `./youtube-YYYYMMDD-HHMMSS`.
+
+Batch flow:
+
+1. Use the batch script when the user asks for multiple aliases, handles, channel URLs, video URLs, or channel IDs in one request.
+2. Put each target in the command arguments or in a UTF-8 targets file.
+3. Run the batch script once with the narrowest valid shared range; exact duplicate targets are ignored after their first occurrence.
+4. Validate the batch summary plus each per-target JSON output.
+5. If no output directory was provided, expect the script to create a timestamped directory like `./youtube-batch-YYYYMMDD-HHMMSS`.
 
 Download flow:
 
@@ -34,6 +42,14 @@ Accepted targets:
 - video URL such as `https://www.youtube.com/watch?v=Hbn5H0rFOmE`
 - `@handle` such as `@OpenAI`
 - direct `channel_id` such as `UCXZCJLdBC09xxGZ6gcdrc6A`
+
+Accepted batch targets:
+
+- any mix of the accepted single-target forms
+- command arguments such as `"YT_OpenAI" "@AnthropicAI" "UC..."`
+- a UTF-8 text file with one target per line; blank lines and lines starting with `#` are ignored
+- a JSON file containing either a list of strings or an object with a `targets` list
+- every alias in `defaults/youtube_channels.json` by passing `--all-configured`
 
 Accepted download targets:
 
@@ -142,6 +158,26 @@ Run:
 python "{SKILL_ROOT}/scripts/youtube_channel_meta.py" "<target>"
 ```
 
+Batch scrape command:
+
+Run:
+
+```bash
+python "{SKILL_ROOT}/scripts/youtube_batch_meta.py" "<target-1>" "<target-2>"
+```
+
+Or from a targets file:
+
+```bash
+python "{SKILL_ROOT}/scripts/youtube_batch_meta.py" --targets-file "targets.txt"
+```
+
+Or all configured aliases:
+
+```bash
+python "{SKILL_ROOT}/scripts/youtube_batch_meta.py" --all-configured
+```
+
 Examples:
 
 ```bash
@@ -151,6 +187,12 @@ python "{SKILL_ROOT}/scripts/youtube_channel_meta.py" "YT_OpenAI" --days-lookbac
 ```bash
 python "{SKILL_ROOT}/scripts/youtube_channel_meta.py" "@OpenAI" --since-date 2026-03-01 --until-date 2026-03-20 --limit 20
 ```
+
+```bash
+python "{SKILL_ROOT}/scripts/youtube_batch_meta.py" "YT_OpenAI" "@OpenAI" "UCXZCJLdBC09xxGZ6gcdrc6A" --days-lookback 14 --limit 10
+```
+
+When the user asks to scrape all configured YouTube accounts, prefer `--all-configured` instead of manually extracting aliases into a targets file. The batch script forwards shared range and output options to the single-target metadata script. It continues after individual target failures by default and returns `partial_failure` with a nonzero exit code if any target fails. Use `--stop-on-error` only when partial results are not useful.
 
 Explicit download commands:
 
@@ -169,6 +211,7 @@ python "{SKILL_ROOT}/scripts/youtube_download.py" "https://www.youtube.com/watch
 Do not download media by default during normal scraping workflows.
 
 If `--output-dir` is omitted, both scripts create a timestamped directory like `./youtube-YYYYMMDD-HHMMSS`.
+For batch metadata scraping, omitted `--output-dir` creates a timestamped directory like `./youtube-batch-YYYYMMDD-HHMMSS`.
 
 ## Validate Result
 
@@ -181,12 +224,26 @@ After the script finishes, check all of the following before you trust the resul
 - if the feed returned a `feed_channel_id`, it matches the resolved channel unless the script explicitly marked a warning
 - `video_count = 0` is treated as a valid but notable outcome, not silent success
 
+For batch runs, also check:
+
+- batch summary `status` is `ok`, `ok_with_warnings`, or `partial_failure`
+- `attempted_count`, `success_count`, and `failure_count` match the per-target results
+- every successful target has per-target JSON and Markdown paths
+- for each successful target, validate the per-target JSON using the single-target checklist above
+- `partial_failure` is reported to the user with the failed targets and structured error messages
+
 ## Expected Outputs
 
 The metadata script writes:
 
 - a JSON file with metadata, effective query parameters, validation results, and video items
 - a Markdown file with one section per video showing raw publication information
+
+The batch metadata script writes:
+
+- all per-target JSON and Markdown files produced by the single-target metadata script
+- one batch summary JSON file with target status, per-target paths, counts, and errors
+- one batch summary Markdown file for quick review
 
 The download script writes:
 
@@ -217,6 +274,13 @@ When reporting results to the user:
 - summarize the videos; do not paste long descriptions unless the user asks
 - if the user requested Chinese, provide your own translation or summary after reading the output
 - surface partial failures such as empty feeds, mismatched IDs, or handle resolution failures
+
+For batch metadata runs also report:
+
+- batch status, attempted count, success count, and failure count
+- the batch summary JSON and Markdown paths
+- per-target output paths for successful targets
+- failed targets with `error_type`, `failed_step`, and actionable suggestions when present
 
 For explicit downloads also report:
 

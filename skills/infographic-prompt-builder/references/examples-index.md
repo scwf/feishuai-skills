@@ -26,7 +26,7 @@ Use these user-curated examples for horizontal/landscape infographic composition
 Important:
 
 - These examples are horizontal `1536x1024` images, about 3:2 ratio. Use them for landscape composition, hierarchy, density, and style references.
-- For horizontal PPT-ratio output, still generate `16:9, 1920x1080px or 2K`; do not copy the 3:2 canvas ratio.
+- For horizontal PPT-ratio output, still generate `16:9, recommended 1920x1080px`; do not copy the 3:2 canvas ratio.
 - Treat their prompt files as structure/style references only unless the user explicitly says to use their content as source material.
 
 Best horizontal references:

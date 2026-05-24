@@ -57,8 +57,8 @@ Rules:
 
 5. Ask or choose canvas orientation.
    Offer the user a required orientation choice before writing the final prompt unless they already specified it:
-   - Vertical infographic: 9:16, 1080x1920px or 2K. Use for poster-like tree, stack, timeline, deep-dive, or mobile/social sharing formats.
-   - Horizontal PPT infographic: 16:9, 1920x1080px or 2K. Use for one-page slide, board deck, presentation, side-by-side comparison, system landscape, or wide architecture map formats.
+   - Vertical infographic: 9:16, recommended 1080x1920px. Use for poster-like tree, stack, timeline, deep-dive, or mobile/social sharing formats.
+   - Horizontal PPT infographic: 16:9, recommended 1920x1080px. Use for one-page slide, board deck, presentation, side-by-side comparison, system landscape, or wide architecture map formats.
    If the user wants a direct result and has not specified orientation, ask one concise question: “这张信息图要做竖版 9:16，还是横版 16:9 PPT 比例？” Do not write the final image prompt until the orientation is known.
 
 6. Ask or choose visual style.
@@ -93,8 +93,8 @@ If the user asks for only the final prompt, still do the internal extraction fir
 ## House Rules
 
 - Canvas must be explicitly chosen before the final prompt: vertical 9:16 or horizontal 16:9 PPT ratio.
-- Default canvas only after the user asks to skip choices: vertical 9:16, 1080x1920px or 2K.
-- Horizontal PPT canvas: 16:9, 1920x1080px or 2K.
+- Default canvas only after the user asks to skip choices: vertical 9:16, recommended 1080x1920px.
+- Horizontal PPT canvas: 16:9, recommended 1920x1080px.
 - Vertical default footer: `Data & AI 洞察小分队`.
 - Horizontal PPT pages must not include `Data & AI 洞察小分队`; use no footer signature unless the user explicitly asks for one.
 - Default style: light color system, clean consulting/research brief.

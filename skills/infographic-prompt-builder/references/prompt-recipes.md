@@ -3,7 +3,7 @@
 ## Universal Final Prompt Structure
 
 ```text
-Create a [vertical 9:16 / horizontal 16:9 PPT-ratio] Chinese insight infographic, [1080x1920px / 1920x1080px] or 2K.
+Create a [vertical 9:16 / horizontal 16:9 PPT-ratio] Chinese insight infographic, [vertical: 1080x1920px / horizontal PPT: 1920x1080px].
 
 Overall style:
 [chosen style name]
@@ -55,7 +55,7 @@ Best for poster-style insight graphics, mobile/social sharing, tree structures, 
 Opening line:
 
 ```text
-Create a vertical 9:16 Chinese insight infographic poster, 1080x1920px or 2K.
+Create a vertical 9:16 Chinese insight infographic poster, 1080x1920px.
 ```
 
 Layout pattern:
@@ -72,7 +72,7 @@ Best for one-page presentation slides, executive decks, board updates, landscape
 Opening line:
 
 ```text
-Create a horizontal 16:9 PPT-ratio Chinese insight infographic slide, 1920x1080px or 2K.
+Create a horizontal 16:9 PPT-ratio Chinese insight infographic slide, 1920x1080px.
 ```
 
 Layout pattern:

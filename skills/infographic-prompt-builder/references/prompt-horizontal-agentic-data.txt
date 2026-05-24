@@ -43,7 +43,7 @@ Light Cool Consulting
 
 ## 6. Final Image Prompt (最终绘图提示词)
 ```text
-Create a horizontal 16:9 PPT-ratio Chinese insight infographic slide, 1920x1080px or 2K.
+Create a horizontal 16:9 PPT-ratio Chinese insight infographic slide, 1920x1080px.
 
 Overall style:
 Light Cool Consulting

@@ -177,7 +177,7 @@ Each frame result must use only these fields:
 {
   "timestamp": "00:00:30",
   "video_topic": "confirmed or inferred video topic",
-  "frame_content": "clearly visible published material on the screen, such as slide text, product names, technical terms, charts, architecture, timelines, interface content, and key visual structure",
+  "frame_content": "clearly visible published material on the screen, preserving text hierarchy when possible: main titles, subtitles, card titles, small explanatory text, chart node labels, footnotes/notes, product names, technical terms, charts, architecture, timelines, interface content, and key visual structure",
   "frame_interpretation": "faithful interpretation of what the visible slide, screen, demo, or presentation material communicates"
 }
 ```
@@ -186,7 +186,7 @@ Field rules:
 
 - `timestamp`: the frame time in the source video.
 - `video_topic`: the confirmed topic for the whole video.
-- `frame_content`: observable published material only. Prioritize screen/PPT/demo/interface text, diagrams, product names, technologies, metrics, and visual structure. If no clear published material is visible, say `未看到清晰可读的发布材料内容`.
+- `frame_content`: observable published material only. Prioritize screen/PPT/demo/interface text, diagrams, product names, technologies, metrics, and visual structure. Preserve text hierarchy when possible, including main titles, subtitles, card titles, small explanatory text under technical concepts, chart node labels, footnotes, and notes. If no clear published material is visible, say `未看到清晰可读的发布材料内容`.
 - `frame_interpretation`: explain what the visible slide, screen, demo, or presentation material communicates. Do not add background knowledge, assumptions, opinions, or external facts.
 
 Low-value frame rule:
@@ -194,6 +194,11 @@ Low-value frame rule:
 - Do not describe speaker clothing, posture, microphones, stage lighting, audience, seats, or atmosphere unless they directly affect understanding the published material.
 - If the frame mainly shows a speaker or venue with no readable slide/demo content, keep both fields short and mark it as lacking substantive published material.
 - Speaker names, titles, company logos, conference titles, and agenda pages are valid content when they appear as text on the screen.
+
+Small-text rule:
+
+- Do not stop at large titles. Small explanatory text under technical concepts, product capability cards, architecture nodes, metrics, or diagrams is often critical and should be extracted when readable.
+- If small text is partially readable, preserve the readable parts and mark the rest as `部分看不清` or `看不清`.
 
 ## Output Principles
 

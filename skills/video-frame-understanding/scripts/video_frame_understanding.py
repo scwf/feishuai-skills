@@ -26,9 +26,12 @@ PROMPT_TEMPLATE = """你是一个科技发布会视频帧发布材料理解助�
 
 请优先提取和解读：
 1. 屏幕/PPT/演示界面上的清晰可见文字；
-2. 产品名、技术名、能力点、指标、时间线、架构关系；
-3. 图表、流程图、架构图、表格或 Demo 界面表达的结构和含义；
-4. 这一页发布材料正在表达的核心信息。
+2. 大标题、小标题、卡片标题、标题下方小字说明、图表节点文字、脚注/备注；
+3. 产品名、技术名、能力点、指标、时间线、架构关系；
+4. 图表、流程图、架构图、表格或 Demo 界面表达的结构和含义；
+5. 这一页发布材料正在表达的核心信息。
+
+对技术概念、产品能力、架构节点、数据指标下方的小字说明要优先保留，因为这些通常承载定义、解释、能力边界、适用场景和价值说明。不要只提取大字标题。
 
 请忽略或极度压缩以下现场元素，除非它们直接出现在发布材料中并影响理解：
 - 演讲者衣着、姿态、动作；
@@ -42,13 +45,18 @@ PROMPT_TEMPLATE = """你是一个科技发布会视频帧发布材料理解助�
 不要根据常识、品牌背景、上下文或猜测补充图片中不存在的信息。
 如果文字或发布材料内容看不清，请明确写“看不清”或“无法确认”。
 
-请严格输出 JSON，不要输出 Markdown，不要输出额外解释。
+输出要求：
+- 只输出一个 JSON 对象；
+- 不要输出 Markdown；
+- 不要输出代码块；
+- 不要输出 JSON 之外的任何解释文字；
+- JSON 字段只能包含 timestamp、video_topic、frame_content、frame_interpretation。
 
-JSON 字段只能包含：
+输出 JSON 模板：
 {{
   "timestamp": "{timestamp}",
   "video_topic": "{video_topic}",
-  "frame_content": "屏幕/PPT/演示界面中清晰可见的发布材料内容，包括文字、标题、图表、架构、产品信息、技术信息和关键视觉结构；忽略与发布材料无关的现场元素",
+  "frame_content": "屏幕/PPT/演示界面中清晰可见的发布材料内容，尽量保留文字层级，包括大标题、小标题、卡片标题、小字说明、图表节点、脚注/备注、产品信息、技术信息和关键视觉结构；忽略与发布材料无关的现场元素",
   "frame_interpretation": "基于屏幕/PPT/演示界面可见内容，对这一页发布材料在讲什么做忠实解读；不补充画面中不存在的信息"
 }}
 """
@@ -253,11 +261,68 @@ def extract_frames(video_path: Path, frames_dir: Path, interval_seconds: float, 
 
 
 def parse_json_content(content: str) -> dict[str, Any]:
+    candidates = []
     text = content.strip()
+    candidates.append(text)
+
     if text.startswith("```"):
-        text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.I)
-        text = re.sub(r"\s*```$", "", text)
-    return json.loads(text)
+        unfenced = re.sub(r"^```(?:json)?\s*", "", text, flags=re.I)
+        unfenced = re.sub(r"\s*```$", "", unfenced).strip()
+        candidates.append(unfenced)
+
+    extracted = extract_first_json_object(text)
+    if extracted:
+        candidates.append(extracted)
+
+    for candidate in candidates:
+        cleaned = clean_json_candidate(candidate)
+        try:
+            parsed = json.loads(cleaned)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+
+    raise json.JSONDecodeError("Could not parse JSON object from model output.", text, 0)
+
+
+def extract_first_json_object(text: str) -> str | None:
+    start = text.find("{")
+    if start < 0:
+        return None
+
+    depth = 0
+    in_string = False
+    escape = False
+    for index in range(start, len(text)):
+        char = text[index]
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            continue
+
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : index + 1]
+    return None
+
+
+def clean_json_candidate(text: str) -> str:
+    cleaned = text.strip()
+    cleaned = cleaned.replace("\ufeff", "")
+    cleaned = cleaned.replace("\u201c", '"').replace("\u201d", '"')
+    cleaned = cleaned.replace("\u2018", "'").replace("\u2019", "'")
+    cleaned = re.sub(r",\s*([}\]])", r"\1", cleaned)
+    return cleaned
 
 
 def normalize_frame_record(record: dict[str, Any], timestamp: str, video_topic: str) -> dict[str, str]:

@@ -21,6 +21,26 @@ Before running the workflow, resolve these inputs:
 3. Frame interval.
 4. Ollama model name.
 
+### Required User Confirmation
+
+Do not run extraction or Ollama calls until the user explicitly confirms the resolved execution plan.
+
+Always show the confirmation block even when every value is a default or an inferred value:
+
+```text
+请确认本次视频帧理解任务配置：
+- 视频文件：<absolute video path>
+- 视频主题：<confirmed or filename-inferred video_topic>
+- 抽帧间隔：30 秒（或用户指定值）
+- Ollama 模型：qwen3-vl:8b（或用户指定值）
+- 输出目录：<explicit output dir or current working directory timestamped dir>
+- 预计抽帧数量：<estimated_frames if duration is available>
+
+确认后我再开始执行。
+```
+
+If the user changes any value, update the plan and ask for confirmation again. Treat this confirmation as a hard gate, not an optional courtesy.
+
 Check the local environment before starting a long run:
 
 ```bash
@@ -99,6 +119,8 @@ The script prints progress lines:
 After completion, report `manifest.output_dir` so the user can find the timestamped result directory.
 
 ## Command
+
+Run commands only after the required user confirmation above.
 
 Default command:
 

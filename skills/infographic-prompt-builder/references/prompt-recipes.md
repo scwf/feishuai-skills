@@ -3,7 +3,7 @@
 ## Universal Final Prompt Structure
 
 ```text
-Create a vertical 9:16 Chinese insight infographic poster, 1080x1920px or 2K.
+Create a [vertical 9:16 / horizontal 16:9 PPT-ratio] Chinese insight infographic, [1080x1920px / 1920x1080px] or 2K.
 
 Overall style:
 [chosen style name]
@@ -19,7 +19,10 @@ One-sentence judgment:
 Target reader:
 [Data & AI product managers / technical leads / technical architects / executives]
 
-Layout zones from top to bottom:
+Canvas orientation:
+[Vertical 9:16: poster-like top-to-bottom layout / Horizontal 16:9 PPT: slide-like left-to-right landscape layout]
+
+Layout zones:
 1. Header zone: [height %, role]
 2. Thesis/spec zone: [height %, role]
 3. Main visual zone: [height %, graphic type]
@@ -31,14 +34,53 @@ Zone details:
 [For each zone, specify exact text, hierarchy, icons, arrows, chart values, labels, and colors.]
 
 Footer:
-Left: Data & AI 洞察小分队
-Right: [topic/date if applicable]
+[Vertical 9:16 only] Left: Data & AI 洞察小分队
+[Vertical 9:16 only] Right: [topic/date if applicable]
+[Horizontal 16:9 PPT] No footer signature. Do not include Data & AI 洞察小分队. Put date/source metadata in the top header only if needed.
 
 Negative constraints:
 No logo, no watermark, no cartoon, no heavy 3D, no neon cyberpunk unless selected,
 no dense paragraphs, no overlapping text, no garbled Chinese, no unsupported facts,
 no generic text-card wall without a main diagram.
 ```
+
+## Canvas Orientation Patterns
+
+Use one of these before writing the final image prompt.
+
+### Vertical 9:16
+
+Best for poster-style insight graphics, mobile/social sharing, tree structures, stacked architecture, vertical timelines, or product deep dives.
+
+Opening line:
+
+```text
+Create a vertical 9:16 Chinese insight infographic poster, 1080x1920px or 2K.
+```
+
+Layout pattern:
+
+- Header and thesis at the top.
+- Main visual in the middle, occupying the largest vertical zone.
+- Supporting evidence below or around the main visual.
+- Bottom insight conclusion and footer.
+
+### Horizontal 16:9 PPT
+
+Best for one-page presentation slides, executive decks, board updates, landscape architecture maps, side-by-side comparisons, wide timelines, or system flows.
+
+Opening line:
+
+```text
+Create a horizontal 16:9 PPT-ratio Chinese insight infographic slide, 1920x1080px or 2K.
+```
+
+Layout pattern:
+
+- Header strip across the top.
+- Main visual as a wide central landscape diagram.
+- Supporting evidence in left/right side panels or a bottom proof band.
+- Bottom-right or bottom-band insight conclusion. No footer signature; if metadata is needed, place it as small header text.
 
 ## Model / Benchmark Brief
 

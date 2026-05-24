@@ -1,0 +1,65 @@
+Create a horizontal 16:9 PPT-ratio Chinese insight infographic slide, 1920x1080px or 2K.
+
+Overall style:
+Light Cool Consulting
+Clean executive research slide, white and very light blue-gray background, thin grid lines, navy and cyan accents, modern Chinese sans-serif typography, precise diagram labels, premium consulting report feel.
+All Chinese and English text must be sharp, fully readable, and not garbled.
+
+Topic:
+[主题名称]
+
+One-sentence judgment:
+[一句话核心判断：这页横版 PPT 最想让读者 5 秒内记住什么]
+
+Target reader:
+Data & AI product managers / technical leads / technical architects / executives
+
+Canvas orientation:
+Horizontal 16:9 PPT ratio. This is a slide-like landscape layout, not a vertical poster.
+
+Layout zones:
+1. Top header strip, 12% height: title, subtitle, small date/source note.
+2. Left thesis panel, 22% width: one large strategic statement and 3 compact fact badges.
+3. Central main visual, 52% width and 64% height: wide architecture map / system flow / ecosystem landscape.
+4. Right evidence panel, 22% width: 3 proof modules with mini charts or comparison blocks.
+5. Bottom insight band, 14% height: final conclusion sentence and implication.
+
+Zone details:
+
+Top header strip:
+- Main title: "[主标题]"
+- Subtitle: "[副标题，用一句话说明主题范围]"
+- Small meta: "[日期 / 来源范围 / 版本，如适用]"
+
+Left thesis panel:
+- Large statement: "[核心判断]"
+- Badge 1: "[关键事实 1]"
+- Badge 2: "[关键事实 2]"
+- Badge 3: "[关键事实 3]"
+
+Central main visual:
+- Use a left-to-right landscape diagram.
+- Main graphic type: [wide architecture map / system flow / comparison matrix / timeline band / ecosystem map]
+- Draw 4-6 major nodes with clear arrows, grouped by capability layer or workflow stage.
+- Keep labels short, use icon-like technical symbols only where they clarify meaning.
+- Make this the strongest visual hook on the slide.
+
+Right evidence panel:
+- Proof block 1: "[证据/机制/指标 1]" with mini bar, small flow, or metric chip.
+- Proof block 2: "[证据/机制/指标 2]" with mini comparison.
+- Proof block 3: "[证据/机制/指标 3]" with short annotation.
+
+Bottom insight band:
+- Insight sentence: "[底部收束判断]"
+- Implication: "[对产品、架构、生态或商业策略的含义]"
+
+Footer:
+No footer signature. Do not include "Data & AI 洞察小分队" on horizontal PPT-ratio slides.
+If date/source metadata is needed, place it as small text in the top header strip.
+
+Negative constraints:
+No logo, no watermark, no cartoon, no heavy 3D, no neon cyberpunk unless selected,
+no vertical poster composition, no stacked tree layout unless explicitly requested,
+no "Data & AI 洞察小分队" footer or signature on horizontal PPT-ratio slides,
+no dense paragraphs, no overlapping text, no garbled Chinese, no unsupported facts,
+no generic text-card wall without a main diagram.

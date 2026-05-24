@@ -6,7 +6,9 @@ description: >
 
 # Video Frame Understanding
 
-Use this skill to convert a local video into a faithful frame-level material library.
+Use this skill to convert a local video into a faithful screen-content-first material library.
+
+For technology conference and product launch videos, prioritize the published material shown on screen: slides, large-screen content, demo interfaces, charts, architecture diagrams, timelines, product pages, and data pages. Do not treat venue, lighting, audience, speaker clothing, microphones, or generic stage activity as important unless those details are part of the visible published material.
 
 The skill is platform-neutral. Any agent may use it by reading this file and running the bundled script.
 
@@ -175,8 +177,8 @@ Each frame result must use only these fields:
 {
   "timestamp": "00:00:30",
   "video_topic": "confirmed or inferred video topic",
-  "frame_content": "clearly visible text, visual elements, page content, chart content, interface content, or people in this frame",
-  "frame_interpretation": "faithful interpretation based only on visible content in this frame"
+  "frame_content": "clearly visible published material on the screen, such as slide text, product names, technical terms, charts, architecture, timelines, interface content, and key visual structure",
+  "frame_interpretation": "faithful interpretation of what the visible slide, screen, demo, or presentation material communicates"
 }
 ```
 
@@ -184,8 +186,14 @@ Field rules:
 
 - `timestamp`: the frame time in the source video.
 - `video_topic`: the confirmed topic for the whole video.
-- `frame_content`: observable facts only. Include visible text and visual content. If unclear, say it is unclear.
-- `frame_interpretation`: explain what the visible frame appears to communicate. Do not add background knowledge, assumptions, opinions, or external facts.
+- `frame_content`: observable published material only. Prioritize screen/PPT/demo/interface text, diagrams, product names, technologies, metrics, and visual structure. If no clear published material is visible, say `未看到清晰可读的发布材料内容`.
+- `frame_interpretation`: explain what the visible slide, screen, demo, or presentation material communicates. Do not add background knowledge, assumptions, opinions, or external facts.
+
+Low-value frame rule:
+
+- Do not describe speaker clothing, posture, microphones, stage lighting, audience, seats, or atmosphere unless they directly affect understanding the published material.
+- If the frame mainly shows a speaker or venue with no readable slide/demo content, keep both fields short and mark it as lacking substantive published material.
+- Speaker names, titles, company logos, conference titles, and agenda pages are valid content when they appear as text on the screen.
 
 ## Output Principles
 
@@ -196,6 +204,7 @@ The Markdown summary is a human-readable material summary, not an insight report
 Follow these rules:
 
 - stay faithful to frame JSON records
+- prioritize published screen material over stage or venue details
 - merge only obvious duplicate or near-duplicate consecutive frames
 - do not write opinions
 - do not make business judgments

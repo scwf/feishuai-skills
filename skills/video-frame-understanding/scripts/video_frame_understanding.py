@@ -45,20 +45,8 @@ PROMPT_TEMPLATE = """你是一个科技发布会视频帧发布材料理解助�
 不要根据常识、品牌背景、上下文或猜测补充图片中不存在的信息。
 如果文字或发布材料内容看不清，请明确写“看不清”或“无法确认”。
 
-输出要求：
-- 只输出一个 JSON 对象；
-- 不要输出 Markdown；
-- 不要输出代码块；
-- 不要输出 JSON 之外的任何解释文字；
-- JSON 字段只能包含 timestamp、video_topic、frame_content、frame_interpretation。
-
-输出 JSON 模板：
-{{
-  "timestamp": "{timestamp}",
-  "video_topic": "{video_topic}",
-  "frame_content": "屏幕/PPT/演示界面中清晰可见的发布材料内容，尽量保留文字层级，包括大标题、小标题、卡片标题、小字说明、图表节点、脚注/备注、产品信息、技术信息和关键视觉结构；忽略与发布材料无关的现场元素",
-  "frame_interpretation": "基于屏幕/PPT/演示界面可见内容，对这一页发布材料在讲什么做忠实解读；不补充画面中不存在的信息"
-}}
+请直接输出这一帧发布材料内容的中文理解文本，不要输出 JSON，不要输出 Markdown 代码块，不要加字段名。
+输出内容应同时包含可见文字提取和忠实于可见内容的解释，合并为一段或多段自然语言。
 """
 
 
@@ -260,80 +248,6 @@ def extract_frames(video_path: Path, frames_dir: Path, interval_seconds: float, 
     return renamed
 
 
-def parse_json_content(content: str) -> dict[str, Any]:
-    candidates = []
-    text = content.strip()
-    candidates.append(text)
-
-    if text.startswith("```"):
-        unfenced = re.sub(r"^```(?:json)?\s*", "", text, flags=re.I)
-        unfenced = re.sub(r"\s*```$", "", unfenced).strip()
-        candidates.append(unfenced)
-
-    extracted = extract_first_json_object(text)
-    if extracted:
-        candidates.append(extracted)
-
-    for candidate in candidates:
-        cleaned = clean_json_candidate(candidate)
-        try:
-            parsed = json.loads(cleaned)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, dict):
-            return parsed
-
-    raise json.JSONDecodeError("Could not parse JSON object from model output.", text, 0)
-
-
-def extract_first_json_object(text: str) -> str | None:
-    start = text.find("{")
-    if start < 0:
-        return None
-
-    depth = 0
-    in_string = False
-    escape = False
-    for index in range(start, len(text)):
-        char = text[index]
-        if in_string:
-            if escape:
-                escape = False
-            elif char == "\\":
-                escape = True
-            elif char == '"':
-                in_string = False
-            continue
-
-        if char == '"':
-            in_string = True
-        elif char == "{":
-            depth += 1
-        elif char == "}":
-            depth -= 1
-            if depth == 0:
-                return text[start : index + 1]
-    return None
-
-
-def clean_json_candidate(text: str) -> str:
-    cleaned = text.strip()
-    cleaned = cleaned.replace("\ufeff", "")
-    cleaned = cleaned.replace("\u201c", '"').replace("\u201d", '"')
-    cleaned = cleaned.replace("\u2018", "'").replace("\u2019", "'")
-    cleaned = re.sub(r",\s*([}\]])", r"\1", cleaned)
-    return cleaned
-
-
-def normalize_frame_record(record: dict[str, Any], timestamp: str, video_topic: str) -> dict[str, str]:
-    return {
-        "timestamp": str(record.get("timestamp") or timestamp),
-        "video_topic": str(record.get("video_topic") or video_topic),
-        "frame_content": str(record.get("frame_content") or ""),
-        "frame_interpretation": str(record.get("frame_interpretation") or ""),
-    }
-
-
 def understand_frame(frame_path: Path, timestamp: str, video_topic: str, model: str) -> dict[str, str]:
     try:
         from ollama import chat
@@ -350,7 +264,6 @@ def understand_frame(frame_path: Path, timestamp: str, video_topic: str, model: 
                 "images": [frame_path.read_bytes()],
             }
         ],
-        format="json",
         options={
             "temperature": 0,
             "num_ctx": 8192,
@@ -359,17 +272,21 @@ def understand_frame(frame_path: Path, timestamp: str, video_topic: str, model: 
         keep_alive="30m",
     )
 
-    content = response.message.content
-    try:
-        parsed = parse_json_content(content)
-        return normalize_frame_record(parsed, timestamp, video_topic)
-    except Exception:
-        return {
-            "timestamp": timestamp,
-            "video_topic": video_topic,
-            "frame_content": "无法解析模型输出。",
-            "frame_interpretation": content.strip(),
-        }
+    content = clean_model_text(response.message.content)
+    return {
+        "timestamp": timestamp,
+        "video_topic": video_topic,
+        "frame_content": content or "未看到清晰可读的发布材料内容。",
+    }
+
+
+def clean_model_text(content: str) -> str:
+    text = content.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:markdown|md|text)?\s*", "", text, flags=re.I)
+        text = re.sub(r"\s*```$", "", text).strip()
+    text = re.sub(r"^(?:frame_content|发布材料内容|画面内容)\s*[:：]\s*", "", text, flags=re.I).strip()
+    return text
 
 
 def write_json(path: Path, payload: Any) -> None:
@@ -399,8 +316,7 @@ def compact_text(value: str, limit: int = 220) -> str:
 
 def similarity_key(record: dict[str, Any]) -> str:
     content = str(record.get("frame_content", ""))
-    interpretation = str(record.get("frame_interpretation", ""))
-    key = (content + " " + interpretation).lower()
+    key = content.lower()
     key = re.sub(r"\s+", "", key)
     return key[:240]
 
@@ -435,12 +351,10 @@ def build_summary(records: list[dict[str, Any]], summary_path: Path, video_topic
         previous_key = current_key
         timestamp = record.get("timestamp", "")
         content = compact_text(str(record.get("frame_content", "")), 360)
-        interpretation = compact_text(str(record.get("frame_interpretation", "")), 360)
 
         lines.append(f"### {timestamp}")
         lines.append("")
-        lines.append(f"- 画面内容：{content or '无法确认'}")
-        lines.append(f"- 画面解读：{interpretation or '无法确认'}")
+        lines.append(f"- 发布材料内容：{content or '无法确认'}")
         lines.append("")
 
     if duplicate_count:
@@ -475,7 +389,6 @@ def main() -> None:
     frames = extract_frames(video_path, frames_dir, args.interval_seconds, args.overwrite)
 
     failures: list[dict[str, Any]] = []
-    warnings: list[dict[str, Any]] = []
     for index, frame_path in enumerate(frames, start=1):
         timestamp = timestamp_for_frame(frame_path, args.interval_seconds, index)
         out_json_path = frame_json_dir / f"{frame_path.stem}.json"
@@ -487,16 +400,6 @@ def main() -> None:
         print(f"[RUN ] {index}/{len(frames)} {frame_path.name}")
         try:
             result = understand_frame(frame_path, timestamp, video_topic, args.model)
-            if result.get("frame_content") == "无法解析模型输出。":
-                warnings.append(
-                    {
-                        "warning_type": "model_json_parse_fallback",
-                        "frame_index": index,
-                        "frame_file": frame_path.name,
-                        "timestamp": timestamp,
-                        "message": "Model output was not valid JSON; raw output was preserved in frame_interpretation.",
-                    }
-                )
             write_json(out_json_path, result)
         except Exception as exc:
             error = {
@@ -516,22 +419,7 @@ def main() -> None:
     build_summary(records, summary_path, video_topic)
 
     processed_count = len(records)
-    parse_warning_timestamps = {
-        item.get("timestamp")
-        for item in warnings
-        if item.get("warning_type") == "model_json_parse_fallback"
-    }
-    for record in records:
-        timestamp = record.get("timestamp", "")
-        if record.get("frame_content") == "无法解析模型输出。" and timestamp not in parse_warning_timestamps:
-            warnings.append(
-                {
-                    "warning_type": "model_json_parse_fallback",
-                    "timestamp": timestamp,
-                    "message": "A frame JSON contains model output that could not be parsed as valid JSON.",
-                }
-            )
-
+    warnings: list[dict[str, Any]] = []
     if processed_count < len(frames):
         warnings.append(
             {

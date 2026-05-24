@@ -1,0 +1,126 @@
+# 阿里云千问云战略与能力全景图 - 信息图提示词生成
+
+## 1. Research Extraction Summary (研究提取摘要)
+*   **组织架构重构（ATH 事业群）**：
+    *   **ATH 定义**：Alibaba Token Hub，由阿里集团 CEO 吴泳铭亲自挂帅，于 2026 年成立。核心逻辑是围绕 Token 的生产、输送和应用，组织基本单位由“产品/流量”切换为“Token”。
+    *   **三段式分工**：
+        *   **创造 Token**：通义实验室负责，主攻底层大模型（Qwen）研发。
+        *   **输送 Token**：MaaS（模型即服务）业务线负责，其底座为百炼平台。
+        *   **应用 Token**：千问事业部、悟空事业部、AI 创新事业部负责，推动 Token 落地 C 端与 B 端具体应用。
+*   **平台底座与入口关系**：
+    *   **百炼平台**：归属于千问云，扮演后端技术与推理引擎角色（负责 Token 的调度、微调、安全、加速等硬核技术层）。
+    *   **千问云官网 (www.qianwenai.com)**：前端统一 AI 服务入口和 AI 时代独立门户，首个独立于阿里云传统官网（aliyun.com）的全新官网。
+*   **千问云两大核心定义**：
+    *   **“为 Agent 而生的新入口”**：AI-First，摒弃传统云复杂的控制台和产品树，实现 Agent 友好。
+    *   **MaaS 开放大集市**：面向全球开发者提供统一的模型 API 集成界面，售卖自研及全球第三方大模型。
+*   **千问云四大核心功能发布**：
+    1.  **150+ 主流模型 API 一站式接入**：通过统一 API 接口访问通义千问系列（Qwen3.7-Max、Qwen-Omni 多模态模型、语音/同传等）、第三方生态模型（智谱 GLM-5.1、MiniMax M2.7、月之暗面 Kimi K2.6、快手可灵 Kling、生数科技 Vidu Q3等）及其他开源/闭源模型（DeepSeek、Wan、HappyHorse等）。
+    2.  **模型核心能力 Skills 化与 CLI 化**：封装模型核心功能。Skills 化将能力转化为 Agent 可调用的标准技能模块；CLI 提供命令行工具让 Agent 在隔离沙箱内自主操作和管理模型。
+    3.  **Agent 自主用量管理**：Agent 在运行期间实时调用用量接口获取自身 Token 消耗，并能自主分析用量趋势，识别死循环或幻觉导致的 Token 异常暴涨，执行中断、回滚或优化。
+    4.  **人类开发者的极简体验**：提供大模型 Playground。支持在同一界面输入相同 Prompt，同步对比多款模型（如 Qwen3.7 对比 GLM-5.1、Kimi K2.6）的输出质量，提供快速选型评测工具。
+
+## 2. Core Judgment (核心判断)
+千问云作为阿里云首个AI原生的独立入口，标志着阿里在组织维度完成了围绕Token生产、输送与应用的“ATH事业群”战略闭环，在产品维度通过百炼平台底座与Agent/CLI友好接口，实现了从“以传统云资源为中心”到“以Token和Agent为中心”的历史性跨越。
+
+## 3. Canvas Orientation (画布方向)
+Horizontal 16:9 PPT-ratio (1920x1080px)
+
+## 4. Visual Strategy (视觉策略)
+*   **主视觉选择**：采用“ATH-千问云双轨协同架构流向图” (ATH-Qianwen Cloud Dual-Track Architecture & Flow Diagram)。
+*   **布局逻辑**：
+    *   **顶部标题栏**：主标题 + 副标题 + 官网网址。
+    *   **左侧版块 (ATH 组织引擎)**：采用纵向三段式管道流向图，展示 Token 的生产、输送、应用闭环。
+    *   **右侧版块 (千问云服务全景)**：采用 2x2 卡片网格，展示一站式模型接入、能力封装、Agent 用量自愈、人类 Playground。
+    *   **中部纽带**：使用齿轮/咬合图标连接“百炼后端技术引擎”与“千问云前端 Agent 入口”，体现前后台的深度绑定。
+    *   **底部版块**：两个并排的对比分析卡片，分别阐述“组织基本单位切换”与“云官网交互重构”的核心逻辑。
+    *   **右下角**：高对比度的“核心洞察金句”卡片。
+
+## 5. Style Choice (风格选择)
+*   **风格定位**：Light Cool Consulting (轻冷咨询风)
+*   **颜色搭配**：
+    *   背景色：冷白 `#F6F8FC`，浅蓝底色 `#EEF3FB`
+    *   主色调（Accent）：深学术蓝 `#0F3D91`，用于主标题、关键框架线和核心分类标签
+    *   高亮色（Highlight）：琥珀金 `#F59E0B`，用于关键指标、警示标识和“核心洞察”重点字眼
+    *   卡片：白底，搭配细石板灰边框 `#CBD5E1`，带微投影效果
+*   **字体规范**：无衬线字体，字重清晰（Bold/Regular/Light），避免多余修饰
+
+## 6. Final Image Prompt (最终绘图提示词)
+```text
+Create a horizontal 16:9 PPT-ratio Chinese insight infographic slide, 1920x1080px or 2K.
+
+Overall style:
+Light Cool Consulting
+- Background: cool white #F6F8FC, pale blue tint #EEF3FB
+- Accent: deep academic blue #0F3D91
+- Highlight: amber #F59E0B
+- Cards: white, thin slate border #CBD5E1, subtle shadow
+- Font: Clean sans-serif, high legibility
+All Chinese and English text must be sharp, fully readable, and not garbled.
+
+Topic:
+阿里 ATH 事业群与千问云全新 AI 原生战略布局
+
+One-sentence judgment:
+千问云作为阿里云首个AI原生的独立入口，依托ATH事业群“创造、输送、应用”三段式Token引擎与百炼后台，开启了以Token为组织单位、以Agent为交互核心的新云时代。
+
+Target reader:
+Executives, technical leads, and product managers
+
+Canvas orientation:
+Horizontal 16:9 PPT: slide-like left-to-right landscape layout
+
+Layout zones:
+1. Header zone: [height 10%, title, subtitle, date/metadata]
+2. Main visual zone: [height 65%, layout details of the wide central landscape diagram, e.g. system flow, architecture stacks, comparison tables, showing rich details]
+3. Supporting evidence/panels: [height 15%, side panels or bottom proof cards]
+4. Insight conclusion zone: [height 10%, bottom-right or bottom-band summary]
+
+Zone details:
+- Header Zone (10% height):
+  - Main Title (Left aligned, bold deep academic blue #0F3D91): "阿里云千问云战略布局与能力全景图"
+  - Subtitle (Left aligned below main title, slate gray): "以 Token 为核心，重构 AI 时代组织分工与 Agent 原生入口"
+  - Metadata Tag (Right aligned, in white pills with #CBD5E1 borders): "战略发布：2026年" | "独立官网：www.qianwenai.com"
+- Main Visual Zone (65% height, Split Layout):
+  - Left Column (Width 40%): "ATH (Alibaba Token Hub) 战略引擎 - 三段式组织分工"
+    - A vertical flow diagram from top to bottom representing Token lifecycle.
+    - Card A1 (Top, pale blue #EEF3FB): "【创造Token】通义实验室" -> Description: "主攻大模型（Qwen）底层研发".
+    - Downward Connector arrow (slate gray #CBD5E1) ->
+    - Card A2 (Middle, white background, deep blue border #0F3D91): "【输送Token】MaaS 业务线" -> Sub-label: "百炼平台为底座" -> Description: "后端推理引擎：负责Token调度、微调、安全与推理加速".
+    - Downward Connector arrow (slate gray #CBD5E1) ->
+    - Card A3 (Bottom, pale amber): "【应用Token】应用层矩阵" -> Description: "推动Token落地到C端/B端具体场景" -> Labels: "千问事业部 | 悟空事业部 | AI 创新事业部".
+  - Middle Connection:
+    - A clear circular gear icon or directional arrow indicating the deep coupling of "后端百炼推理引擎 (Backend Engine)" and "前端千问云门户 (Frontend Portal)".
+  - Right Column (Width 60%): "千问云四维能力堆栈 (Four-Dimensional Capability Stack)"
+    - Arranged in a 2x2 grid of white rounded cards with subtle shadows.
+    - Grid 1 (Top-Left): "150+ 主流模型 API 一站式集成"
+      - Details: "统一 API 接口访问，全面覆盖大模型生态"
+      - Models list: "通义系列 (Qwen3.7-Max, Qwen-Omni, 语音/同传等)" | "第三方顶尖 (GLM-5.1, Kimi K2.6, MiniMax M2.7, 可灵 Kling, Vidu Q3)" | "业界开源 (DeepSeek, Wan, HappyHorse)".
+    - Grid 2 (Top-Right): "核心能力 Skills 化与 CLI 化"
+      - Details: "面向 Agent 调用的极简适配开发"
+      - Bullet points: "• Skills 化封装：转化为标准技能模块，如调用函数般便捷" | "• CLI 命令行工具：沙箱隔离环境，Agent 自主操作与模型管理".
+    - Grid 3 (Bottom-Left): "Agent 自主用量与异常管理"
+      - Details: "智能、透明的 Token 消耗自愈系统"
+      - Sub-features: "• 实时查询：Agent 实时获取消耗数据" | "• 异常自愈 (Amber alert #F59E0B)：自动识别死循环与幻觉导致的 Token 异常暴涨，自主执行中断、回滚与优化".
+    - Grid 4 (Bottom-Right): "人类开发者大模型 Playground"
+      - Details: "极简选型与对比测评界面"
+      - Functions: "• 同步对比测试：同一 Prompt 同步对比输出质量 (如 Qwen3.7 对比 GLM-5.1 或 Kimi K2.6)" | "• 快速测评选型：一键辅助商业决策".
+- Supporting Panels (15% height, at the bottom):
+  - Two parallel cards explaining the transformation logic.
+  - Card 1: "组织基本单位转型 (Organization Shift)" -> Text: "摆脱传统‘产品与流量’指标，集团CEO吴泳铭挂帅ATH事业群，将Token作为全集团最基础的生产要素与业务引擎。"
+  - Card 2: "云服务交互重构 (Interaction Shift)" -> Text: "阿里云17年来首个脱离传统官网的独立产品线，摒弃复杂控制台，打造首个 Agent-First 和 AI-First 的友好物理入口。"
+- Insight Conclusion Zone (10% height, bottom-right):
+  - A highlighted amber-bordered card:
+    - Text: "【核心洞察】千问云的发布不仅是入口的重构，更是基础设施从以‘算力资源’为中心到以‘Token/Agent’为中心的范式迭代。"
+
+Negative constraints:
+No footer signature (do not include "Data & AI 洞察小分队"). No logo, no watermark, no cartoon, no heavy 3D, no neon cyberpunk, no dense paragraphs, no overlapping text, no garbled Chinese, no unsupported facts, no generic text-card wall without a main diagram.
+```
+
+## 7. Quality Checklist (质量清单)
+*   **One Main Judgment (一个核心判断)**：有，位于核心判断板块及绘图提示词的 "One-sentence judgment" 字段。
+*   **One Strong Visual Hook (一个视觉爆点/流向图)**：有，左侧的 ATH 三段式 Token 纵向流向管道，以及前后台齿轮咬合设计。
+*   **Clear Hierarchy (清晰的层次)**：有，由 Header 到主视觉区 (左流向、右矩阵)，再到支持性面板与底部洞察金句，层次递进清晰。
+*   **No Text-only Card Wall (无纯文字卡片墙)**：有，包含流程图结构、2x2网格和咬合关系设计，拒绝单纯列表排版。
+*   **Faithful Facts (忠实于事实)**：有，所有数据（150+模型、Qwen3.7-Max、GLM-5.1、Kimi K2.6等）、名词（ATH、通义实验室、MaaS业务线、百炼平台）以及机制（用量自愈、Playground）全部基于输入文件。
+*   **Readable Chinese (可读的中文标签指示)**：有，指定了清晰的中英文标签格式与层级。
+*   **A Memorable Bottom Insight (有启发性的底部洞察)**：有，洞察千问云是传统算力资源向 AI Token/Agent 原生范式的底层变迁。

@@ -1,0 +1,117 @@
+# 研究提取摘要 (Research Extraction Summary)
+* **大模型预训练能力 (Pre-training)**
+  * **集群规模**：支持单集群 10 万卡规模，万卡规模下 GPU 线性扩展效率大于 96%。
+  * **网络架构**：升级至 HPN 8.0，支持 $10\times10$ 万卡连接规模，片间/节点间网络带宽达 800Gbps。
+  * **框架加速**：基于 PAI 平台，Qwen3.5 MOE 训练加速提升 3 倍；自研预训练框架 TrunkFlow 和 Microtrunk 端到端性能提升 4-5 倍；具备 Checkpoint HA 高可用能力，应对硬件故障。
+  * **磐久 AL128 超节点**：搭载自研 ICN Switch 1.0 互联芯片，将 128 张真武 M890 AI 芯片连接成单一算力资源池（9.2TB 超级内存池），芯片间 P2P 时延 <150ns，片间带宽 800GB/s，单节点内即可完成超大模型分步训练。
+* **大模型后训练能力 (Post-training)**
+  * **Agentic 强化学习**：全面向 RLVR（Reinforcement Learning with Verifiable Reward）范式演进，优化自主执行、多步规划和工具调用。
+  * **沙箱评测规模**：单任务支持扩展至万级沙箱（10,000+ Sandbox）并发运行和评测 Agent 任务。
+  * **百炼平台调优**：提供一站式闭环调优（API化操作，屏蔽GPU管理）；开箱即用支持 GRPO 和 DPO 强化学习算法；白盒化训练面板支持轨迹分析、奖励分配分析和工具调用监控。
+* **推理服务能力 (Inference Serving)**
+  * **极速弹性与调度**：
+    * **Flashboot 引擎**：优化权重文件加载，Qwen3.7-Max 启动与加载时间由 1200 秒压缩至 90 秒。
+    * **Unischeduler 调度器**：集群调度决策时间从 20 秒降至 0.4 秒，弹性响应时间降低 81%，可在 1 分钟内拉起 1 万个 Pod。
+  * **单次推理性能 (TTFT / TPOT)**：
+    * Qwen3.6-Plus 在 PTO（预置吞吐单元）推理下，TTFT（首包延迟）下降 38%；TPOT（Token 输出延迟）从 25 毫秒优化至 10 毫秒（输出速度 100+ Tokens/s）。
+    * 引入多阶段 QoS 和 SO 调度，峰值异常频率降低 98%，峰值请求吞吐提升 2 倍。
+  * **TEL 全局分布式 KV 缓存与降价**：
+    * 自研分布式全局 KV 缓存框架，使 Attention 内存缓存命中率达 90% 以上。
+    * 长对话场景下，重复上下文计算成本降低 97%~98%，多轮对答首包延迟降低 85%。
+    * 商业定价中，Problem Caching（Prompt 缓存）价格降低 90% 以上。
+  * **批量推理 API & 售卖形态**：
+    * 推出 Batch Chat 接口，兼容标准 Completion 协议，支持异步批量处理。
+    * 提供预置吞吐单元（PTO）和模型单元（MU）等资源预留模式，支持百万级上下文和千万级 TPM 默认突发。
+
+# 核心判断 (Core Judgment)
+阿里云通过底层磐久超节点与 HPN 8.0 网络、后训练 Agentic RLVR 以及推理 TEL 全局 KV 缓存的全链路技术升级，打造了低时延、万级高弹性、极致性价比的 Agentic 时代大模型算力与推理底座。
+
+# 画布方向 (Canvas Orientation)
+Horizontal 16:9 PPT-ratio (1920x1080px)
+
+# 视觉策略 (Visual Strategy)
+* **核心视觉架构**：采用“三列式横向架构演进图（Left-to-Right 3-Column Landscape Flow）”，分别对应预训练（Pre-training）、后训练（Post-training）和推理服务（Inference Serving）三个核心阶段。
+* **色彩分配**：
+  * 背景使用冷白色 `#F6F8FC` 搭配淡蓝底色 `#EEF3FB`。
+  * 框架、核心节点与线条使用深学术蓝 `#0F3D91` 进行勾勒，确保专业咨询风。
+  * 关键突破性指标与重要变化（如“降价90%”、“提升4-5倍”、“10万卡规模”）采用琥珀色 `#F59E0B` 高亮标记。
+* **版面布局细节**：
+  * **顶部 Header**：单行标题 + 双排副标题，左对齐，右侧保留版本与架构图例。
+  * **左侧一列（预训练能力）**：上下堆叠式架构，包含底层硬件层（AL128超节点与ICN Switch）、中层网络与集群规模层（HPN 8.0 与万卡扩展）、上层自研训练框架加速层（PAI、Qwen3.5 MOE加速、TrunkFlow）。
+  * **中间一列（后训练对齐）**：Agentic 强化学习专区，采用闭环流向图。下方是 RLVR 范式，中间是万级沙箱并发评测，上方是百炼平台白盒化监控与 GRPO/DPO 算法模块。
+  * **右侧一列（推理服务底座）**：高弹性、低时延推理架构。下方为 Flashboot 与 Unischeduler 调度层（万级弹性拉起），中间为 TTFT/TPOT 性能提升与 QoS 调度，上方为 TEL 全局 KV 缓存与 Prompt 缓存降价模块。
+  * **底部/侧边数据看板（Supporting Panels）**：以四个核心对比卡片形式，直观呈现“90s启动”、“1分钟1万Pod”、“90%缓存命中率”、“90%价格降低”的核心数值。
+  * **底部右下角 Insight Zone**：总结一句话洞察。
+
+# 风格选择 (Style Choice)
+Light Cool Consulting
+
+# 最终绘图提示词 (Final Image Prompt)
+Create a horizontal 16:9 PPT-ratio Chinese insight infographic slide, 1920x1080px or 2K.
+
+Overall style:
+Light Cool Consulting
+- Background: cool white #F6F8FC, pale blue tint #EEF3FB
+- Accent: deep academic blue #0F3D91
+- Highlight: amber #F59E0B
+- Cards: white, thin slate border #CBD5E1, subtle shadow
+- Font: Clean sans-serif, high legibility
+All Chinese and English text must be sharp, fully readable, and not garbled.
+
+Topic:
+阿里云大模型训推一体化底座能力全景图 (Alibaba Cloud Full-link LLM Training & Inference Infrastructure Landscape)
+
+One-sentence judgment:
+阿里云通过底层磐久超节点与 HPN 8.0 网络、后训练 Agentic RLVR 以及推理 TEL 全局 KV 缓存的全链路技术升级，打造了低时延、万级高弹性、极致性价比的 Agentic 时代大模型算力与推理底座。
+
+Target reader:
+Executives, technical leads, and product managers in AI, cloud computing, and enterprise software.
+
+Canvas orientation:
+Horizontal 16:9 PPT: slide-like left-to-right landscape layout
+
+Layout zones:
+1. Header zone: [height 10%, top header strip, clean alignment]
+   - Main Title (Bold Deep Academic Blue #0F3D91): "阿里云大模型训推一体化底座能力全景"
+   - Subtitle (Slate Gray): "从十万卡预训练、万级沙箱后训练，到高弹性极致性价比推理服务底座"
+2. Main visual zone: [height 65%, wide central landscape layout divided into three main columns representing the LLM lifecycle: Left (Pre-training), Middle (Post-training), Right (Inference Serving)]
+3. Supporting evidence/panels: [height 15%, bottom proof cards highlighting core metrics]
+4. Insight conclusion zone: [height 10%, bottom-right summary panel]
+
+Zone details:
+- **Main Visual Zone (Middle 65%): 3-Column Architecture**
+  - **Left Column (预训练能力 Pre-training)**:
+    - *Top Card*: "自研训练框架加速" -> Text points: [PAI优化：Qwen3.5 MOE 训练加速 3x; 自研预训练框架 TrunkFlow/Microtrunk 端到端性能提升 4~5x; Checkpoint HA 硬件故障高可用].
+    - *Middle Card*: "集群与网络规模" -> Text points: [单集群 10万卡规模; 万卡级 GPU 线性扩展效率 >96%; HPN 8.0 网络架构：支持 10x10万卡级连接，带宽达 800Gbps].
+    - *Bottom Card*: "磐久 AL128 超节点服务器" -> Text points: [搭载 ICN Switch 1.0 芯片; 融合成 128x真武 M890 算力池; 9.2TB 超级内存池; 片间 P2P 延时 <150ns，带宽 800GB/s].
+  - **Middle Column (后训练能力 Post-training)**:
+    - *Top Card*: "百炼平台白盒化调优" -> Text points: [一站式闭环调优：数据、精调、评估、部署 API 化; 白盒面板：轨迹分析、奖励分配、工具调用分析; 支持 GRPO 和 DPO 强化学习算法].
+    - *Middle Card*: "万级沙箱并发评测" -> Text points: [单任务扩展至 10,000+ 沙箱规模; 并发运行与快速评测 Agent 任务，提升后训练泛化能力].
+    - *Bottom Card*: "Agentic 强化学习范式" -> Text points: [全面向 Agentic RLVR (Reinforcement Learning with Verifiable Reward) 范式收敛; 基于可验证反馈优化模型自主规划与工具调用].
+  - **Right Column (推理服务能力 Inference Serving)**:
+    - *Top Card*: "TEL 全局分布式 KV 缓存" -> Text points: [自研全局 KV 缓存框架; Attention 内存缓存命中率达 90% 以上; 降本：Problem Caching 价格降幅达 90%+; 重复上下文计算成本降低 97%~98%, 延迟降 85%].
+    - *Middle Card*: "单次推理性能优化" -> Text points: [Qwen3.6-Plus PTO 推理：TTFT 首包延迟降低 38%; TPOT 缩短至 10ms (100+ Tokens/s); 多阶段 QoS & SO 调度：异常率降 98%，峰值吞吐 2x].
+    - *Bottom Card*: "极速弹性与资源调度" -> Text points: [Flashboot 引擎：Qwen3.7-Max 权重加载 1200s 压缩至 90s; Unischeduler 调度器：集群调度 20s 降至 0.4s，弹性响应缩短 81% (1分钟拉起 1万个 Pod)].
+    - *Sidebar / Bottom Badge*: "商业化售卖形态" -> Text points: [百万级上下文 & 千万级 TPM 突发; 提供预置吞吐单元 (PTO) / 模型单元 (MU) 资源预留; Batch Chat API：批量异步处理，极低费率].
+
+- **Supporting Panels (Bottom 15%): Four High-contrast Metric Cards**
+  - Card 1 (Pre-training Core): "线性扩展效率 >96%" (Amber highlight #F59E0B) | "128卡融为一体，片间时延 <150ns" (Deep Blue)
+  - Card 2 (Post-training Core): "10,000+ 沙箱并发" (Amber highlight #F59E0B) | "GRPO / DPO 强化学习白盒化" (Deep Blue)
+  - Card 3 (Inference Speed): "Qwen3.7-Max 90秒启动" (Amber highlight #F59E0B) | "1分钟拉起 1万个 Pod" (Deep Blue)
+  - Card 4 (Cost Reduction): "Prompt 缓存降价 90%+" (Amber highlight #F59E0B) | "KV 缓存内存命中率 >90%" (Deep Blue)
+
+- **Insight Conclusion Zone (Bottom-Right 10%)**
+  - Text box with subtle light blue tint `#EEF3FB` and thin deep blue border `#0F3D91`:
+    - "核心洞察：通过软硬协同的全链路重构，阿里云成功打通了从底层芯片、网络扩展、强化学习对齐到推理阶段 KV 缓存与快速弹性的每一个瓶颈，为 Agentic 大模型应用落地铺平了高性能与低成本的商业化道路。"
+
+Negative constraints:
+No footer signature (do not include "Data & AI 洞察小分队"). No logo, no watermark, no cartoon, no heavy 3D, no neon cyberpunk, no dense paragraphs, no overlapping text, no garbled Chinese, no unsupported facts, no generic text-card wall without a main diagram.
+
+# 质量清单 (Quality Checklist)
+* [x] **单一核心判断**：核心判断总结为一句话，突出软硬协同全链路升级构建的高弹性与性价比底座。
+* [x] **强视觉锚点**：主视觉采用“三列式横向架构演进图（预训练-后训练-推理）”，逻辑清晰，层次分明。
+* [x] **清晰的结构层级**：分三个层级逐步下钻（Header 标题层 -> Main 三列架构演进图 -> Bottom 核心指标卡与核心洞察），确保信息阅读流的顺畅。
+* [x] **拒绝纯文本卡片墙**：利用架构层级（软件-网络-硬件）、闭环流向、卡片分类和数据高亮区分模块，展现极具工业感与专业度的主图。
+* [x] **事实完全忠实**：所有数据（如线性效率 >96%、时延 <150ns、90秒启动、降价 90%+、10,000+沙箱）均严格提取自输入文档，没有任何幻觉和编造。
+* [x] **高可读性中文**：所有标题和技术指标点均使用精准易懂的中英文对照与行业通用名词，无乱码。
+* [x] **深刻的洞察总结**：右下角提供点睛之笔，揭示软硬协同在降低 Agentic 落地门槛上的商业与技术价值。

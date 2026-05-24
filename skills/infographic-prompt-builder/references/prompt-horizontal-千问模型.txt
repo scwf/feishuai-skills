@@ -1,0 +1,108 @@
+# 1. Research Extraction Summary (研究提取摘要)
+- **迭代脉络**: 通义大模型在近3个月内完成了从 Qwen3.5、Qwen3.6 到 Qwen3.7 的稳定迭代。
+- **旗舰大模型 Qwen3.7-Max**:
+  - **性能表现**: TextArena 盲测总榜国产第一、全球第六；Vision Arena 盲测国产第一、全球第五。
+  - **Agent 原生设计**: 原生强化自主规划、多步决策、表格控制与工具调用，原生支持 Model Context Protocol (MCP) 协议，可无缝对接企业外部服务与工具。
+  - **长周期/长程任务 (Long-Horizon)**: 利用超长记忆、多步规划与动态纠错处理复杂任务。在“真武M890芯片”实证中，无人类干预自主工作 35 小时，独立编写与调优生产级 AI 计算内核，性能较官方版提升 10 倍。
+- **原生多模态模型 Qwen-Omni**:
+  - **融合特征**: 文本、语音、视觉原生融合，支持 100+ 种语言，具备顶尖的音视频理解与分割能力。
+  - **交互特征**: 实时流式交互，支持语音指令实时生成代码并进行网页渲染。
+- **语音与交互模型矩阵**:
+  - **Live Translate (实时同传)**: 支持 60 种语言输入、29 种语言输出，内置音色克隆以保留说话人原声。
+  - **Real-Time ASR (语音转文本)**: AA 榜全球第一，针对多语言/方言/噪音精细优化，已落地钉钉、高德。
+  - **TTS (语音合成)**: 极低延迟，大幅提升准确度、自然度及情绪表现力。
+  - **AudioChat (实时双工语音对话)**: 解决“模型降智”难题，双工交互下依然保留高智能，支持在语音通话中调用外部工具与 Agent 框架，权威榜单全球第一。
+
+# 2. Core Judgment (核心判断)
+通义大模型家族通过 Qwen3.7-Max 旗舰级长程任务（Long-Horizon）自主执行力与全场景语音双工交互矩阵的发布，实现了从“单步交互工具”向“高可靠自主 Agent 与全模态企业级智能中枢”的跨代级演进。
+
+# 3. Canvas Orientation (画布方向)
+Horizontal 16:9 PPT-ratio (1920x1080px)
+
+# 4. Visual Strategy (视觉策略)
+- **核心版面架构**: 横向三柱式矩阵 + 底部双向支撑与右下角洞察结论的横屏PPT排版。
+- **视觉锚点与对比**:
+  - 以学术深蓝色（#0F3D91）作为结构线条与主标题颜色，突出专业感。
+  - 核心榜单数据（国产第一、全球第一、10倍性能提升）使用琥珀金（#F59E0B）圆圈徽章进行高亮。
+  - 卡片以冷白底色、细灰框（#CBD5E1）和微阴影立体呈现，逻辑边界清晰。
+- **信息分流路径**: 
+  - 顶部横条显示版本演进（Qwen3.5 ➔ Qwen3.6 ➔ Qwen3.7）。
+  - 中间三栏分别呈现“Qwen3.7-Max 旗舰引擎”、“Qwen-Omni 多模态交互”和“语音与交互模型矩阵”。
+  - 中部右下侧放置最终的洞察结论框，实现从左至右、自顶向下的专业阅读流线。
+
+# 5. Style Choice (风格选择)
+Light Cool Consulting
+
+# 6. Final Image Prompt (最终绘图提示词)
+Create a horizontal 16:9 PPT-ratio Chinese insight infographic slide, 1920x1080px or 2K.
+
+Overall style:
+Light Cool Consulting
+- Background: cool white #F6F8FC, pale blue tint #EEF3FB
+- Accent: deep academic blue #0F3D91
+- Highlight: amber #F59E0B
+- Cards: white, thin slate border #CBD5E1, subtle shadow
+- Font: Clean sans-serif, high legibility
+All Chinese and English text must be sharp, fully readable, and not garbled.
+
+Topic:
+通义千问（Qwen）大模型家族全新升级发布
+
+One-sentence judgment:
+通义大模型家族通过 Qwen3.7-Max 旗舰级长程任务（Long-Horizon）自主执行力与全场景语音双工交互矩阵的发布，实现了从“单步交互工具”向“高可靠自主 Agent 与全模态企业级智能中枢”的跨代级演进。
+
+Target reader:
+Executives, technical leads, and product managers
+
+Canvas orientation:
+Horizontal 16:9 PPT: slide-like left-to-right landscape layout
+
+Layout zones:
+1. Header zone: [height 10%, top banner containing the main title, subtitle, and an evolutionary timeline graphic on the far right]
+2. Main visual zone: [height 65%, a 3-column structured architecture layout representing the Qwen Family Core capabilities]
+3. Supporting panels: [height 15%, bottom proof highlights showing implementation use cases]
+4. Insight conclusion zone: [height 10%, bottom-right highlighted summary container]
+
+Zone details:
+- **Header zone**:
+  - Title: "通义千问新一代大模型与多模态矩阵发布" (font size: large, color: #0F3D91, bold).
+  - Subtitle: "以 Qwen3.7-Max 旗舰与 Qwen-Omni 为核心，构建面向 Agent 与企业场景的全新 AI 生产力矩阵" (font size: medium, color: #475569).
+  - Right-aligned Timeline Graphic: "Qwen 3.5 ➔ Qwen 3.6 ➔ Qwen 3.7 (近3个月快速稳定迭代)" in a subtle pale-blue horizontal capsule tag.
+
+- **Main visual zone (3 columns layout)**:
+  - **Column 1 (Left): Qwen3.7-Max 旗舰大模型** (Deep academic blue header block).
+    - Top sub-card (Rankings): "榜单双魁首" with two amber badge icons:
+      - "TextArena 盲测总榜: 国产模型第1 (全球第6)"
+      - "Vision Arena 盲测: 国产模型第1 (全球第5)"
+    - Middle sub-card (Agent Architecture): "Agent 原生架构". Bullets: "自主规划 / 多步决策", "高精表格控制", "工具自主调用", "原生支持 MCP (Model Context Protocol) 协议".
+    - Bottom sub-card (Long-Horizon Tasks): "长程任务 (Long-Horizon) 引擎". Bullets: "超长记忆与动态纠错机制", "处理复杂编程与多智能体协作".
+  - **Column 2 (Center): Qwen-Omni 原生多模态** (Pale blue header block).
+    - Sub-card A (Fusion): "全模态有机融合". Text: "有机融合文本、语音与视觉，支持 100+ 种语言。顶尖音视频理解与分割。".
+    - Sub-card B (Interaction): "实时流式交互". Text: "双向实时语音流控制，支持以语音指令控制模型，实现实时代码编写与网页端动态渲染呈现。".
+  - **Column 3 (Right): 语音与交互模型矩阵** (Slate header block).
+    - Four stacked horizontal cards:
+      1. "Live Translate 实时同传": "支持60种语言输入/29种语言输出，内置音色克隆，高保真还原原声"
+      2. "Real-Time ASR 语音转文本": "AA榜全球第1，优化复杂噪音与方言，钉钉、高德落地"
+      3. "TTS 语音合成": "极低延迟，提升准确度、自然度与丰富情绪表达"
+      4. "AudioChat 双工语音": "全球第1，首创破解‘传统语音模型降智’瓶颈，语音双工下仍可调用外部工具与 Agent 框架" (Highlight global first status with an amber dot).
+
+- **Supporting panels**:
+  - Horizontal block: "【真武M890芯片】极限调优实证":
+    - Left text: "芯片训练零接触 ➔ 纯任务说明指引 ➔ 35小时无人类干预自主工作"
+    - Right metric: "独立完成生产级 AI 计算内核编写与优化 ➔ 最终性能提升 10 倍 (10x)" (highlight "10倍 (10x)" in bold amber text).
+
+- **Insight conclusion zone (Bottom Right)**:
+  - Box Style: Highlight border in #F59E0B, light yellow background tint #FEF3C7.
+  - Text: "【核心洞察】通义千问在长程任务（Long-Horizon）中解决传统模型易断层、易降智的痛点，通过 Agent 架构和双工语音矩阵的耦合，已初步具备企业级自主数字员工与硬件底层自动调优的落地能力。"
+
+Negative constraints:
+No footer signature (do not include "Data & AI 洞察小分队"). No logo, no watermark, no cartoon, no heavy 3D, no neon cyberpunk, no dense paragraphs, no overlapping text, no garbled Chinese, no unsupported facts, no generic text-card wall without a main diagram.
+
+# 7. Quality Checklist (质量清单)
+- **One Main Judgment**: Yes, it concludes that the release marks the transition from single-step tools to autonomous Agents and full-mode enterprise intelligence centers.
+- **One Strong Visual Hook**: Yes, the 3-column architecture coupled with the "真武M890芯片 10倍性能提升" bottom实证 and the "Qwen 3.5->3.6->3.7" timeline.
+- **Clear Hierarchy**: Header zone (10%), Main visual matrix (65%), Supporting evidence (15%), Bottom-right insight (10%).
+- **No Text-only Card Wall**: Fully structured into columns, badges, flow timelines, and metric cards.
+- **Faithful Facts**: Zero hallucination, only uses facts like TextArena, Vision Arena, Zhenwu M890 chip 35 hrs, 10x speedup, 60/29 language translation, AudioChat global #1, etc.
+- **Readable Chinese**: Text labels are explicitly given in clear, logical Chinese.
+- **Memorable Bottom Insight**: Present in the bottom-right yellow-tinted box highlighting the shift from tools to autonomous digital workers.

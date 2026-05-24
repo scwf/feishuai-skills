@@ -1,0 +1,140 @@
+# 研究提取摘要 (Research Extraction Summary)
+
+- **背景与转型**：在2026阿里云峰会上，阿里云百炼平台负责人于文渊宣布，随着Agentic时代到来，企业大模型需求演变为“长决策链路、高突发峰值、高Token消耗”。阿里云百炼正式上线搭载平头哥最新AI芯片的超节点服务器，并转型为“Agent推理服务平台”。
+- **高性能表现**：
+  - **Flashboot（引擎启动优化）**：打通OS、容器与推理引擎。Qwen3.7-Max服务启动时间从1200秒压缩至**90秒**。
+  - **Unischeduler（集群调度器）**：调度决策时间由20秒降至**0.4秒**，扩缩容响应时间降低**81%**，支持**1分钟内拉起1万个Pod实例**。
+  - **单次推理延迟与吞吐**：以Qwen3.6-Plus在PTO（预置吞吐）场景为例，首包延迟（TTFT）下降**38%**；Token输出延迟（TPOT）从25毫秒下降至**10毫秒**，单流吞吐达**100+ Tokens/秒**。
+  - **智能流量调度**：多阶段QoS调度保障，峰值请求异常频次降低**98%**，峰值吞吐量提升**2倍**。
+  - **商业售卖与规格**：支持百万级长上下文，默认提供千万级TPM的动态Burst弹性空间；提供PTO（预置吞吐单元）和MU（模型单元）两种商业售卖模式。
+- **高性价比设计**：
+  - **TEL全局分布式KV缓存（KVCache）框架**：智能匹配生命周期，重复上下文计算成本最高降低**97%~98%**，首包延迟降低**85%**，使得Problem Caching（Prompt缓存）价格直降**90%以上**。
+  - **Batch Chat（批量推理API）**：为离线评测/批量生成设计异步接口，大幅降低调用成本。
+  - **Token Plan（团队套餐）**：支持统一支付、多应用与多席位统一管理，并提供额外套餐优惠。
+- **安全可靠（99.9% 生产级 SLA）**：
+  - **多租户隔离与全链路加密**：实现请求、算力、网络和工作空间4层多租户彻底隔离。基于TLS/KMS/CMK自带密钥，关键链路100%加密，100%可审计。
+  - **CMAS机密推理（机密批量推理技术）**：承诺数据可用不可见，数据主权完全归属用户。4大可信基石为：
+    1. *基础设施可信*：芯片级硬件安全区域（TEE），提供可信机密虚拟机。
+    2. *推理服务可信*：环境加固，从BIOS到百炼推理网关的端到端源代码定向开源，支持审计。
+    3. *传输链路可信*：基于远程证明（Remote Attestation）校验开启会话，全链路加密。
+    4. *审计验证可信*：支持第三方审计、透明日志，并引入联盟链技术存证。
+- **效果优化与强化学习（Agentic RL）**：
+  - **一站式模型精调（SFT）**：覆盖数据准备到部署，屏蔽底层GPU管理细节（蚂蚁集团、金山WPS、萤石、步步高已落地）。
+  - **Agentic RL（强化学习调优）**：专门优化自主执行、多步规划和工具调用。支持用户接入专属执行环境、沙箱、奖励函数和任务目标。
+  - **白盒化训练面板**：内置GRPO与DPO算法，提供轨迹分析、奖励分配、工具调用多维监控。
+  - **小模型平替**：RL精调的小模型在特定业务场景可替代大模型，极大降低运行成本。
+- **生态与连接**：
+  - **统一API接口**：屏蔽底座差异，一套API享受弹性、安全、计量和计费。
+  - **主流兼容**：全面兼容主流Agent开发框架。
+  - **第三方模型生态**：开放接入智谱GLM-5.1、MiniMax M2.7、月之暗面Kimi K2.6、快手可灵、生数科技Vidu Q3等。
+
+# 核心判断 (Core Judgment)
+
+阿里云百炼全面升级为以“超级算力、极致性能、普惠成本与全面信任”为核心的Agent推理服务平台，助推企业平滑步入Agentic大模型长链路应用时代。
+
+# 画布方向 (Canvas Orientation)
+
+Horizontal 16:9 PPT-ratio (1920x1080px)
+
+# 视觉策略 (Visual Strategy)
+
+- **核心图表设计**：采用“5层统一技术栈与4大核心支柱面板”的横向架构流图。顶部为统一API与多模型生态层，中间为并列的四大核心赋能面板（高性能极速调度、极致高性价比、安全与数据主权、效果调优与RL），底部为硬件算力与物理基础设施层。
+- **视觉引导与排版**：
+  - 核心架构图居中，左右及底部设置支持性看板，右下角以金黄色边框的突出卡片承载“核心洞察”。
+  - 四大支柱内部的数据指标（如“90秒”、“0.4秒”、“降81%”、“降97%~98%”等）采用高饱和度的琥珀色（#F59E0B）加粗放大显示，形成强烈的视觉焦点。
+- **色彩策略**：以学术冷灰蓝色调（#F6F8FC 与 #EEF3FB）作为大背景，核心架构卡片使用纯白底色配细灰边，关键品牌色及标题使用深学术蓝（#0F3D91），关键数据突显和警示用琥珀金（#F59E0B）。
+
+# 风格选择 (Style Choice)
+
+Light Cool Consulting
+
+# 最终绘图提示词 (Final Image Prompt)
+
+Create a horizontal 16:9 PPT-ratio Chinese insight infographic slide, 1920x1080px or 2K.
+
+Overall style:
+Light Cool Consulting
+- Background: cool white #F6F8FC, pale blue tint #EEF3FB
+- Accent: deep academic blue #0F3D91
+- Highlight: amber #F59E0B
+- Cards: white, thin slate border #CBD5E1, subtle shadow
+- Font: Clean sans-serif, high legibility
+All Chinese and English text must be sharp, fully readable, and not garbled.
+
+Topic:
+阿里云百炼：Agentic 时代的推理服务平台发布
+
+One-sentence judgment:
+阿里云百炼全面升级为以‘超级算力、极致性能、普惠成本与全面信任’为核心的Agent推理服务平台，助推企业平滑步入Agentic大模型长链路应用时代。
+
+Target reader:
+Executives, technical leads, and product managers
+
+Canvas orientation:
+Horizontal 16:9 PPT: slide-like left-to-right landscape layout
+
+Layout zones:
+1. Header zone: [height 10%, title, subtitle, date/metadata]
+2. Main visual zone: [height 65%, layout details of the wide central landscape diagram, showing rich details of the 3-tier architecture and 4 vertical pillars]
+3. Supporting evidence/panels: [height 15%, bottom-left and bottom-center proof cards]
+4. Insight conclusion zone: [height 10%, bottom-right summary card]
+
+Zone details:
+1. Header zone:
+   - Topic Title: "阿里云百炼：Agentic 时代的推理服务" (28pt, bold, deep academic blue #0F3D91).
+   - Subtitle: "2026阿里云峰会重磅发布：搭载平头哥AI芯片超节点，全面转型Agent推理服务平台，支撑长决策链路与高突发峰值" (14pt, slate grey #475569).
+   - Right-side small tags: "发布人：于文渊" | "SLA保障：99.9% 生产级" (thin border capsules).
+
+2. Main visual zone (Wide 3-tier Architecture Stack):
+   - TOP LAYER: "统一API与多元生态层 (Unified API & Ecosystem)" (Horizontal banner, pale blue background #EEF3FB).
+     - Left pill: "兼容主流 Agent 框架"
+     - Center text: "一套 API 接口 (适配弹性、安全、计量和计费)"
+     - Right block showing third-party model cards: "阿里通义模型" | "智谱 GLM-5.1" | "MiniMax M2.7" | "月之暗面 Kimi K2.6" | "快手可灵" | "生数科技 Vidu Q3".
+   - MIDDLE LAYER: "4大核心赋能支柱 (4 Core Pillars)" (4 vertical white cards side-by-side, border #CBD5E1).
+     - Pillar A: "高性能极速调度 (High Performance)"
+       * Item 1: "Flashboot 引擎启动优化" -> "打通OS、容器与推理引擎" -> Qwen3.7-Max 启动时间从 1200秒 压缩至 **90秒** (Amber #F59E0B).
+       * Item 2: "Unischeduler 集群调度" -> "资源动态匹配" -> 调度决策 **20s -> 0.4s** | 扩缩容响应时间降 **81%** | 一分钟内拉起 **1万个 Pod**.
+       * Item 3: "极速推理与吞吐" -> "微内核与 Attention 优化" -> Qwen3.6-Plus PTO TTFT 降低 **38%** | TPOT 25ms 降至 **10ms** | 单流吞吐 **100+ Tokens/s**.
+       * Item 4: "智能流量调度 (QoS & SO)" -> 峰值异常频次降低 **98%** | 峰值吞吐提升 **2倍**.
+       * Item 5: "规格售卖" -> 支持百万长上下文 | 默认 **1000万 TPM** 动态 Burst 空间 | 提供 PTO (预置吞吐单元) 与 MU (模型单元).
+     - Pillar B: "极致高性价比 (Cost-Performance)"
+       * Item 1: "TEL 全局分布式 KV 缓存 (KVCache)" -> "上下文生命周期动态匹配" -> 重复上下文计算成本降低 **97%~98%** | TTFT 降低 **85%** | Problem Caching 价格降 **90%+** (Amber #F59E0B).
+       * Item 2: "Batch Chat (批量推理 API)" -> "异步接口融合 completion" -> 针对离线评测与批量生成降低调用成本.
+       * Item 3: "Token Plan (团队套餐)" -> 统一支付、多应用及多席位统一管理 + 额外套餐优惠.
+     - Pillar C: "安全与数据主权 (Security & Isolation)"
+       * Item 1: "4层多租户彻底隔离" -> 请求、算力、网络、工作空间全面物理隔离。
+       * Item 2: "全链路加密与审计" -> TLS + KMS + CMK 自带密钥，100%加密，100%可审计。
+       * Item 3: "CMAS 机密推理" -> "数据可用不可见，数据主权完全归属用户"。
+       * Item 4: "CMAS 4大可信基石":
+         * 基础设施可信: 基于 CPU/GPU 硬件安全区域 (TEE)，提供机密虚拟机。
+         * 推理服务可信: BIOS 到推理网关端到端源代码定向开源，支持自主/第三方审计。
+         * 传输链路可信: 远程证明 (Remote Attestation) 会话校验 + 端到端加密。
+         * 审计验证可信: 联盟链技术存证，访问过程防抵赖、防篡改。
+     - Pillar D: "效果调优与 Agentic RL (RL Tuning & SFT)"
+       * Item 1: "一站式模型精调 (SFT)" -> 覆盖数据准备到部署，屏蔽 GPU 算力管理细节。标杆客户：蚂蚁集团、金山 WPS、萤石、步步高。
+       * Item 2: "Agentic RL (Agent 强化学习)" -> 优化自主执行、多步规划与工具调用。
+       * Item 3: "开放接入训练流" -> 支持客户接入专属执行环境、沙箱、Reward Function 和任务目标。
+       * Item 4: "白盒化监控面板" -> 内置 GRPO 与 DPO 算法，轨迹分析、奖励分配、工具调用监控。
+       * Item 5: "小模型平替" -> 强化学习调优的小模型在特定业务场景可平替大模型，极大地降低长期成本。
+   - BOTTOM LAYER: "平头哥最新 AI 芯片超节点服务器 (Infrastructure Layer)" (Solid background band in deep academic blue #0F3D91 with white glowing text).
+
+3. Supporting evidence/panels (Bottom row, Left & Center):
+   - Card 1: "**应对 Agentic 时代新挑战**" -> "从一问一答转变为长决策链路与高 Token 吞吐。百炼结合智能流量调度、弹性 Burst 空间，保障高并发下的高可用性。"
+   - Card 2: "**生产级场景与客户见证**" -> "99.9% 生产级 SLA 承诺。已经在 WPS、蚂蚁集团、萤石、步步高等企业落地精调，实现业务效果与成本的双重突破。"
+
+4. Insight conclusion zone (Bottom row, Right):
+   - Highlight Card: "核心洞察 (Core Insight)" (Amber border #F59E0B, white background).
+   - Content: "Agentic 时代的推理服务，竞争焦点已从单纯的单次 Token 价格战，升级为包含‘加载速度、弹性调度、分布式缓存、全链路机密计算及白盒化 RL 调优’的系统级工程能力竞争。"
+
+Negative constraints:
+No footer signature (do not include "Data & AI 洞察小分队"). No logo, no watermark, no cartoon, no heavy 3D, no neon cyberpunk, no dense paragraphs, no overlapping text, no garbled Chinese, no unsupported facts, no generic text-card wall without a main diagram.
+
+# 质量清单 (Quality Checklist)
+
+- [x] 核心判断：有且仅有一个核心判断，突出强调百炼由单次推理转变为以四大能力为核心的Agent推理服务平台。
+- [x] 视觉钩子：设计了清晰的“5层统一技术栈与4大核心支柱面板”3D层叠架构图，底部基石为平头哥AI芯片超节点，顶部为多模型生态。
+- [x] 层次分明：明确划分了顶部标题栏（10%）、中部核心架构图（65%）、底部佐证卡片（15%）及右下角总结卡片（10%）的明确比例，空间错落有致。
+- [x] 拒绝纯文字卡片墙：通过架构层级图、支柱横向排列及逻辑箭头展示技术流转，避免了枯燥的文字块堆叠。
+- [x] 忠于事实：所有数据与结论（90秒启动、0.4秒调度、1万Pod、KV缓存降本等）完全来源于原始输入文件，无任何编造。
+- [x] 文本可读性：使用中文命名结构及关键术语，指定了清晰的色值及字体层级。
+- [x] 底部核心洞察：右下角独立金框卡片明确总结了“Agentic时代的推理服务已从价格战升级为系统级工程竞争”的深刻洞察。

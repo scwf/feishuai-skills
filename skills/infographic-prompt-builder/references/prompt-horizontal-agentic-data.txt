@@ -1,0 +1,134 @@
+# 阿里云 Agentic Cloud 数据平面与存储架构全新升级信息图提示词
+
+## 1. Research Extraction Summary (研究提取摘要)
+* **发布背景**：2026年阿里云峰会，首席技术官李飞飞（飞刀）发布。针对 Agentic Cloud（面向智能体的云基础设施）在数据平面（Data Plane）、数据平台及数据库/存储领域的全新架构与产品。
+* **升级核心逻辑（Data for Model & Data for Agent）**：
+  * Agent 负载特征：“无规律弹性、短生命周期、瞬时起量即走”。
+  * **Data for Model**：提供支持模型训练与微调的数据清洗、标注等工具链。
+  * **Data for Agent**：面向 Agent 运行时的核心诉求，解决**多元检索、语义融合、上下文组装及记忆持久化**等挑战。
+* **多模态数据平面能力升级**：
+  * **DTS（数据传输服务）**：升级支持 **AI Native ETL**，支持非结构化数据（音视频、日志、图片），融合千问大模型能力，一键式提取关键特征与语义，并导入数据库/大数据系统。
+  * **DataWorks**：推出**全链路线性格谱（Linear Graph，可视化数据血缘分析）**与**上下文（Context）管理**，解决 Agent 决策链路长、上下文依赖高的问题。
+  * **DMS**：对阿里云旗下所有数据库产品上的核心资产和元数据进行统一安全治理与访问管控。
+  * **大数据产品矩阵**：MaxCompute、Flink、Hologres 全面 Agentic 升级，原生支持大规模多模态数据并行清洗、特征处理与实时分析。
+  * **Lindorm（多模态数据库）**：增强对 AI 搜索和多模态数据低延迟处理、存储的能力。
+  * **低成本数据底座**：DLF（数据湖构建） + OSS 冷存储，提供高性价比多模态数据底座。
+* **智能体分层记忆架构（Hierarchical Memory Architecture）**：
+  * **短期记忆 (Short-term Memory)**：Session 会话保持，维护单次会话 Context。支持产品：`语音缓存 (TEL)` (专为语音交互 Agent 提供的高速语音数据缓存)、`TableStore` (Memory 缓存与持久化引擎优化)。
+  * **长期记忆 (Long-term Memory)**：跨会话 (Cross-session) 上下文状态保持与持续沉淀。支持产品：`OSS Vector Bucket` (低延迟向量化记忆存取)、`Hologres 与 Elasticsearch` (深度集成 **Mem0** 记忆管理框架)。
+  * **知识记忆 (Knowledge Memory)**：企业外挂知识库，RAG 检索增强生成，向量化/多模态化企业文档与经验。支持产品：`Milvus 生态集成` (提供开箱即用的 Agentic 记忆检索)、`PolarDB 与云原生 RDS` (引入 **Ontology 本体能力**，将长短期记忆与知识库深度结合，实现分层存储与快速召唤)。
+* **数据 Agent 开发平台 (Data Agent Platform) 与控制面**：
+  * 控制面改造：云产品全面推行 **Skills 化、MCP 化、CLI 化**。
+  * 典型 Agent 应用：
+    * **DataWorks Agent**：数据 Agent 开发平台，封装数据与业务流，实现自主采集、分析、加工。
+    * **瑶池数据库 Agent (Yaochi Database Agent)**：支持数据库自动性能诊断、SQL 优化分析与自主智能运维。
+    * **OSS Agent**：自动管理和优化冷存储生命周期，降低存储成本。
+
+## 2. Core Judgment (核心判断)
+阿里云数据平面全面实现 Agentic 升级，以“多模态 AI Native ETL”与“三层分层记忆架构”为核心，构建了面向智能体时代的高性能、低延迟、高性价比数据底座，使智能体能够从单次会话交互跃升至长程闭环决策。
+
+## 3. Canvas Orientation (画布方向)
+Horizontal 16:9 PPT-ratio (1920x1080px)
+
+## 4. Visual Strategy (视觉策略)
+* **整体布局**：顶部贯通标题栏（10%），主体采用横向三段式流向布局（65%），底部为三卡片技术佐证栏（15%），右下角配以深蓝色洞察结论卡片（10%）。
+* **主视觉设计**：中部核心视觉区以横向的“数据流与记忆架构”为核心。
+  * **左侧：输入与核心驱动**，展示 Agent 独特的负载特征（无规律弹性等）和双轮驱动（Data for Model 与 Data for Agent）的对比。
+  * **中间：双核并行处理平面**，上方为“多模态数据处理平面（AI Native ETL 管道）”，展示从非结构化多模态数据输入，通过 DTS (AI Native ETL)、DataWorks (Linear Graph) 到大算力并行清洗平台（MaxCompute/Flink/Hologres/Lindorm），最终落入 DLF + OSS 的流向；下方为“分层记忆架构 (Hierarchical Memory)”，清晰分为“短期记忆”、“长期记忆”、“知识记忆”三层，每层旁边标注其对应的技术底座（TEL/TableStore、OSS Vector/Mem0、Milvus/Ontology）。
+  * **右侧：控制面与数据 Agent 平台**，展示 Skills/MCP/CLI 改造理念，引出 DataWorks Agent、Yaochi DB Agent、OSS Agent 三大智能体实例。
+* **色彩搭配**：采用“冷感咨询风格（Light Cool Consulting）”。背景使用冷白 `#F6F8FC` 与淡蓝 `#EEF3FB`。核心文字、边框与逻辑指向箭头使用深学术蓝 `#0F3D91`。分层记忆架构的核心概念、Agent 亮点使用琥珀黄 `#F59E0B` 进行高亮。卡片背景采用纯白，配以 `#CBD5E1` 的细边框和微弱阴影。
+
+## 5. Style Choice (风格选择)
+Light Cool Consulting
+
+## 6. Final Image Prompt (最终绘图提示词)
+```text
+Create a horizontal 16:9 PPT-ratio Chinese insight infographic slide, 1920x1080px or 2K.
+
+Overall style:
+Light Cool Consulting
+- Background: cool white #F6F8FC, pale blue tint #EEF3FB
+- Accent: deep academic blue #0F3D91
+- Highlight: amber #F59E0B
+- Cards: white, thin slate border #CBD5E1, subtle shadow
+- Font: Clean sans-serif, high legibility
+All Chinese and English text must be sharp, fully readable, and not garbled.
+
+Topic:
+阿里云 Agentic Cloud 数据平面与存储架构全新升级
+
+One-sentence judgment:
+阿里云数据平面全面实现 Agentic 升级，以“多模态 AI Native ETL”与“三层分层记忆架构”为核心，构建了面向智能体时代的高性能、低延迟、高性价比数据底座，使智能体能够从单次会话交互跃升至长程闭环决策。
+
+Target reader:
+Executives, technical leads, and product managers
+
+Canvas orientation:
+Horizontal 16:9 PPT: slide-like left-to-right landscape layout
+
+Layout zones:
+1. Header zone: [height 10%, top-aligned full width, deep academic blue title, cool grey metadata]
+2. Main visual zone: [height 65%, a rich landscape system architecture diagram with 3 columns showing technical workflows, data pipelines, and hierarchical memory stacks]
+3. Supporting evidence/panels: [height 15%, bottom horizontal band of 3 metrics/proof cards]
+4. Insight conclusion zone: [height 10%, bottom-right highlighted summary card]
+
+Zone details:
+
+1. Header zone:
+- Main Title: "阿里云 Agentic Cloud 数据平面与存储架构全新发布" (font: bold, deep academic blue #0F3D91, large size)
+- Subtitle: "聚焦 Data for Agent 核心诉求，打造智能体分层记忆与多模态 AI Native ETL 底座" (font: regular, slate grey, medium size)
+- Metadata tag in top-right: "2026 阿里云峰会 · 发布人：CTO 李飞飞" (small size)
+
+2. Main visual zone:
+Divided into 3 horizontal sections from left to right with thin slate divider lines:
+- Left Column: [Input & Driving Force Engine]
+  * Top Card: "Agent 负载特征 (Workload)"
+    - Text: "无规律弹性、短生命周期、瞬时起量即走"
+  * Middle Card: "升级核心逻辑 (Evolutionary Dual Wheels)"
+    - "Data for Model": 数据清洗、标注工具链 (支持模型训练与微调)
+    - "Data for Agent" (Highlighted with amber outline): 解决多元检索、语义融合、上下文组装及记忆持久化
+  * Bottom Input Box: "非结构化多模态数据输入" (图片、视频、文本、日志、音频)
+
+- Center Column: [Core Planes: Processing Flow & Memory Architecture] (Divided into Upper and Lower Blocks)
+  * Upper Block: "多模态数据平面流水线 (Multimodal Data Plane Pipeline)"
+    - Stage 1: "DTS AI Native ETL" -> "结合通义千问大模型，实现非结构化数据的一键式特征/语义自动提取与导入"
+    - Stage 2: "DataWorks 全链路线性格谱" -> "可视化数据血缘分析 & Context 上下文管理 (解决长决策链路与上下文依赖)"
+    - Stage 3: "DMS 统一原数据治理" -> "全数据库核心资产统一安全治理与访问管控"
+    - Stage 4: "并行计算与多模态分析" -> MaxCompute (大算力数仓) | Flink (流计算) | Hologres (实时数仓) 原生支持并行清洗与分析; Lindorm 负责多模态低延迟 AI 搜索
+    - Base Layer: "多模态数据底座" -> DLF (数据湖构建) + OSS 冷存储 (低成本冷存储)
+    - (Draw arrows connecting Stage 1 -> Stage 2 -> Stage 3 -> Stage 4 -> Base Layer)
+  * Lower Block: "智能体分层记忆架构 (Hierarchical Memory Architecture)" (Stacked vertically with 3 amber-bordered layers)
+    - Layer 1: "短期记忆 (Short-term Memory)" -> "Session 会话保持，单会话 Context 维护" -> Support: [语音缓存 TEL (语音 Agent 提速)] & [TableStore 缓存优化]
+    - Layer 2: "长期记忆 (Long-term Memory)" -> "跨会话 (Cross-session) 状态保持与持续沉淀" -> Support: [OSS Vector Bucket 向量存取] & [Hologres / Elasticsearch (深度集成 Mem0 记忆框架)]
+    - Layer 3: "知识记忆 (Knowledge Memory)" -> "企业外挂知识库 (RAG 检索增强)" -> Support: [Milvus 生态集成 (开箱即用)] & [PolarDB / 云原生 RDS (Ontology 本体能力，长短期记忆深度结合)]
+
+- Right Column: [Control Plane & Data Agent Platforms]
+  * Top Card: "控制面三化改造" -> "Skills 化、MCP 化、CLI 化"
+  * Middle & Bottom Cards: Three Key Agent Platforms
+    - Card 1: "DataWorks Agent" (数据 Agent 开发平台: 封装数据与业务流，自主采集/分析/加工)
+    - Card 2: "瑶池数据库 Agent (Yaochi DB Agent)" (自动性能诊断、SQL 优化分析与自主智能运维)
+    - Card 3: "OSS Agent" (自动管理优化冷存储生命周期，极佳成本优化)
+
+3. Supporting evidence/panels:
+Horizontal row of 3 cards at the bottom-left:
+- Card 1: "AI Native ETL 变革" -> "突破传统 DTS 局限，全面实现非结构化多模态数据的一键语义解析"
+- Card 2: "记忆快速召唤" -> "引入 Ontology 本体能力与 Mem0，长短期记忆按需即时精准检索"
+- Card 3: "极佳性价比保障" -> "通过 OSS Cold Storage + DLF 数据湖降低智能体全场景冷数据存储成本"
+
+4. Insight conclusion zone:
+Bottom-right large card in deep academic blue #0F3D91 with amber #F59E0B title and text:
+- Title: "专家洞察 (Expert Insight)"
+- Content: "在 Agentic Cloud 时代，数据库与数据平台已超越‘记录系统’的传统定义，进化为具身智能与智能体高效运转的‘分层脑皮层与数字记忆体’。"
+
+Negative constraints:
+No footer signature (do not include "Data & AI 洞察小分队"). No logo, no watermark, no cartoon, no heavy 3D, no neon cyberpunk, no dense paragraphs, no overlapping text, no garbled Chinese, no unsupported facts, no generic text-card wall without a main diagram.
+```
+
+## 7. Quality Checklist (质量清单)
+- [x] **唯一核心判断**：包含明确的单句核心结论，位于 Core Judgment 部分并整合入最终 prompt 显眼处。
+- [x] **强视觉锚点**：采用横向流向与三层记忆架构图（Short-term, Long-term, Knowledge Memory）相结合作为中心视觉主图，避免单纯的文字卡片堆叠。
+- [x] **信息层级分明**：使用顶部标题栏、中部三栏式架构流水线图、底部佐证指标与右下角突出结论卡片的清晰空间区隔。
+- [x] **拒绝纯文字墙**：包含多组流程连接箭头（DTS -> DataWorks -> Parallel Engine -> DLF）、层次分明的记忆金字塔堆栈，以及各产品线之间的生态联结。
+- [x] **忠实于原文**：所有涉及的词汇（如 Qwen 大模型、DTS AI Native ETL、DataWorks Linear Graph、Mem0 框架、Ontology 本体能力、TEL 语音缓存等）均源自输入文件，无任何外部编造或夸大事实。
+- [x] **中文可读性**：所有中英文标注清晰，核心主题、层级关系与技术架构名称完美呼应。
+- [x] **深刻的底部洞察**：右下角包含一处具有行业高度的洞察总结，指明数据库从“信息记录系统”到“分层脑皮层与记忆体”的时代跃升。

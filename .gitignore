@@ -17,6 +17,7 @@ venv/
 output/
 youtube-[0-9]*/
 x-posts-*/
+skills/*/eval/test_runs/
 
 # Generic local secrets
 .env

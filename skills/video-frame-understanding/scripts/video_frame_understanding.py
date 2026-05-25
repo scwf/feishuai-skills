@@ -386,7 +386,14 @@ def main() -> None:
         clear_directory(frame_json_dir)
 
     started_at = datetime.now().isoformat(timespec="seconds")
+    print(
+        f"[START] video={video_path} topic={video_topic} interval={args.interval_seconds:g} model={args.model}",
+        flush=True,
+    )
+    print(f"[EXTRACT] extracting frames to {frames_dir}", flush=True)
     frames = extract_frames(video_path, frames_dir, args.interval_seconds, args.overwrite)
+    print(f"[FRAMES] extracted {len(frames)} frames", flush=True)
+    print(f"[UNDERSTAND] processing {len(frames)} frames serially with {args.model}", flush=True)
 
     failures: list[dict[str, Any]] = []
     for index, frame_path in enumerate(frames, start=1):
@@ -394,10 +401,10 @@ def main() -> None:
         out_json_path = frame_json_dir / f"{frame_path.stem}.json"
 
         if args.skip_existing and out_json_path.exists():
-            print(f"[SKIP] {index}/{len(frames)} {frame_path.name}")
+            print(f"[SKIP] {index}/{len(frames)} {frame_path.name}", flush=True)
             continue
 
-        print(f"[RUN ] {index}/{len(frames)} {frame_path.name}")
+        print(f"[RUN ] {index}/{len(frames)} {frame_path.name}", flush=True)
         try:
             result = understand_frame(frame_path, timestamp, video_topic, args.model)
             write_json(out_json_path, result)
@@ -411,7 +418,7 @@ def main() -> None:
             failures.append(error)
             error_path = frame_json_dir / f"{frame_path.stem}.error.txt"
             error_path.write_text(json.dumps(error, ensure_ascii=False, indent=2), encoding="utf-8")
-            print(f"[ERR ] {index}/{len(frames)} {frame_path.name}: {exc}")
+            print(f"[ERR ] {index}/{len(frames)} {frame_path.name}: {exc}", flush=True)
 
         time.sleep(0.2)
 

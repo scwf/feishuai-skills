@@ -113,6 +113,10 @@ Tell the user the estimate when possible. For large jobs, prefer running in a wa
 The script prints progress lines:
 
 ```text
+[START] video=... topic=... interval=30 model=qwen3-vl:8b
+[EXTRACT] extracting frames to ...
+[FRAMES] extracted 240 frames
+[UNDERSTAND] processing 240 frames serially with qwen3-vl:8b
 [RUN ] 12/240 frame_000012_00-05-30.png
 [SKIP] 13/240 frame_000013_00-06-00.png
 [ERR ] 14/240 frame_000014_00-06-30.png: ...

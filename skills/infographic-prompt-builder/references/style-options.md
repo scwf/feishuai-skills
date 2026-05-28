@@ -1,12 +1,23 @@
 # Style Options
 
-Offer this selector when the user has not specified a style.
+Offer this selector when the user has not specified a color system or style.
 
-Default recommendation: **A. Light Cool Consulting**.
+Default recommendation: **A. Classic Business Red-Black-Gray**.
 
-## A. Light Cool Consulting
+## A. Classic Business Red-Black-Gray
 
 Best for model briefs, benchmarks, AI product launches, technical architecture, executive summaries.
+
+- Theme: “经典商务红黑灰”. Strictly keep the palette inside red, black, white, and gray unless the user explicitly approves another color.
+- Primary accent: `#C7000B` (PANTONE 185C, RGB 199/0/11) for titles, critical keywords, process lines, arrows, key numbers, and core emphasis.
+- Background/base: pure white `#FFFFFF`; light gray `#F5F5F5` for panels/cards; medium gray `#E0E0E0` for dividers, axes, and subtle borders.
+- Text/contrast: deep black `#1A1A1A` or `#333333` for body text. Emphasized body points, numbers, and metrics use bold black or bold red.
+- Cards: white or `#F5F5F5`, thin gray border `#E0E0E0`, minimal shadow if needed.
+- Feeling: sober, premium, executive business brief, high-contrast, readable, disciplined.
+
+## B. Light Cool Consulting
+
+Use only if the user prefers a cooler consulting palette over the default red-black-gray system.
 
 - Background: cool white `#F6F8FC`, pale blue tint `#EEF3FB`.
 - Accent: deep academic blue `#0F3D91`.
@@ -14,7 +25,7 @@ Best for model briefs, benchmarks, AI product launches, technical architecture, 
 - Cards: white, thin slate border `#CBD5E1`, subtle shadow.
 - Feeling: rational, premium, consulting research brief, executive-readable.
 
-## B. Light Warm Strategy Memo
+## C. Light Warm Strategy Memo
 
 Best for product strategy, industry trend, business model, ecosystem analysis.
 
@@ -24,7 +35,7 @@ Best for product strategy, industry trend, business model, ecosystem analysis.
 - Cards: ivory, warm thin border, paper-like texture.
 - Feeling: strategic memo, thoughtful, high-level, human but still analytical.
 
-## C. Light Minimal Research Card
+## D. Light Minimal Research Card
 
 Best for dense material, high readability, clean executive decks.
 
@@ -34,7 +45,7 @@ Best for dense material, high readability, clean executive decks.
 - Cards: minimal borders, more whitespace, fewer icons.
 - Feeling: clean, sober, high signal, less decorative.
 
-## D. Dark Technical Brief
+## E. Dark Technical Brief
 
 Use only when the user chooses dark style or the topic strongly benefits from it.
 
@@ -49,11 +60,12 @@ Use only when the user chooses dark style or the topic strongly benefits from it
 If the user has not specified style, ask:
 
 ```text
-请选择信息图风格：
-A. 浅色冷静咨询风（默认，适合技术/产品/benchmark）
-B. 浅色暖调战略备忘录风（适合商业/行业/生态）
-C. 浅色极简研究卡风（适合高密度信息）
-D. 深色技术演示风（可选，不默认）
+请先确认信息图配色体系：
+A. 经典商务红黑灰（默认，严控红/黑/白/灰边界；主色 #C7000B）
+B. 浅色冷静咨询风（蓝灰/琥珀，适合技术/产品/benchmark）
+C. 浅色暖调战略备忘录风（适合商业/行业/生态）
+D. 浅色极简研究卡风（适合高密度信息）
+E. 深色技术演示风（可选，不默认）
 
-如果你不选，我将默认使用 A。
+请回复选项或确认默认 A 后，我再继续。
 ```

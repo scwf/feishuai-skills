@@ -2,12 +2,36 @@
 
 ## Universal Final Prompt Structure
 
+## Content Confirmation Table
+
+Use this table after research extraction and core judgment, before writing the final image prompt. This is a content-only checkpoint; do not include color system, canvas ratio, style, or other already confirmed execution parameters.
+
+```markdown
+| 内容要素 | 当前建议 |
+|---|---|
+| 核心主题 | [本图聚焦的主题与边界] |
+| 一句话观点 | [读者 5 秒内应记住的核心结论] |
+| 信息图主线 | [内容展开逻辑，如 问题 -> 机制 -> 证据 -> 结论] |
+| 关键事实和依据 | [必须出现的数据、机制、事件、对比点及来源边界] |
+| 洞察观点 | [区别于通用常识的独特判断或启示] |
+| 关键术语 | [需要准确呈现的产品名、技术名、指标名、英文缩写] |
+```
+
+After the table, ask:
+
+```text
+请确认以上内容关键要素是否需要调整；确认后我再生成最终信息图提示词。
+```
+
 ```text
 Create a [vertical 9:16 / horizontal 16:9 PPT-ratio] Chinese insight infographic, [vertical: 1080x1920px / horizontal PPT: 1920x1080px].
 
 Overall style:
 [chosen style name]
 [background, color palette, typography, grid, mood]
+Color system:
+[confirmed color system name]
+[exact palette boundaries and hex values; for default use Classic Business Red-Black-Gray: `#C7000B`, `#FFFFFF`, `#F5F5F5`, `#E0E0E0`, `#1A1A1A`, `#333333`; no colors outside red/black/white/gray unless explicitly approved]
 All Chinese and English text must be sharp, fully readable, and not garbled.
 
 Topic:
@@ -40,6 +64,7 @@ Footer:
 
 Negative constraints:
 No logo, no watermark, no cartoon, no heavy 3D, no neon cyberpunk unless selected,
+no off-palette colors when Classic Business Red-Black-Gray is selected,
 no dense paragraphs, no overlapping text, no garbled Chinese, no unsupported facts,
 no generic text-card wall without a main diagram.
 ```

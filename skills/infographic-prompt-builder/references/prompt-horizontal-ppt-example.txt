@@ -1,8 +1,10 @@
 Create a horizontal 16:9 PPT-ratio Chinese insight infographic slide, 1920x1080px.
 
 Overall style:
-Light Cool Consulting
-Clean executive research slide, white and very light blue-gray background, thin grid lines, navy and cyan accents, modern Chinese sans-serif typography, precise diagram labels, premium consulting report feel.
+Classic Business Red-Black-Gray
+Clean executive research slide using a strict red/black/white/gray palette, modern Chinese sans-serif typography, precise diagram labels, premium consulting report feel.
+Color system:
+“经典商务红黑灰”. Primary accent `#C7000B` for titles, key emphasis, process lines, arrows, and critical indicators. Background `#FFFFFF`; panel/card base `#F5F5F5`; divider/border gray `#E0E0E0`; body text `#1A1A1A` or `#333333`. Emphasized body points, numbers, and metrics use bold black or bold red. Avoid colors outside red, black, white, and gray unless explicitly approved.
 All Chinese and English text must be sharp, fully readable, and not garbled.
 
 Topic:
@@ -59,6 +61,7 @@ If date/source metadata is needed, place it as small text in the top header stri
 
 Negative constraints:
 No logo, no watermark, no cartoon, no heavy 3D, no neon cyberpunk unless selected,
+no off-palette colors when Classic Business Red-Black-Gray is selected,
 no vertical poster composition, no stacked tree layout unless explicitly requested,
 no "Data & AI 洞察小分队" footer or signature on horizontal PPT-ratio slides,
 no dense paragraphs, no overlapping text, no garbled Chinese, no unsupported facts,

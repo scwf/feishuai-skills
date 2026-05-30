@@ -1,0 +1,5 @@
+faster-whisper>=1.1.0
+yt-dlp>=2025.1.15
+openai>=1.0.0
+json-repair>=0.30.0
+tenacity>=8.2.0

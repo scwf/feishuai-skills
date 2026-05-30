@@ -18,6 +18,10 @@ output/
 youtube-[0-9]*/
 x-posts-*/
 skills/*/eval/test_runs/
+skills/*/_subtitle_work/
+skills/*/subtitles/
+skills/*/bin/
+skills/*/models/
 
 # Generic local secrets
 .env

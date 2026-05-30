@@ -1,11 +1,26 @@
 # Setup
 
-Use a regular Python environment on Windows, macOS, or Linux.
 Resolve `{SKILL_ROOT}` to this skill folder before running commands.
 
+Prefer `uv` to create a per-skill virtual environment at `{SKILL_ROOT}/.venv` so this skill's dependencies do not pollute the user's global Python environment. If the host agent provides an isolated Python runtime, use that runtime instead.
+
+Create and install once on macOS/Linux:
+
 ```bash
-python -m pip install -r {SKILL_ROOT}/requirements.txt
+uv venv {SKILL_ROOT}/.venv
+uv pip install --python {SKILL_ROOT}/.venv/bin/python -r {SKILL_ROOT}/requirements.txt
 ```
+
+On Windows:
+
+```bash
+uv venv {SKILL_ROOT}\.venv
+uv pip install --python {SKILL_ROOT}\.venv\Scripts\python.exe -r {SKILL_ROOT}\requirements.txt
+```
+
+If `uv` is unavailable, fall back to `python -m venv` and install dependencies with the venv's `python -m pip`.
+
+Run later commands with the same venv Python: `{SKILL_ROOT}/.venv/bin/python` on macOS/Linux or `{SKILL_ROOT}\.venv\Scripts\python.exe` on Windows.
 
 For media decoding and URL downloads, make sure `ffmpeg` is available on `PATH`. `yt-dlp` uses it for extracting audio from video URLs.
 

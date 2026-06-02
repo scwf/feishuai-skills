@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
-Send X-daily report email: plain body + TXT attachment + optional PDF (Bcc).
+Send X-daily report email: plain body + TXT attachment + optional PDF.
+
+Recipient users are sent through the SMTP envelope only; no Bcc header is
+written, so recipients are not exposed in the message headers.
 
 成功：EMAIL_OK <N>
 失败：EMAIL_FAILED <short_reason>，并将邮件正文写入 reports 目录下 email_failed_<date>.txt
@@ -97,7 +100,7 @@ def paths_for_date(reports: Path, date_str: str) -> dict[str, Path]:
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Send X-daily email (Bcc, TXT + optional PDF).",
+        description="Send X-daily email (envelope Bcc, TXT + optional PDF).",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     p.add_argument("--date", help="Report date YYYY-MM-DD")
@@ -214,7 +217,6 @@ def main() -> None:
         msg["Subject"] = subject
         msg["From"] = from_header
         msg["To"] = from_addr
-        msg["Bcc"] = ", ".join(recipients)
         msg.set_content(email_body, charset="utf-8")
 
         add_attachment(msg, report_path)
@@ -225,7 +227,12 @@ def main() -> None:
             env["smtp_server"], int(env["smtp_port"]), timeout=30
         ) as s:
             s.login(env["smtp_username"], env["smtp_password"])
-            s.send_message(msg)
+            envelope_recipients = list(dict.fromkeys([from_addr, *recipients]))
+            s.send_message(
+                msg,
+                from_addr=from_addr,
+                to_addrs=envelope_recipients,
+            )
 
         print("EMAIL_OK", len(recipients))
 

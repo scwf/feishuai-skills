@@ -36,6 +36,10 @@ def extract_first_topic_per_category(txt_path: Path) -> list:
     section_divider_re = re.compile(r"^═+")
     horizontal_divider_re = re.compile(r"^─+$")
     summary_marker = "今日总判断"
+    judgement_labels = ("产品判断", "技术判断", "实践启示")
+
+    def is_judgement_heading(text: str) -> bool:
+        return any(text.startswith(f"{label}：") for label in judgement_labels)
 
     results = []
     current_category = None
@@ -87,6 +91,7 @@ def extract_first_topic_per_category(txt_path: Path) -> list:
                 "title": m_topic.group(2).strip(),
                 "fact": "",
                 "judgement": "",
+                "judgement_label": "产品判断",
                 "links": [],
                 "is_skip": False,
             }
@@ -100,7 +105,7 @@ def extract_first_topic_per_category(txt_path: Path) -> list:
                 while i < n:
                     nxt = lines[i]
                     nxt_s = nxt.strip()
-                    if (nxt_s.startswith("产品判断：") or nxt_s.startswith("推文链接：")
+                    if (is_judgement_heading(nxt_s) or nxt_s.startswith("推文链接：")
                         or category_re.match(nxt_s) or topic_re.match(nxt_s)
                         or section_divider_re.match(nxt_s) or horizontal_divider_re.match(nxt_s)):
                         break
@@ -109,7 +114,8 @@ def extract_first_topic_per_category(txt_path: Path) -> list:
                 current_topic["fact"] = "\n".join(buf).strip()
                 current_topic["is_skip"] = is_skip_topic(current_topic)
                 continue
-            if stripped.startswith("产品判断："):
+            if is_judgement_heading(stripped):
+                current_topic["judgement_label"] = stripped.split("：", 1)[0]
                 buf = []
                 i += 1
                 while i < n:
@@ -129,7 +135,7 @@ def extract_first_topic_per_category(txt_path: Path) -> list:
                 while i < n:
                     nxt = lines[i]
                     nxt_s = nxt.strip()
-                    if (nxt_s.startswith("事实：") or nxt_s.startswith("产品判断：")
+                    if (nxt_s.startswith("事实：") or is_judgement_heading(nxt_s)
                         or category_re.match(nxt_s) or topic_re.match(nxt_s)
                         or section_divider_re.match(nxt_s) or horizontal_divider_re.match(nxt_s)):
                         break
@@ -193,7 +199,8 @@ def build_email_body(
         out.append(f"【{cat}】")
         out.append(t["title"])
         out.append(f"事实：{condense(t.get('fact', ''), 220)}")
-        out.append(f"简要解读：{condense(t.get('judgement', ''), 140)}")
+        judgement_label = t.get("judgement_label", "产品判断")
+        out.append(f"{judgement_label}：{condense(t.get('judgement', ''), 140)}")
         links = t.get("links", [])[:2]
         if links:
             out.append("链接：")

@@ -20,7 +20,7 @@
 | `email_body.py` | report 后 | 生成邮件速览纯文本正文 |
 | `txt_to_html.py` | report 后 | report TXT 转结构化 HTML |
 | `render_pdf.js` | HTML 后 | HTML 转 PDF |
-| `send_email.py` | 投递 | 发送邮件，Bcc，附 TXT 与可选 PDF |
+| `send_email.py` | 投递 | 发送邮件，目标用户通过 SMTP envelope 隐式 Bcc，附 TXT 与可选 PDF |
 
 ## `email_body.py`
 
@@ -83,7 +83,7 @@ node "{SKILL_ROOT}/scripts/render_pdf.js" <INPUT_HTML> <OUTPUT_PDF>
 
 ## `send_email.py`
 
-**用途**：SMTP_SSL 发送邮件；正文为 `email_body` 文件；附件为 report TXT 与可选 PDF；`To` 为发件地址，`Bcc` 为收件人列表。
+**用途**：SMTP_SSL 发送邮件；正文为 `email_body` 文件；附件为 report TXT 与可选 PDF；`To` 为发件地址，目标用户只进入 SMTP envelope，不写入 `Bcc` 邮件头。
 
 发送邮件是对外动作。只有在外部调用方或用户明确授权时才执行；不要输出 SMTP 密码、credentials 原文或完整异常堆栈。
 

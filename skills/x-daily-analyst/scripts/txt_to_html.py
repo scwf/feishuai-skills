@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Convert structured X-daily TXT report to structured HTML.
 
-Parses the structured markers in the TXT (【类别】, 【主题 0X】, 事实：, 产品判断：,
-推文链接：, 今日总判断) and emits a layered HTML file with deep-blue headers,
+Parses the structured markers in the TXT (【类别】, 【主题 0X】, 事实：,
+产品判断：/技术判断：/实践启示：, 推文链接：, 今日总判断) and emits a layered HTML file with deep-blue headers,
 category containers, white topic cards, and color-coded fact/judgement/link labels.
 
 Usage:
@@ -95,6 +95,10 @@ def txt_to_html(txt_path: Path, html_path: Path) -> None:
     category_note = None
     summary_mode = False
     summary_buffer = []
+    judgement_labels = ("产品判断", "技术判断", "实践启示")
+
+    def is_judgement_heading(text: str) -> bool:
+        return any(text.startswith(f"{label}：") for label in judgement_labels)
 
     def close_topic():
         nonlocal current_topic, current_topic_buffer
@@ -122,9 +126,10 @@ def txt_to_html(txt_path: Path, html_path: Path) -> None:
                         cat_body.append(f"            <p>{escape(para.strip())}</p>")
                 cat_body.append("          </div>")
             elif btype == "judgement":
+                label, text = btext
                 cat_body.append('          <div class="content-block">')
-                cat_body.append('            <span class="label label-judgement">产品判断</span>')
-                for para in btext.strip().split("\n\n"):
+                cat_body.append(f'            <span class="label label-judgement">{escape(label)}</span>')
+                for para in text.strip().split("\n\n"):
                     if para.strip():
                         cat_body.append(f"            <p>{escape(para.strip())}</p>")
                 cat_body.append("          </div>")
@@ -234,7 +239,7 @@ def txt_to_html(txt_path: Path, html_path: Path) -> None:
                 while i < n:
                     nxt_s = lines[i].strip()
                     if (
-                        nxt_s.startswith("产品判断：")
+                        is_judgement_heading(nxt_s)
                         or nxt_s.startswith("推文链接：")
                         or category_re.match(nxt_s)
                         or topic_re.match(nxt_s)
@@ -246,7 +251,8 @@ def txt_to_html(txt_path: Path, html_path: Path) -> None:
                     i += 1
                 current_topic_buffer.append(("fact", "\n".join(buf)))
                 continue
-            if stripped.startswith("产品判断："):
+            if is_judgement_heading(stripped):
+                judgement_label = stripped.split("：", 1)[0]
                 buf = []
                 i += 1
                 while i < n:
@@ -262,7 +268,7 @@ def txt_to_html(txt_path: Path, html_path: Path) -> None:
                         break
                     buf.append(lines[i])
                     i += 1
-                current_topic_buffer.append(("judgement", "\n".join(buf)))
+                current_topic_buffer.append(("judgement", (judgement_label, "\n".join(buf))))
                 continue
             if stripped.startswith("推文链接："):
                 buf = []
@@ -271,7 +277,7 @@ def txt_to_html(txt_path: Path, html_path: Path) -> None:
                     nxt_s = lines[i].strip()
                     if (
                         nxt_s.startswith("事实：")
-                        or nxt_s.startswith("产品判断：")
+                        or is_judgement_heading(nxt_s)
                         or category_re.match(nxt_s)
                         or topic_re.match(nxt_s)
                         or section_divider_re.match(nxt_s)

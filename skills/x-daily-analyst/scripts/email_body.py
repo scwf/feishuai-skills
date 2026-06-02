@@ -191,10 +191,17 @@ def build_email_body(
 
     for cat, t in picks:
         out.append(f"【{cat}】")
+        out.append("")
+        out.append("主题：")
         out.append(t["title"])
-        out.append(f"事实：{(t.get('fact') or '').strip()}")
+        out.append("")
+        out.append("事实：")
+        out.append((t.get("fact") or "").strip())
+        out.append("")
         judgement_label = t.get("judgement_label", "产品判断")
-        out.append(f"{judgement_label}：{(t.get('judgement') or '').strip()}")
+        out.append(f"{judgement_label}：")
+        out.append((t.get("judgement") or "").strip())
+        out.append("")
         links = t.get("links", [])[:2]
         if links:
             out.append("链接：")

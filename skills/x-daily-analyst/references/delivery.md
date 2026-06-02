@@ -20,11 +20,11 @@
 | `email_body.py` | report 后 | 生成邮件速览纯文本正文 |
 | `txt_to_html.py` | report 后 | report TXT 转结构化 HTML |
 | `render_pdf.js` | HTML 后 | HTML 转 PDF |
-| `send_email.py` | 投递 | 发送邮件，目标用户通过 SMTP envelope 隐式 Bcc，附 TXT 与可选 PDF |
+| `send_email.py` | 投递 | 发送邮件：发件人自收 1 封，目标用户逐个单独投递，附 TXT 与可选 PDF |
 
 ## `email_body.py`
 
-**用途**：从 report TXT 为每个类别取第一个有效主题，拼出「今日各领域首要事实速览」及附件说明。
+**用途**：从 report TXT 为每个类别取第一个有效主题，拼出「今日各领域首要事实速览」及附件说明。正文中类别使用 `【category】`，字段使用 `主题：` / `事实：` / 判断段 / `链接：`，字段与内容换行，各段之间保留空行，方便邮件阅读。
 
 **调用**：
 
@@ -83,7 +83,7 @@ node "{SKILL_ROOT}/scripts/render_pdf.js" <INPUT_HTML> <OUTPUT_PDF>
 
 ## `send_email.py`
 
-**用途**：SMTP_SSL 发送邮件；正文为 `email_body` 文件；附件为 report TXT 与可选 PDF；`To` 为发件地址，目标用户只进入 SMTP envelope，不写入 `Bcc` 邮件头。
+**用途**：SMTP_SSL 发送邮件；正文为 `email_body` 文件；附件为 report TXT 与可选 PDF。脚本会先给发件人发送 1 封自收副本，再对目标收件人逐个单独发送，每封目标邮件的 `To` 都是该目标邮箱，不使用 `Bcc`。邮件正文保持纯文本，不发送 HTML alternative，降低企业邮箱拦截概率。
 
 发送邮件是对外动作。只有在外部调用方或用户明确授权时才执行；不要输出 SMTP 密码、credentials 原文或完整异常堆栈。
 
@@ -106,4 +106,6 @@ python3 "{SKILL_ROOT}/scripts/send_email.py" [--date YYYY-MM-DD] [--report PATH]
 
 **路径解析**：若提供 `--report`，据此解析日期并推导 `_email_body.txt` / `_full.pdf`；若仅 `--date`，在 reports 目录按命名查找；若均未提供，取 reports 下最新的 `*_full.txt`。
 
-**输出**：`EMAIL_OK <N>` 或 `EMAIL_FAILED <短原因>`；失败时会把邮件正文写入 reports 目录下 `email_failed_<date>.txt`。
+**输出**：`EMAIL_OK <N>` 或 `EMAIL_FAILED <短原因>`；`N` 表示被 SMTP 接受的目标收件人数（不包含发件人自收副本）。失败时会把邮件正文写入 reports 目录下 `email_failed_<date>.txt`，并写 `email_failed_<date>.log`。成功时写 `email_sent_<date>.log`，记录逐个收件人的投递结果、目标收件人、SMTP 拒收明细；不记录 SMTP 密码。
+
+若任一目标收件人被 SMTP 拒收，视为投递失败并输出 `EMAIL_FAILED 收件人被拒收`，避免只给自己投递成功却误报目标用户成功。因为目标用户逐个单独发送，发件箱中通常可看到发给每个目标邮箱的独立邮件。

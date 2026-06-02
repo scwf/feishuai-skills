@@ -2,8 +2,9 @@
 """
 Send X-daily report email: plain body + TXT attachment + optional PDF.
 
-Recipient users are sent through the SMTP envelope only; no Bcc header is
-written, so recipients are not exposed in the message headers.
+The sender receives one self-copy. Each target recipient receives a separate
+message with its own To header, so recipients are not exposed to each other and
+enterprise mail gateways see a normal point-to-point delivery shape.
 
 成功：EMAIL_OK <N>
 失败：EMAIL_FAILED <short_reason>，并将邮件正文写入 reports 目录下 email_failed_<date>.txt
@@ -22,6 +23,7 @@ from pathlib import Path
 from smtplib import (
     SMTPAuthenticationError,
     SMTPConnectError,
+    SMTPRecipientsRefused,
     SMTPServerDisconnected,
     SMTPException,
 )
@@ -41,17 +43,48 @@ def short_reason(exc: BaseException) -> str:
         (SMTPConnectError, SMTPServerDisconnected, socket.timeout, TimeoutError),
     ):
         return "连接超时"
+    if isinstance(exc, SMTPRecipientsRefused):
+        return "收件人被拒收"
     if isinstance(exc, FileNotFoundError):
         return "文件缺失"
     if isinstance(exc, KeyError):
         return "配置缺失"
     if isinstance(exc, SMTPException):
         return "SMTP失败"
+    if isinstance(exc, RuntimeError) and "收件人被拒收" in str(exc):
+        return "收件人被拒收"
     if isinstance(exc, RuntimeError) and "邮件正文过期" in str(exc):
         return "邮件正文过期"
     if isinstance(exc, RuntimeError) and "收件人" in str(exc):
         return "收件人为空"
     return "未知错误"
+
+
+def normalize_refused_recipients(refused: dict | None) -> dict[str, str]:
+    normalized: dict[str, str] = {}
+    for recipient, detail in (refused or {}).items():
+        if isinstance(detail, tuple) and len(detail) >= 2:
+            code, message = detail[0], detail[1]
+            if isinstance(message, bytes):
+                message = message.decode("utf-8", errors="replace")
+            normalized[str(recipient)] = f"{code} {message}"
+        else:
+            normalized[str(recipient)] = str(detail)
+    return normalized
+
+
+def format_delivery_attempts(attempts: list[dict[str, str]] | None) -> list[str]:
+    if not attempts:
+        return ["- none"]
+    lines = []
+    for attempt in attempts:
+        role = attempt.get("role", "")
+        recipient = attempt.get("recipient", "")
+        status = attempt.get("status", "")
+        detail = attempt.get("detail", "")
+        suffix = f" ({detail})" if detail else ""
+        lines.append(f"- {role}: {recipient}: {status}{suffix}")
+    return lines
 
 
 def write_failure_log(
@@ -65,12 +98,17 @@ def write_failure_log(
     reci_path: Path | None = None,
     env: dict[str, str] | None = None,
     recipients: list[str] | None = None,
+    envelope_recipients: list[str] | None = None,
+    refused_recipients: dict | None = None,
+    delivery_attempts: list[dict[str, str]] | None = None,
     missing_keys: list[str] | None = None,
     attach_pdf: bool | None = None,
     exc: BaseException | None = None,
 ) -> None:
     env = env or {}
     recipients = recipients or []
+    envelope_recipients = envelope_recipients or []
+    refused_recipients = normalize_refused_recipients(refused_recipients)
     missing_keys = missing_keys or []
     paths = paths or {}
 
@@ -109,12 +147,91 @@ def write_failure_log(
     else:
         lines.append("- none")
 
+    lines.extend(
+        [
+            f"envelope_recipients_count: {len(envelope_recipients)}",
+            "envelope_recipients:",
+        ]
+    )
+    if envelope_recipients:
+        lines.extend(f"- {recipient}" for recipient in envelope_recipients)
+    else:
+        lines.append("- none")
+
+    lines.extend(["refused_recipients:"])
+    if refused_recipients:
+        lines.extend(f"- {recipient}: {detail}" for recipient, detail in refused_recipients.items())
+    else:
+        lines.append("- none")
+
+    lines.extend(["delivery_attempts:"])
+    lines.extend(format_delivery_attempts(delivery_attempts))
+
     lines.extend(["", "exception:"])
     if exc is not None:
         lines.extend(traceback.format_exception(type(exc), exc, exc.__traceback__))
     else:
         lines.append("")
 
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def write_success_log(
+    path: Path,
+    *,
+    date_str: str,
+    paths: dict[str, Path],
+    cred_path: Path,
+    reci_path: Path,
+    env: dict[str, str],
+    recipients: list[str],
+    envelope_recipients: list[str],
+    refused_recipients: dict | None,
+    delivery_attempts: list[dict[str, str]],
+    attach_pdf: bool,
+) -> None:
+    refused_recipients = normalize_refused_recipients(refused_recipients)
+    accepted_targets = [recipient for recipient in recipients if recipient not in refused_recipients]
+    lines = [
+        "status: EMAIL_OK",
+        f"date: {date_str}",
+        "",
+        f"report: {paths.get('report', '')}",
+        f"email_body: {paths.get('email_body', '')}",
+        f"pdf: {paths.get('pdf', '')}",
+        f"attach_pdf: {attach_pdf}",
+        "",
+        f"smtp_server: {env.get('smtp_server', '')}",
+        f"smtp_port: {env.get('smtp_port', '')}",
+        f"email_from: {env.get('email_from', '')}",
+        f"credentials_file: {cred_path}",
+        f"recipients_file: {reci_path}",
+        "",
+        f"target_recipients_count: {len(recipients)}",
+        f"accepted_target_recipients_count: {len(accepted_targets)}",
+        "target_recipients:",
+    ]
+    if recipients:
+        lines.extend(f"- {recipient}" for recipient in recipients)
+    else:
+        lines.append("- none")
+    lines.extend(
+        [
+            f"envelope_recipients_count: {len(envelope_recipients)}",
+            "envelope_recipients:",
+        ]
+    )
+    if envelope_recipients:
+        lines.extend(f"- {recipient}" for recipient in envelope_recipients)
+    else:
+        lines.append("- none")
+    lines.append("refused_recipients:")
+    if refused_recipients:
+        lines.extend(f"- {recipient}: {detail}" for recipient, detail in refused_recipients.items())
+    else:
+        lines.append("- none")
+    lines.append("delivery_attempts:")
+    lines.extend(format_delivery_attempts(delivery_attempts))
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -153,6 +270,28 @@ def add_attachment(msg: EmailMessage, path: Path) -> None:
             subtype=subtype,
             filename=path.name,
         )
+
+
+def build_message(
+    *,
+    subject: str,
+    from_header: str,
+    to_addr: str,
+    email_body: str,
+    report_path: Path,
+    pdf_path: Path,
+    attach_pdf: bool,
+) -> EmailMessage:
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = from_header
+    msg["To"] = to_addr
+    msg.set_content(email_body, charset="utf-8")
+
+    add_attachment(msg, report_path)
+    if attach_pdf:
+        add_attachment(msg, pdf_path)
+    return msg
 
 
 def ensure_fresh_email_body(email_body_path: Path, report_path: Path) -> None:
@@ -263,6 +402,9 @@ def main() -> None:
     paths: dict[str, Path] | None = None
     env: dict[str, str] = {}
     recipients: list[str] = []
+    envelope_recipients: list[str] = []
+    refused_recipients: dict = {}
+    delivery_attempts: list[dict[str, str]] = []
     missing_keys: list[str] = []
     attach_pdf: bool | None = None
     step = "resolve_paths"
@@ -314,33 +456,115 @@ def main() -> None:
         from_addr = env["email_from"]
         from_header = f"{from_name} <{from_addr}>" if from_name else from_addr
 
-        step = "build_message"
-        msg = EmailMessage()
-        msg["Subject"] = subject
-        msg["From"] = from_header
-        msg["To"] = from_addr
-        msg.set_content(email_body, charset="utf-8")
-
-        add_attachment(msg, report_path)
-        if attach_pdf:
-            add_attachment(msg, pdf_path)
-
         step = "smtp_send"
         with smtplib.SMTP_SSL(
             env["smtp_server"], int(env["smtp_port"]), timeout=30
         ) as s:
             s.login(env["smtp_username"], env["smtp_password"])
-            envelope_recipients = list(dict.fromkeys([from_addr, *recipients]))
-            s.send_message(
-                msg,
-                from_addr=from_addr,
-                to_addrs=envelope_recipients,
+            self_msg = build_message(
+                subject=subject,
+                from_header=from_header,
+                to_addr=from_addr,
+                email_body=email_body,
+                report_path=report_path,
+                pdf_path=pdf_path,
+                attach_pdf=bool(attach_pdf),
             )
+            envelope_recipients = [from_addr]
+            self_refused = s.send_message(
+                self_msg, from_addr=from_addr, to_addrs=[from_addr]
+            )
+            refused_recipients.update(self_refused)
+            if from_addr in self_refused:
+                delivery_attempts.append(
+                    {
+                        "role": "self",
+                        "recipient": from_addr,
+                        "status": "refused",
+                        "detail": normalize_refused_recipients(self_refused).get(from_addr, ""),
+                    }
+                )
+            else:
+                delivery_attempts.append(
+                    {
+                        "role": "self",
+                        "recipient": from_addr,
+                        "status": "accepted",
+                    }
+                )
 
-        print("EMAIL_OK", len(recipients))
+            for recipient in recipients:
+                target_msg = build_message(
+                    subject=subject,
+                    from_header=from_header,
+                    to_addr=recipient,
+                    email_body=email_body,
+                    report_path=report_path,
+                    pdf_path=pdf_path,
+                    attach_pdf=bool(attach_pdf),
+                )
+                envelope_recipients.append(recipient)
+                try:
+                    refused = s.send_message(
+                        target_msg,
+                        from_addr=from_addr,
+                        to_addrs=[recipient],
+                    )
+                except SMTPRecipientsRefused as exc:
+                    refused = exc.recipients
+                refused_recipients.update(refused)
+                if recipient in refused:
+                    delivery_attempts.append(
+                        {
+                            "role": "target",
+                            "recipient": recipient,
+                            "status": "refused",
+                            "detail": normalize_refused_recipients(refused).get(recipient, ""),
+                        }
+                    )
+                else:
+                    delivery_attempts.append(
+                        {
+                            "role": "target",
+                            "recipient": recipient,
+                            "status": "accepted",
+                        }
+                    )
+
+        accepted_target_count = sum(
+            1
+            for attempt in delivery_attempts
+            if attempt.get("role") == "target" and attempt.get("status") == "accepted"
+        )
+        if accepted_target_count < len(recipients):
+            failed_targets = [
+                attempt.get("recipient", "")
+                for attempt in delivery_attempts
+                if attempt.get("role") == "target" and attempt.get("status") != "accepted"
+            ]
+            raise RuntimeError("目标收件人被拒收：" + ",".join(failed_targets))
+
+        success_log_path = reports / f"email_sent_{date_str}.log"
+        write_success_log(
+            success_log_path,
+            date_str=date_str,
+            paths=paths,
+            cred_path=cred_path,
+            reci_path=reci_path,
+            env=env,
+            recipients=recipients,
+            envelope_recipients=envelope_recipients,
+            refused_recipients=refused_recipients,
+            delivery_attempts=delivery_attempts,
+            attach_pdf=bool(attach_pdf),
+        )
+
+        print("EMAIL_OK", accepted_target_count)
 
     except Exception as e:
         reason = short_reason(e)
+        if isinstance(e, SMTPRecipientsRefused):
+            refused_recipients = e.recipients
         try:
             if paths is None:
                 paths = resolve_paths(args)
@@ -361,6 +585,9 @@ def main() -> None:
                 reci_path=reci_path,
                 env=env,
                 recipients=recipients,
+                envelope_recipients=envelope_recipients,
+                refused_recipients=refused_recipients,
+                delivery_attempts=delivery_attempts,
                 missing_keys=missing_keys,
                 attach_pdf=attach_pdf,
                 exc=e,

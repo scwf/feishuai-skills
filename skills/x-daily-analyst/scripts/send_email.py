@@ -46,6 +46,8 @@ def short_reason(exc: BaseException) -> str:
         return "配置缺失"
     if isinstance(exc, SMTPException):
         return "SMTP失败"
+    if isinstance(exc, RuntimeError) and "邮件正文过期" in str(exc):
+        return "邮件正文过期"
     if isinstance(exc, RuntimeError) and "收件人" in str(exc):
         return "收件人为空"
     return "未知错误"
@@ -86,6 +88,20 @@ def add_attachment(msg: EmailMessage, path: Path) -> None:
             subtype=subtype,
             filename=path.name,
         )
+
+
+def ensure_fresh_email_body(email_body_path: Path, report_path: Path) -> None:
+    email_mtime = email_body_path.stat().st_mtime
+    stale_sources = []
+    if email_mtime < report_path.stat().st_mtime:
+        stale_sources.append("report")
+
+    generator_path = _SCRIPT_DIR / "email_body.py"
+    if generator_path.exists() and email_mtime < generator_path.stat().st_mtime:
+        stale_sources.append("email_body.py")
+
+    if stale_sources:
+        raise RuntimeError("邮件正文过期：" + ",".join(stale_sources))
 
 
 def paths_for_date(reports: Path, date_str: str) -> dict[str, Path]:
@@ -193,6 +209,7 @@ def main() -> None:
             raise RuntimeError("报告文件为空或不存在")
         if not email_body_path.exists() or email_body_path.stat().st_size <= 0:
             raise RuntimeError("邮件正文为空或不存在")
+        ensure_fresh_email_body(email_body_path, report_path)
 
         date_str = paths["date"]
         env = load_env(cred_path)

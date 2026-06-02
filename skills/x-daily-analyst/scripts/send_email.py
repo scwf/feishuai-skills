@@ -16,6 +16,7 @@ import re
 import smtplib
 import socket
 import sys
+import traceback
 from email.message import EmailMessage
 from pathlib import Path
 from smtplib import (
@@ -51,6 +52,70 @@ def short_reason(exc: BaseException) -> str:
     if isinstance(exc, RuntimeError) and "收件人" in str(exc):
         return "收件人为空"
     return "未知错误"
+
+
+def write_failure_log(
+    path: Path,
+    *,
+    reason: str,
+    step: str,
+    date_str: str,
+    paths: dict[str, Path] | None = None,
+    cred_path: Path | None = None,
+    reci_path: Path | None = None,
+    env: dict[str, str] | None = None,
+    recipients: list[str] | None = None,
+    missing_keys: list[str] | None = None,
+    attach_pdf: bool | None = None,
+    exc: BaseException | None = None,
+) -> None:
+    env = env or {}
+    recipients = recipients or []
+    missing_keys = missing_keys or []
+    paths = paths or {}
+
+    lines = [
+        "status: EMAIL_FAILED",
+        f"reason: {reason}",
+        f"step: {step}",
+        f"date: {date_str}",
+        "",
+        f"report: {paths.get('report', '')}",
+        f"email_body: {paths.get('email_body', '')}",
+        f"pdf: {paths.get('pdf', '')}",
+        f"attach_pdf: {attach_pdf if attach_pdf is not None else ''}",
+        "",
+        f"smtp_server: {env.get('smtp_server', '')}",
+        f"smtp_port: {env.get('smtp_port', '')}",
+        f"email_from: {env.get('email_from', '')}",
+        f"credentials_file: {cred_path or ''}",
+        f"recipients_file: {reci_path or ''}",
+        f"credentials_loaded: {bool(env)}",
+        "missing_keys:",
+    ]
+    if missing_keys:
+        lines.extend(f"- {key}" for key in missing_keys)
+    else:
+        lines.append("- none")
+
+    lines.extend(
+        [
+            f"recipients_count: {len(recipients)}",
+            "recipients:",
+        ]
+    )
+    if recipients:
+        lines.extend(f"- {recipient}" for recipient in recipients)
+    else:
+        lines.append("- none")
+
+    lines.extend(["", "exception:"])
+    if exc is not None:
+        lines.extend(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    else:
+        lines.append("")
+
+    path.write_text("\n".join(lines), encoding="utf-8")
 
 
 def extract_date_from_name(path: Path) -> str:
@@ -195,8 +260,15 @@ def main() -> None:
     args = parse_args()
     cred_path = (args.credentials or credentials_path()).expanduser().resolve()
     reci_path = (args.recipients or recipients_path()).expanduser().resolve()
+    paths: dict[str, Path] | None = None
+    env: dict[str, str] = {}
+    recipients: list[str] = []
+    missing_keys: list[str] = []
+    attach_pdf: bool | None = None
+    step = "resolve_paths"
 
     try:
+        step = "resolve_paths"
         paths = resolve_paths(args)
         reports = paths["reports"]
         reports.mkdir(parents=True, exist_ok=True)
@@ -204,23 +276,37 @@ def main() -> None:
         report_path = paths["report"]
         email_body_path = paths["email_body"]
         pdf_path = paths["pdf"]
+        date_str = paths["date"]
+        attach_pdf = pdf_path.exists() and pdf_path.stat().st_size > 0
+
+        step = "load_recipients"
+        recipients = load_recipients(reci_path)
+        step = "load_credentials"
+        env = load_env(cred_path)
+        missing_keys = [
+            key
+            for key in ("smtp_server", "smtp_port", "smtp_username", "smtp_password", "email_from")
+            if not env.get(key)
+        ]
 
         if not report_path.exists() or report_path.stat().st_size <= 0:
+            step = "validate_report"
             raise RuntimeError("报告文件为空或不存在")
         if not email_body_path.exists() or email_body_path.stat().st_size <= 0:
+            step = "validate_email_body"
             raise RuntimeError("邮件正文为空或不存在")
+        step = "validate_email_body"
         ensure_fresh_email_body(email_body_path, report_path)
 
-        date_str = paths["date"]
-        env = load_env(cred_path)
-        recipients = load_recipients(reci_path)
+        step = "validate_recipients"
         if not recipients:
             raise RuntimeError("收件人为空")
 
-        for key in ("smtp_server", "smtp_port", "smtp_username", "smtp_password", "email_from"):
-            if not env.get(key):
-                raise KeyError(key)
+        step = "validate_config"
+        if missing_keys:
+            raise KeyError(",".join(missing_keys))
 
+        step = "read_email_body"
         email_body = email_body_path.read_text(encoding="utf-8")
         subject = f"X 每日情报 · {date_str}"
 
@@ -228,8 +314,7 @@ def main() -> None:
         from_addr = env["email_from"]
         from_header = f"{from_name} <{from_addr}>" if from_name else from_addr
 
-        attach_pdf = pdf_path.exists() and pdf_path.stat().st_size > 0
-
+        step = "build_message"
         msg = EmailMessage()
         msg["Subject"] = subject
         msg["From"] = from_header
@@ -240,6 +325,7 @@ def main() -> None:
         if attach_pdf:
             add_attachment(msg, pdf_path)
 
+        step = "smtp_send"
         with smtplib.SMTP_SSL(
             env["smtp_server"], int(env["smtp_port"]), timeout=30
         ) as s:
@@ -256,13 +342,29 @@ def main() -> None:
     except Exception as e:
         reason = short_reason(e)
         try:
-            paths = resolve_paths(args)
+            if paths is None:
+                paths = resolve_paths(args)
             date_str = paths.get("date", "unknown-date")
             body = ""
             if paths["email_body"].exists():
                 body = paths["email_body"].read_text(encoding="utf-8")
             failed_path = paths["reports"] / f"email_failed_{date_str}.txt"
             failed_path.write_text(body, encoding="utf-8")
+            log_path = paths["reports"] / f"email_failed_{date_str}.log"
+            write_failure_log(
+                log_path,
+                reason=reason,
+                step=step,
+                date_str=date_str,
+                paths=paths,
+                cred_path=cred_path,
+                reci_path=reci_path,
+                env=env,
+                recipients=recipients,
+                missing_keys=missing_keys,
+                attach_pdf=attach_pdf,
+                exc=e,
+            )
         except Exception:
             pass
         print("EMAIL_FAILED", reason)

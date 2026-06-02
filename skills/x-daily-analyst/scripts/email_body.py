@@ -165,12 +165,6 @@ def build_email_body(
 ) -> str:
     topics = extract_first_topic_per_category(txt_path)
 
-    def condense(text: str, max_chars: int = 200) -> str:
-        text = (text or "").strip()
-        if len(text) <= max_chars:
-            return text
-        return text[: max_chars - 1] + "…"
-
     # Group by category, then pick first non-skip
     by_cat: dict = {}
     for cat, topic in topics:
@@ -198,9 +192,9 @@ def build_email_body(
     for cat, t in picks:
         out.append(f"【{cat}】")
         out.append(t["title"])
-        out.append(f"事实：{condense(t.get('fact', ''), 220)}")
+        out.append(f"事实：{(t.get('fact') or '').strip()}")
         judgement_label = t.get("judgement_label", "产品判断")
-        out.append(f"{judgement_label}：{condense(t.get('judgement', ''), 140)}")
+        out.append(f"{judgement_label}：{(t.get('judgement') or '').strip()}")
         links = t.get("links", [])[:2]
         if links:
             out.append("链接：")

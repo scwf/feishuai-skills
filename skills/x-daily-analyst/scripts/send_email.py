@@ -2,9 +2,9 @@
 """
 Send X-daily report email: plain body + TXT attachment + optional PDF.
 
-The sender receives one self-copy. Each target recipient receives a separate
-message with its own To header, so recipients are not exposed to each other and
-enterprise mail gateways see a normal point-to-point delivery shape.
+All target recipients are listed in a single To header on one message (visible to
+each other). One SMTP DATA transaction is used for the target list to avoid
+back-to-back duplicate deliveries.
 
 成功：EMAIL_OK <N>
 失败：EMAIL_FAILED <short_reason>，并将邮件正文写入 reports 目录下 email_failed_<date>.txt
@@ -224,6 +224,7 @@ def write_success_log(
         lines.append("- none")
     lines.extend(
         [
+            "send_mode: combined_to",
             f"envelope_recipients_count: {len(envelope_recipients)}",
             "envelope_recipients:",
         ]
@@ -279,11 +280,15 @@ def add_attachment(msg: EmailMessage, path: Path) -> None:
         )
 
 
+def format_to_header(recipients: list[str]) -> str:
+    return ", ".join(recipients)
+
+
 def build_message(
     *,
     subject: str,
     from_header: str,
-    to_addr: str,
+    to_recipients: list[str],
     email_body: str,
     report_path: Path,
     pdf_path: Path,
@@ -293,7 +298,7 @@ def build_message(
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = from_header
-    msg["To"] = to_addr
+    msg["To"] = format_to_header(to_recipients)
     msg["Reply-To"] = from_header
     msg["Date"] = formatdate(localtime=True)
     msg["Message-ID"] = message_id
@@ -332,7 +337,7 @@ def paths_for_date(reports: Path, date_str: str) -> dict[str, Path]:
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Send X-daily email (envelope Bcc, TXT + optional PDF).",
+        description="Send X-daily email (single message, all targets in To, TXT + optional PDF).",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     p.add_argument("--date", help="Report date YYYY-MM-DD")
@@ -462,7 +467,7 @@ def main() -> None:
 
         step = "read_email_body"
         email_body = email_body_path.read_text(encoding="utf-8")
-        subject = f"X 每日情报 · {date_str}"
+        subject = f"Data&AI 每日情报速递 · {date_str}"
 
         from_name = env.get("email_from_name", "").strip()
         from_addr = env["email_from"]
@@ -473,60 +478,27 @@ def main() -> None:
             env["smtp_server"], int(env["smtp_port"]), timeout=30
         ) as s:
             s.login(env["smtp_username"], env["smtp_password"])
-            self_msg, self_message_id = build_message(
+            target_msg, target_message_id = build_message(
                 subject=subject,
                 from_header=from_header,
-                to_addr=from_addr,
+                to_recipients=recipients,
                 email_body=email_body,
                 report_path=report_path,
                 pdf_path=pdf_path,
                 attach_pdf=bool(attach_pdf),
             )
-            envelope_recipients = [from_addr]
-            self_refused = s.send_message(
-                self_msg, from_addr=from_addr, to_addrs=[from_addr]
-            )
-            refused_recipients.update(self_refused)
-            if from_addr in self_refused:
-                delivery_attempts.append(
-                    {
-                        "role": "self",
-                        "recipient": from_addr,
-                        "status": "refused",
-                        "message_id": self_message_id,
-                        "detail": normalize_refused_recipients(self_refused).get(from_addr, ""),
-                    }
+            envelope_recipients = list(recipients)
+            try:
+                refused = s.send_message(
+                    target_msg,
+                    from_addr=from_addr,
+                    to_addrs=recipients,
                 )
-            else:
-                delivery_attempts.append(
-                    {
-                        "role": "self",
-                        "recipient": from_addr,
-                        "status": "accepted",
-                        "message_id": self_message_id,
-                    }
-                )
-
+            except SMTPRecipientsRefused as exc:
+                refused = exc.recipients
+            refused_recipients.update(refused)
+            refused_normalized = normalize_refused_recipients(refused)
             for recipient in recipients:
-                target_msg, target_message_id = build_message(
-                    subject=subject,
-                    from_header=from_header,
-                    to_addr=recipient,
-                    email_body=email_body,
-                    report_path=report_path,
-                    pdf_path=pdf_path,
-                    attach_pdf=bool(attach_pdf),
-                )
-                envelope_recipients.append(recipient)
-                try:
-                    refused = s.send_message(
-                        target_msg,
-                        from_addr=from_addr,
-                        to_addrs=[recipient],
-                    )
-                except SMTPRecipientsRefused as exc:
-                    refused = exc.recipients
-                refused_recipients.update(refused)
                 if recipient in refused:
                     delivery_attempts.append(
                         {
@@ -534,7 +506,7 @@ def main() -> None:
                             "recipient": recipient,
                             "status": "refused",
                             "message_id": target_message_id,
-                            "detail": normalize_refused_recipients(refused).get(recipient, ""),
+                            "detail": refused_normalized.get(recipient, ""),
                         }
                     )
                 else:

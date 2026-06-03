@@ -20,7 +20,7 @@
 | `email_body.py` | report 后 | 生成邮件速览纯文本正文 |
 | `txt_to_html.py` | report 后 | report TXT 转结构化 HTML |
 | `render_pdf.js` | HTML 后 | HTML 转 PDF |
-| `send_email.py` | 投递 | 发送邮件：发件人自收 1 封，目标用户逐个单独投递，附 TXT 与可选 PDF |
+| `send_email.py` | 投递 | 发送邮件：单封投递，所有目标邮箱写在同一 To 列表（互相可见），附 TXT 与可选 PDF |
 | `smtp_probe.py` | 排障 | 单目标 SMTP 投递测试，用于从纯文本到附件逐步定位企业邮箱拦截点，一般情况下无需使用，只在用户要求定位时使用 |
 
 ## `email_body.py`
@@ -84,7 +84,9 @@ node "{SKILL_ROOT}/scripts/render_pdf.js" <INPUT_HTML> <OUTPUT_PDF>
 
 ## `send_email.py`
 
-**用途**：SMTP_SSL 发送邮件；正文为 `email_body` 文件；附件为 report TXT 与可选 PDF。脚本会先给发件人发送 1 封自收副本，再对目标收件人逐个单独发送，每封目标邮件的 `To` 都是该目标邮箱，不使用 `Bcc`。邮件正文保持纯文本，不发送 HTML alternative，降低企业邮箱拦截概率。每封邮件显式写入 `Date`、唯一 `Message-ID`、`Reply-To`、`X-Mailer`。
+**用途**：SMTP_SSL 发送邮件；正文为 `email_body` 文件；附件为 report TXT 与可选 PDF。脚本对目标收件人**只发送一封邮件**，`To` 头包含 `recipients.txt` 中的全部地址（收件人互相可见），不使用 `Bcc`，也不再逐个单独投递。邮件正文保持纯文本，不发送 HTML alternative，降低企业邮箱拦截概率。该邮件显式写入 `Date`、唯一 `Message-ID`、`Reply-To`、`X-Mailer`。
+
+**主题**：`Data&AI 每日情报速递 · YYYY-MM-DD`（日期与 report / `--date` 一致）。
 
 发送邮件是对外动作。只有在外部调用方或用户明确授权时才执行；不要输出 SMTP 密码、credentials 原文或完整异常堆栈。
 
@@ -107,9 +109,9 @@ python3 "{SKILL_ROOT}/scripts/send_email.py" [--date YYYY-MM-DD] [--report PATH]
 
 **路径解析**：若提供 `--report`，据此解析日期并推导 `_email_body.txt` / `_full.pdf`；若仅 `--date`，在 reports 目录按命名查找；若均未提供，取 reports 下最新的 `*_full.txt`。
 
-**输出**：`EMAIL_OK <N>` 或 `EMAIL_FAILED <短原因>`；`N` 表示被 SMTP 接受的目标收件人数（不包含发件人自收副本）。失败时会把邮件正文写入 reports 目录下 `email_failed_<date>.txt`，并写 `email_failed_<date>.log`。成功时写 `email_sent_<date>.log`，记录逐个收件人的投递结果、目标收件人、Message-ID、SMTP 拒收明细；不记录 SMTP 密码。
+**输出**：`EMAIL_OK <N>` 或 `EMAIL_FAILED <短原因>`；`N` 表示被 SMTP 接受的目标收件人数。失败时会把邮件正文写入 reports 目录下 `email_failed_<date>.txt`，并写 `email_failed_<date>.log`。成功时写 `email_sent_<date>.log`（`send_mode: combined_to`），记录各收件人 RCPT 结果、共享 Message-ID、SMTP 拒收明细；不记录 SMTP 密码。
 
-若任一目标收件人被 SMTP 拒收，视为投递失败并输出 `EMAIL_FAILED 收件人被拒收`，避免只给自己投递成功却误报目标用户成功。因为目标用户逐个单独发送，发件箱中通常可看到发给每个目标邮箱的独立邮件。
+若任一目标收件人被 SMTP 拒收，视为投递失败并输出 `EMAIL_FAILED 收件人被拒收`。发件人可在 126 发件箱查看这一封多 To 邮件。
 
 ## `smtp_probe.py`
 

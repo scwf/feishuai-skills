@@ -18,6 +18,7 @@ import smtplib
 import socket
 import sys
 import traceback
+from email.utils import formatdate, make_msgid
 from email.message import EmailMessage
 from pathlib import Path
 from smtplib import (
@@ -82,7 +83,13 @@ def format_delivery_attempts(attempts: list[dict[str, str]] | None) -> list[str]
         recipient = attempt.get("recipient", "")
         status = attempt.get("status", "")
         detail = attempt.get("detail", "")
-        suffix = f" ({detail})" if detail else ""
+        message_id = attempt.get("message_id", "")
+        parts = []
+        if message_id:
+            parts.append(f"message_id={message_id}")
+        if detail:
+            parts.append(detail)
+        suffix = f" ({'; '.join(parts)})" if parts else ""
         lines.append(f"- {role}: {recipient}: {status}{suffix}")
     return lines
 
@@ -281,17 +288,22 @@ def build_message(
     report_path: Path,
     pdf_path: Path,
     attach_pdf: bool,
-) -> EmailMessage:
+) -> tuple[EmailMessage, str]:
+    message_id = make_msgid(domain="x-daily.local")
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = from_header
     msg["To"] = to_addr
+    msg["Reply-To"] = from_header
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = message_id
+    msg["X-Mailer"] = "X-Daily Analyst"
     msg.set_content(email_body, charset="utf-8")
 
     add_attachment(msg, report_path)
     if attach_pdf:
         add_attachment(msg, pdf_path)
-    return msg
+    return msg, message_id
 
 
 def ensure_fresh_email_body(email_body_path: Path, report_path: Path) -> None:
@@ -461,7 +473,7 @@ def main() -> None:
             env["smtp_server"], int(env["smtp_port"]), timeout=30
         ) as s:
             s.login(env["smtp_username"], env["smtp_password"])
-            self_msg = build_message(
+            self_msg, self_message_id = build_message(
                 subject=subject,
                 from_header=from_header,
                 to_addr=from_addr,
@@ -481,6 +493,7 @@ def main() -> None:
                         "role": "self",
                         "recipient": from_addr,
                         "status": "refused",
+                        "message_id": self_message_id,
                         "detail": normalize_refused_recipients(self_refused).get(from_addr, ""),
                     }
                 )
@@ -490,11 +503,12 @@ def main() -> None:
                         "role": "self",
                         "recipient": from_addr,
                         "status": "accepted",
+                        "message_id": self_message_id,
                     }
                 )
 
             for recipient in recipients:
-                target_msg = build_message(
+                target_msg, target_message_id = build_message(
                     subject=subject,
                     from_header=from_header,
                     to_addr=recipient,
@@ -519,6 +533,7 @@ def main() -> None:
                             "role": "target",
                             "recipient": recipient,
                             "status": "refused",
+                            "message_id": target_message_id,
                             "detail": normalize_refused_recipients(refused).get(recipient, ""),
                         }
                     )
@@ -528,6 +543,7 @@ def main() -> None:
                             "role": "target",
                             "recipient": recipient,
                             "status": "accepted",
+                            "message_id": target_message_id,
                         }
                     )
 

@@ -29,3 +29,5 @@ Useful options:
 ```
 
 For GPU use, keep `--device auto` unless the user asks for a specific device. The script falls back to `cpu/int8` if automatic or GPU loading fails.
+
+On Windows, if GPU transcription fails with a missing CUDA 12 DLL such as `cublas64_12.dll`, install the optional Windows GPU requirements from `references/setup.md`, then retry with `--device cuda --compute-type float16`.

@@ -22,6 +22,14 @@ If `uv` is unavailable, fall back to `python -m venv` and install dependencies w
 
 Run later commands with the same venv Python: `{SKILL_ROOT}/.venv/bin/python` on macOS/Linux or `{SKILL_ROOT}\.venv\Scripts\python.exe` on Windows.
 
+Optional Windows GPU setup:
+
+```bash
+uv pip install --python {SKILL_ROOT}\.venv\Scripts\python.exe -r {SKILL_ROOT}\requirements-windows-gpu.txt
+```
+
+Use this only when CTranslate2 GPU inference on Windows cannot find CUDA 12 runtime DLLs such as `cublas64_12.dll`. The ASR code automatically registers those package DLL directories when they exist; other platforms and CPU-only runs do not need this file.
+
 For media decoding and URL downloads, make sure `ffmpeg` is available on `PATH`. `yt-dlp` uses it for extracting audio from video URLs.
 
 ASR defaults:

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import sysconfig
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -11,6 +13,37 @@ from .base import BaseASR
 
 
 logger = setup_logger("faster_whisper")
+_DLL_DIR_HANDLES: list[Any] = []
+
+
+def _configure_windows_cuda_dll_paths() -> None:
+    if os.name != "nt":
+        return
+
+    purelib = Path(sysconfig.get_paths().get("purelib") or "")
+    candidates = [
+        purelib / "nvidia" / "cublas" / "bin",
+        purelib / "nvidia" / "cudnn" / "bin",
+        purelib / "nvidia" / "cuda_nvrtc" / "bin",
+        purelib / "ctranslate2",
+    ]
+    existing_paths = os.environ.get("PATH", "").split(os.pathsep)
+    prepend_paths: list[str] = []
+
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        path = str(candidate)
+        if path not in existing_paths and path not in prepend_paths:
+            prepend_paths.append(path)
+        if hasattr(os, "add_dll_directory"):
+            try:
+                _DLL_DIR_HANDLES.append(os.add_dll_directory(path))
+            except OSError as exc:
+                logger.warning("Failed to add CUDA DLL directory %s: %s", path, exc)
+
+    if prepend_paths:
+        os.environ["PATH"] = os.pathsep.join(prepend_paths + existing_paths)
 
 
 class FasterWhisperASR(BaseASR):
@@ -19,6 +52,7 @@ class FasterWhisperASR(BaseASR):
         self.config = config
 
     def run(self, callback: Optional[Callable[[int, str], None]] = None) -> ASRData:
+        _configure_windows_cuda_dll_paths()
         try:
             from faster_whisper import WhisperModel
         except ImportError as exc:

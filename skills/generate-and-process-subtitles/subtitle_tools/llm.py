@@ -7,6 +7,7 @@ from urllib.parse import urlparse, urlunparse
 from openai import OpenAI
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_random_exponential
 
+from .local_config import load_local_llm_config
 from .utils import setup_logger
 
 
@@ -41,6 +42,7 @@ _client = None
 def get_llm_client(api_key: Optional[str] = None, base_url: Optional[str] = None) -> OpenAI:
     global _client
 
+    load_local_llm_config()
     if api_key or base_url or _client is None:
         final_api_key = api_key or os.getenv("SUBTITLE_LLM_API_KEY", "").strip()
         final_base_url = base_url or os.getenv("SUBTITLE_LLM_BASE_URL", "").strip()

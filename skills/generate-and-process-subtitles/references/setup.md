@@ -50,6 +50,16 @@ LLM features require an OpenAI-compatible endpoint:
 
 - `SUBTITLE_LLM_API_KEY`
 - Optional `SUBTITLE_LLM_BASE_URL`, defaulting to `https://api.deepseek.com/v1`
-- Optional `SUBTITLE_LLM_MODEL`, defaulting to `deepseek-chat`
+- Optional `SUBTITLE_LLM_MODEL`, defaulting to `deepseek-v4-flash`
+
+You can set those values in the host environment, or create a local untracked config file at `{SKILL_ROOT}/llm.env`:
+
+```bash
+SUBTITLE_LLM_API_KEY=sk-...
+SUBTITLE_LLM_BASE_URL=https://api.deepseek.com/v1
+SUBTITLE_LLM_MODEL=deepseek-v4-flash
+```
+
+Do not commit `llm.env`. It is ignored by this repository. Host environment variables and explicit CLI flags still take precedence over this local file.
 
 Do not configure WSL, Windows Faster-Whisper-XXL, dubbing backends, TTS engines, or voice-cloning assets for this skill.

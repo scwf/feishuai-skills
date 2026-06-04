@@ -17,7 +17,7 @@ from urllib.parse import parse_qs, urlparse
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 WORK_DIR_NAME = "_subtitle_work"
 DEFAULT_MODEL_NAME = "large-v2"
-DEFAULT_LLM_MODEL = "deepseek-chat"
+DEFAULT_LLM_MODEL = "deepseek-v4-flash"
 DEFAULT_LLM_BASE_URL = "https://api.deepseek.com/v1"
 
 if str(SKILL_ROOT) not in sys.path:
@@ -25,6 +25,7 @@ if str(SKILL_ROOT) not in sys.path:
 
 from subtitle_tools import ASRData, optimize_subtitle, process_media, split_subtitle, translate_subtitle  # noqa: E402
 from subtitle_tools.config import DEFAULT_LLM_BASE_URL as CONFIG_DEFAULT_LLM_BASE_URL  # noqa: E402
+from subtitle_tools.local_config import LLM_CONFIG_PATH, load_local_llm_config  # noqa: E402
 
 
 class SubtitleSkillError(RuntimeError):
@@ -126,7 +127,7 @@ def require_llm_api_key(args: argparse.Namespace, action: str) -> str:
             action=action,
             step="validate_runtime",
             error_type="missing_api_key",
-            suggested_fix="Set SUBTITLE_LLM_API_KEY or pass --api-key.",
+            suggested_fix=f"Set SUBTITLE_LLM_API_KEY, pass --api-key, or create {LLM_CONFIG_PATH.name}.",
         )
     return api_key
 
@@ -505,6 +506,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    load_local_llm_config()
     parser = build_parser()
     args = parser.parse_args()
     try:

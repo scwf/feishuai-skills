@@ -18,6 +18,8 @@ Use an LLM to correct subtitle recognition errors while preserving timing:
 python {SKILL_ROOT}/scripts/generate_and_process_subtitles.py optimize input.srt --output-dir ./subtitles
 ```
 
+Configure the LLM with `SUBTITLE_LLM_*` environment variables or the untracked `{SKILL_ROOT}/llm.env` file described in `references/setup.md`.
+
 Add context with `--description` or `--description-file` for names, terminology, or source notes.
 
 ## Translate

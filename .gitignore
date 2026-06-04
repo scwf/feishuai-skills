@@ -35,3 +35,4 @@ credentials.*
 
 # Known skill-local secret files
 skills/x-scraper/defaults/x.env
+skills/generate-and-process-subtitles/llm.env

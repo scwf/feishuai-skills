@@ -5,7 +5,7 @@ from typing import Optional
 DEFAULT_MODEL_NAME = "large-v2"
 DEFAULT_WORK_DIR_NAME = "_subtitle_work"
 DEFAULT_LLM_BASE_URL = "https://api.deepseek.com/v1"
-DEFAULT_LLM_MODEL = "deepseek-chat"
+DEFAULT_LLM_MODEL = "deepseek-v4-flash"
 
 
 @dataclass

@@ -54,7 +54,7 @@ The ASR backend is Python `faster-whisper` only. Default model is `large-v2`. De
 
 On first ASR use, `faster-whisper` may download the selected model. Model files are stored in the system Hugging Face cache, not in the subtitle output directory or `_subtitle_work/`. Repeated runs reuse the cached model.
 
-LLM features use OpenAI-compatible chat completions. Set `SUBTITLE_LLM_API_KEY`; optionally set `SUBTITLE_LLM_BASE_URL` and `SUBTITLE_LLM_MODEL`. The default endpoint is `https://api.deepseek.com/v1`, and the default model is `deepseek-chat`.
+LLM features use OpenAI-compatible chat completions. Set `SUBTITLE_LLM_API_KEY`; optionally set `SUBTITLE_LLM_BASE_URL` and `SUBTITLE_LLM_MODEL`. These can come from the host environment or an untracked local `{SKILL_ROOT}/llm.env` file. The default endpoint is `https://api.deepseek.com/v1`, and the default model is `deepseek-v4-flash`.
 
 ## Commands
 

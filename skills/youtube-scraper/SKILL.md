@@ -1,19 +1,34 @@
 ---
 name: youtube-scraper
-description: Fetch recent YouTube channel publications from one or more configured aliases, channel URLs, video URLs, @handles, or channel IDs, and save raw video metadata plus description text. Use when an agent needs channel-level YouTube updates such as latest uploads, recent channel videos, publishing activity, or a bounded time/count scrape for a channel or a batch of channels. If given a YouTube video URL, resolve its owning channel first and then scrape that channel's publications. This skill may also download a YouTube video or an audio-only media file, but only when the user explicitly asks to save or extract media. Do not use for transcription, subtitle generation, subtitle optimization, subtitle translation, dubbing, or general YouTube analysis that does not require publication metadata or explicit media download.
+description: Fetch recent YouTube channel publications from one or more configured aliases, channel URLs, video URLs, @handles, or channel IDs, and save raw video metadata plus description text. Use when an agent needs channel-level YouTube updates such as latest uploads, recent channel videos, publishing activity, or a bounded time/count scrape for a channel or a batch of channels. Also use when a user asks for metadata or description text for one specific YouTube watch/youtu.be/shorts URL. This skill may also download a YouTube video or an audio-only media file, but only when the user explicitly asks to save or extract media. Do not use for transcription, subtitle generation, subtitle optimization, subtitle translation, dubbing, or general YouTube analysis that does not require publication metadata or explicit media download.
 ---
 
 # YouTube Scraper
 
-Use this skill for YouTube publication discovery by default, and for media download only on explicit user request.
+Use this skill for YouTube channel publication discovery by default, with single-video metadata as a supported narrow path. Use media download only on explicit user request.
 
-Default flow:
+Typical requests:
+
+- "Fetch recent uploads from this YouTube channel"
+- "抓取这些 YouTube 账号最近 7 天发布的视频信息"
+- "抓取这个 YouTube 视频链接的 description"
+- "Get metadata for this YouTube video"
+
+Channel metadata flow:
 
 1. Resolve the target to a `channel_id`.
 2. Run the bundled script once with the narrowest valid range.
 3. Validate that outputs were written and the result is coherent.
 4. Summarize the result without pasting long descriptions into the chat.
 5. If no output directory was provided, expect the script to create a timestamped directory like `./youtube-YYYYMMDD-HHMMSS`.
+
+Single video metadata flow:
+
+1. Use this flow when the user gives a YouTube watch, youtu.be, or shorts URL and asks for that video's description or metadata.
+2. Run the bundled single-video metadata script once.
+3. Validate that outputs were written and the result is coherent.
+4. Summarize the result without pasting the full description unless the user asks for it.
+5. If no output directory was provided, expect the script to create a timestamped directory like `./youtube-video-YYYYMMDD-HHMMSS`.
 
 Batch flow:
 
@@ -39,9 +54,11 @@ Accepted targets:
 
 - configured alias such as `YT_OpenAI` from `defaults/youtube_channels.json`
 - channel URL such as `https://www.youtube.com/@OpenAI`
-- video URL such as `https://www.youtube.com/watch?v=Hbn5H0rFOmE`
 - `@handle` such as `@OpenAI`
 - direct `channel_id` such as `UCXZCJLdBC09xxGZ6gcdrc6A`
+- single YouTube video URL such as `https://www.youtube.com/watch?v=Hbn5H0rFOmE`
+- short URL such as `https://youtu.be/Hbn5H0rFOmE`
+- shorts URL such as `https://www.youtube.com/shorts/Hbn5H0rFOmE`
 
 Accepted batch targets:
 
@@ -60,10 +77,13 @@ Accepted download targets:
 The metadata script uses YouTube's public RSS feed:
 `https://www.youtube.com/feeds/videos.xml?channel_id=<channel_id>`
 
+The single-video metadata script uses `yt-dlp` in metadata-only mode:
+`extract_info(..., download=False)`
+
 No API key is required.
 Optional dependency:
 - `curl_cffi` for browser-like TLS impersonation during handle or URL resolution
-- `yt-dlp` for explicit media downloads
+- `yt-dlp` for single-video metadata and explicit media downloads
 
 RSS stability behavior:
 
@@ -78,6 +98,7 @@ Use this skill for:
 - channel discovery
 - recent uploads
 - publication metadata export
+- single-video metadata and description extraction
 - explicit video download
 - explicit audio-only download
 
@@ -95,6 +116,10 @@ If the user asks for subtitle outputs from YouTube, route that work to `subtitle
 
 ## Resolve Target
 
+If the user gives a watch, youtu.be, or shorts URL and asks for that video's description or metadata, treat it as a single-video metadata request. Do not expand it to a channel recent-upload scrape.
+
+If the user gives a video URL but asks for the owning channel's recent uploads or activity, resolve the video URL to its owning `channelId` and use the channel metadata flow.
+
 Resolve the target in this order:
 
 1. If the user mentions a configured alias, resolve it through `defaults/youtube_channels.json`.
@@ -103,7 +128,7 @@ Resolve the target in this order:
 3. If the input is a YouTube URL or `@handle`, fetch the page and extract the owning `channelId`.
 4. If the input is a bare string that is not an alias, treat it as a handle and try `https://www.youtube.com/@<value>`.
 
-Normalize by trimming whitespace. Strip a leading `@` only when normalizing a handle. Accept `youtube.com/@handle`, `youtube.com/channel/<id>`, `youtube.com/c/...`, `youtube.com/user/...`, and `youtube.com/watch?v=...`.
+Normalize by trimming whitespace. Strip a leading `@` only when normalizing a handle. Accept `youtube.com/@handle`, `youtube.com/channel/<id>`, `youtube.com/c/...`, `youtube.com/user/...`, `youtube.com/watch?v=...`, `youtu.be/...`, and `youtube.com/shorts/...`.
 
 ## Resolve Range
 
@@ -150,7 +175,7 @@ Do not invent optional overrides just because they are available.
 
 ## Command
 
-Default scrape command:
+Channel scrape command:
 
 Run:
 
@@ -178,6 +203,12 @@ Or all configured aliases:
 python "{SKILL_ROOT}/scripts/youtube_batch_meta.py" --all-configured
 ```
 
+Single-video metadata command:
+
+```bash
+python "{SKILL_ROOT}/scripts/youtube_video_meta.py" "https://www.youtube.com/watch?v=example"
+```
+
 Examples:
 
 ```bash
@@ -190,6 +221,10 @@ python "{SKILL_ROOT}/scripts/youtube_channel_meta.py" "@OpenAI" --since-date 202
 
 ```bash
 python "{SKILL_ROOT}/scripts/youtube_batch_meta.py" "YT_OpenAI" "@OpenAI" "UCXZCJLdBC09xxGZ6gcdrc6A" --days-lookback 14 --limit 10
+```
+
+```bash
+python "{SKILL_ROOT}/scripts/youtube_video_meta.py" "https://youtu.be/Hbn5H0rFOmE"
 ```
 
 When the user asks to scrape all configured YouTube accounts, prefer `--all-configured` instead of manually extracting aliases into a targets file. The batch script forwards shared range and output options to the single-target metadata script. It continues after individual target failures by default and returns `partial_failure` with a nonzero exit code if any target fails. Use `--stop-on-error` only when partial results are not useful.
@@ -210,12 +245,13 @@ python "{SKILL_ROOT}/scripts/youtube_download.py" "https://www.youtube.com/watch
 
 Do not download media by default during normal scraping workflows.
 
-If `--output-dir` is omitted, both scripts create a timestamped directory like `./youtube-YYYYMMDD-HHMMSS`.
+If `--output-dir` is omitted, the single-video metadata script creates a timestamped directory like `./youtube-video-YYYYMMDD-HHMMSS`.
+If `--output-dir` is omitted, the channel and download scripts create a timestamped directory like `./youtube-YYYYMMDD-HHMMSS`.
 For batch metadata scraping, omitted `--output-dir` creates a timestamped directory like `./youtube-batch-YYYYMMDD-HHMMSS`.
 
 ## Validate Result
 
-After the script finishes, check all of the following before you trust the result:
+For channel metadata runs, check all of the following before you trust the result:
 
 - the JSON `status` field is `ok` or `ok_with_warnings` (read the JSON file; do not rely only on stdout)
 - JSON and Markdown files both exist
@@ -232,6 +268,14 @@ For batch runs, also check:
 - for each successful target, validate the per-target JSON using the single-target checklist above
 - `partial_failure` is reported to the user with the failed targets and structured error messages
 
+For single-video metadata runs, check all of the following before you trust the result:
+
+- the JSON `status` field is `ok` or `ok_with_warnings` (read the JSON file; do not rely only on stdout)
+- JSON and Markdown files both exist
+- `mode` is `single_video_metadata`
+- `video_id`, `title`, and `description` are present unless the script explicitly marked a warning
+- `channel_id` is present unless the script explicitly marked a warning
+
 ## Expected Outputs
 
 The metadata script writes:
@@ -245,12 +289,17 @@ The batch metadata script writes:
 - one batch summary JSON file with target status, per-target paths, counts, and errors
 - one batch summary Markdown file for quick review
 
+The single-video metadata script writes:
+
+- one JSON file with the requested video's metadata and validation result
+- one Markdown file with the requested video's raw description
+
 The download script writes:
 
 - one local media file
 - one sidecar JSON file ending in `.download.json`
 
-Each video item should include:
+Each channel video item should include:
 
 - `video_id`
 - `title`
@@ -264,12 +313,29 @@ Each video item should include:
 - `duration_seconds`
 - `duration_text`
 
+The single-video metadata output should include:
+
+- `mode`
+- `source_url`
+- `resolved_url`
+- `video_id`
+- `title`
+- `published_at`
+- `channel_name`
+- `channel_id`
+- `duration_seconds`
+- `duration_text`
+- `description`
+- `thumbnail_url`
+- `json_path`
+- `markdown_path`
+
 When reporting results to the user:
 
 - include whether the run succeeded cleanly, succeeded with warnings, or failed
-- include the resolved `channel_id`
-- state whether it came from an alias or explicit input
-- mention the effective range or count
+- include the `video_id` for single-video runs, or the resolved `channel_id` for channel runs
+- state whether it came from an alias, video URL, channel URL, handle, or explicit ID
+- mention the effective range or count for channel runs
 - summarize output file paths
 - summarize the videos; do not paste long descriptions unless the user asks
 - if the user requested Chinese, provide your own translation or summary after reading the output
@@ -293,6 +359,7 @@ For explicit downloads also report:
 
 If the script cannot run:
 
+- if single-video metadata fails because `yt-dlp` is missing, tell the user to install `yt-dlp`
 - read the structured error payload first
 - if the target alias is unknown, tell the user and offer nearby alias matches from `defaults/youtube_channels.json`
 - if the target URL or handle cannot be resolved to a `channel_id`, explain that resolution failed and suggest passing a direct `channel_id`

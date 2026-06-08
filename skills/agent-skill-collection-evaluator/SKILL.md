@@ -28,8 +28,9 @@ Evaluate an existing Agent skill found in third-party material, judge whether it
    - For pasted text, use only the provided text.
    - Identify the existing skill being discussed. It may be a GitHub skill folder, a prompt/workflow skill mentioned in an industry article, or a named third-party agent capability.
    - If the source is a collection of concrete reusable skills, workflows, rules, or templates organized as a package, evaluate it as a `Skill Package` instead of forcing it into a single-skill card.
-   - If one source contains multiple collectible candidates, classify them before recommending: end-user tool/product skills, repository-maintenance workflow skills, and reference packages. Treat `.agents/skills` or `.claude/skills` directories as likely repository-maintenance workflow packages unless their content is clearly for end users.
-   - Prefer broadly reusable end-user tool/product skills by default. Treat repository-maintenance workflows as secondary reference packages unless the user asks for repo-contribution or workflow-design examples.
+   - If one source contains multiple collectible candidates, classify them before recommending: end-user tool/product skills, repository-maintenance workflow skills, and reference packages.
+   - Prefer broadly reusable end-user tool/product skills by default.
+   - When the user provides a GitHub repository URL, do not evaluate `.agents/skills` or `.claude/skills` by default. These directories are usually for agents that help maintain the source repository. Evaluate them only when the user asks for repo-contribution or workflow-design examples, or when the content is clearly for external end users.
    - When multiple candidate types are plausible, show the candidates and ask the user to confirm the target before writing the final card.
    - Lock the evaluation target to the user-provided source. Do not switch to a related repository, adjacent spec, product architecture, or inferred mechanism unless the user explicitly asks to evaluate that different target.
    - For URLs or repositories, fetch or inspect enough source material to identify the skill goal, workflow, inputs, outputs, implementation method, maturity signals, and limitations.

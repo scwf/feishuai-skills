@@ -46,13 +46,13 @@ If a hard gate fails, recommend "否" and state the failed gate. If the source i
 
 ## Example: Multiple Candidates in One Repository
 
-When a repository contains more than one skill-like target, classify the candidates before recommending one.
+When the user provides a GitHub repository URL and the repository contains more than one skill-like target, classify the candidates before recommending one.
 
 Remotion example:
 
 - `packages/skills/skills/remotion/SKILL.md`: end-user tool/product skill. It helps general-purpose AI agents use Remotion to create or edit videos. This is usually the default priority because it is broadly reusable outside the Remotion repository.
-- `.agents/skills` or `.claude/skills`: repository-maintenance workflow package. These directories often help agents contribute to the source repository, such as adding CLI options, writing docs, managing issues, and adding renderer tests. They may be worth collecting as workflow-design reference packages, but they are secondary unless the user asks for repo-contribution skills.
+- `.agents/skills` or `.claude/skills`: repository-maintenance workflow package. These directories usually help agents contribute to the source repository, such as adding CLI options, writing docs, managing issues, and adding renderer tests. Do not evaluate them by default; consider them only when the user asks for repo-contribution or workflow-design examples, or when the content is clearly for external end users.
 
 Preferred response pattern:
 
-"I found two collectible candidates: A is an end-user Remotion skill for general AI agents, and B is a repository-contribution workflow package. By default I recommend evaluating A first because it is more broadly reusable. Should I also evaluate B as a Skill Package reference?"
+"I found two skill-like candidates: A is an end-user Remotion skill for general AI agents, and B is a repository-contribution workflow package under `.agents/skills` or `.claude/skills`. By default I will evaluate A and ignore B unless you want repo-maintenance workflow examples."

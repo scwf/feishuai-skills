@@ -14,6 +14,14 @@ Evaluate an existing Agent skill found in third-party material, judge whether it
 - "看看这个链接里的 Agent skill 值不值得加入我的技能库"
 - "把这个第三方 skill 评估后生成收录卡片"
 
+## Do Not Use For
+
+- Designing or inventing a new skill from scratch, such as "帮我设计一个 skill".
+- Summarizing an article, report, repository, product, or trend when the user does not ask whether an existing skill is worth collecting.
+- Evaluating an agent product, framework, platform, or app as a collectible skill unless the source contains concrete reusable skills or skill packages.
+- Turning a product feature, architecture idea, trend insight, or inspiration into a recommended skill without evidence of an existing reusable operation.
+- Making a collection judgment when no source, link, pasted text, repository, or named third-party skill is provided.
+
 ## Workflow
 
 1. Parse the source.

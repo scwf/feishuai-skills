@@ -82,6 +82,12 @@ def extract_collection_value(fields: dict[str, str]) -> str:
     return value or recommendation
 
 
+def ensure_recommended(fields: dict[str, str]) -> None:
+    recommendation = fields.get("是否推荐收录", "").strip()
+    if not recommendation.startswith("是"):
+        raise ValueError("card must have 是否推荐收录 starting with '是' before it can be appended")
+
+
 def render_library_section(section_number: int, card: str) -> str:
     title = extract_title(card)
     fields = parse_card_fields(card)
@@ -120,6 +126,8 @@ def append_card(library: Path, card: str) -> str:
     card = card.strip()
     if not card:
         raise ValueError("card content is empty")
+    fields = parse_card_fields(card)
+    ensure_recommended(fields)
 
     library.parent.mkdir(parents=True, exist_ok=True)
     existing = library.read_text(encoding="utf-8") if library.exists() else ""

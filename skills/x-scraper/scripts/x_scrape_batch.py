@@ -268,6 +268,7 @@ def render_summary_markdown(summary: Dict[str, Any]) -> str:
         f"- Successful Targets: `{summary['successful_targets']}`",
         f"- Partial Targets: `{summary['partial_targets']}`",
         f"- Failed Targets: `{summary['failed_targets']}`",
+        f"- Total Tweets: `{summary['total_tweets']}`",
         f"- Batch Size: `{summary['batch_size']}`",
         f"- Target Delay Seconds: `{summary['target_delay_min']}-{summary['target_delay_max']}`",
         f"- Batch Delay Seconds: `{summary['batch_delay_min']}-{summary['batch_delay_max']}`",
@@ -395,6 +396,7 @@ def main() -> int:
     successful_targets = sum(1 for item in results if item["run_status"] == "success")
     partial_targets = sum(1 for item in results if item["run_status"] == "partial_success")
     failed_targets = sum(1 for item in results if item["run_status"] == "failed")
+    total_tweets = sum(item["tweet_count"] for item in results)
     if stop_reason:
         run_status = "stopped_rate_limit"
     elif failed_targets or partial_targets:
@@ -410,6 +412,7 @@ def main() -> int:
         "successful_targets": successful_targets,
         "partial_targets": partial_targets,
         "failed_targets": failed_targets,
+        "total_tweets": total_tweets,
         "batch_size": args.batch_size,
         "target_delay_min": args.target_delay_min,
         "target_delay_max": args.target_delay_max,

@@ -98,6 +98,7 @@ class XScrapeBatchTests(unittest.TestCase):
                 "successful_targets": 1,
                 "partial_targets": 0,
                 "failed_targets": 0,
+                "total_tweets": 3,
                 "batch_size": 10,
                 "target_delay_min": 10.0,
                 "target_delay_max": 30.0,
@@ -109,6 +110,7 @@ class XScrapeBatchTests(unittest.TestCase):
 
         self.assertNotIn("Batch Category Index", markdown)
         self.assertNotIn("batch_category_index.json", markdown)
+        self.assertIn("- Total Tweets: `3`", markdown)
 
     def test_main_stops_after_first_rate_limit(self):
         args = self.make_args(targets="X_OpenAI,X_Anthropic,X_DeepSeek")
@@ -193,6 +195,7 @@ class XScrapeBatchTests(unittest.TestCase):
         self.assertIn("Next target: X_DeepSeek", printed)
         self.assertIn("Saved batch category index:", printed)
         self.assertIn("Saved agent README:", printed)
+        self.assertEqual(json_mock.dump.call_args_list[0].args[0]["total_tweets"], 1)
 
 
 if __name__ == "__main__":

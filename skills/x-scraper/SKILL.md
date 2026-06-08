@@ -162,9 +162,16 @@ Batch output behavior:
   - `categories`: mapping of category name to the matching JSON filenames relative to `raw_root`
 - use script defaults unless the user explicitly asks to override batch sizing or delay settings
 
+Batch completion rules:
+
+- After `x_scrape_batch.py` finishes, read `summary.json` before reporting final status.
+- Use `summary.json` fields `total_targets`, `successful_targets`, `failed_targets`, `partial_targets`, `completed_targets`, `total_tweets`, `run_status`, and each target's `run_status`, `tweet_count`, and `partial_failure_reason`.
+- If the user needs a batch total tweet count, read `summary.json.total_tweets`; do not infer it from logs, Markdown files, JSON file counts, or category counts.
+- If some accounts fail because of SSL, temporary network errors, empty fetches, or other per-target issues while the batch script completes, report the batch result as `completed_with_failures`, list the failed/partial targets, and include each visible `partial_failure_reason`. `partial_success` is a per-target status, not the batch-level status.
+
 ## Expected Outputs
 
-The script writes two files:
+For single-target `x_scrape.py` runs, the script writes two files:
 
 - a JSON file with tweet metadata and original text
 - a Markdown file with one section per tweet showing the original content
@@ -194,8 +201,9 @@ When running `x_scrape_batch.py` with many targets, treat it as a long-running j
 
 1. Start the batch in the background when the current environment supports background execution.
 2. Check progress through the job's status or recent log output instead of blocking the session until completion.
-3. Report completion only after the log or output metadata shows `Run status: success`, `Run status: partial_success`, or `Run status: failed`.
-4. If the run is still active, tell the user it is still running and include the latest visible progress or output path.
+3. Report completion only after the process exits and the output directory contains readable `summary.json`.
+4. Treat `summary.json.run_status` as the authoritative batch-level status. Expected values include `success`, `completed_with_failures`, and `stopped_rate_limit`; individual targets may still have `success`, `partial_success`, or `failed`.
+5. If the run is still active, tell the user it is still running and include the latest visible progress or output path.
 
 ## Failure Handling
 

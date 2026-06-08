@@ -20,6 +20,17 @@ description: X 推文批量数据智能分析师。读取 x-scraper batch（默�
 - **索引**：`{batch_dir}/batch_category_index.json`（`categories` 以文件为准）
 - **推文**：`{batch_dir}/raw/*.json`
 
+## Batch 预检
+
+开始 single 或 batch 分析前，先完成预检；预检失败时停止分析并要求用户提供有效 batch 路径。
+
+1. 默认读取 `~/data/x-daily/latest/meta.json`，从 `batch_dir` 字段解析真实 batch 目录；如果用户显式提供 batch 路径，则使用用户路径。
+2. 确认真实 batch 目录存在，且目录名匹配 `x-posts-batch-YYYYMMDD-HHMMSS`。
+3. 读取 `{batch_dir}/batch_category_index.json`，确认 JSON 可解析，且 `categories` 为非空对象。
+4. 后续类别枚举、single 类别校验、batch 覆盖范围均以 `batch_category_index.json` 的 `categories` 为准；不要扫描 `raw/` 自行推断类别。
+5. 报告日期从 batch 目录名解析：`YYYYMMDD` → `YYYY-MM-DD`；不要使用当前系统日期。
+6. 报告头部的推文总数优先使用 `{batch_dir}/summary.json.total_tweets`。只有字段存在且为可信数字时才写 `{N} 条`；否则写 `未知`。实际主题分析仍以 `extract_posts.py` 输出为准，不用总数字段推断主题。
+
 ## 模式判定
 
 先判定模式、视角、输出，再进入对应流程。已说清则直接执行；无法映射时只补问缺失项。
@@ -87,8 +98,8 @@ Single 校验：
 - 全文末尾必须有 `今日总判断`，至少 3 条、最多 5 条。
 
 步骤：
-1. 确认 `batch_dir`、批次日期、视角、类别数量；告知用户当前将读取的 batch 与模式。
-2. 对全部类别运行 `extract_posts.py` 提取推文文本；各类别互不依赖，调用方可按自身能力顺序处理、并发处理或分派处理。
+1. 完成 Batch 预检，确认 `batch_dir`、批次日期、视角、类别数量、头部推文总数；告知用户当前将读取的 batch 与模式。
+2. 对 `batch_category_index.json` 中全部类别分别运行 `extract_posts.py` 提取推文文本；各类别互不依赖，调用方可按自身能力顺序处理、并发处理或分派处理。
 3. 基于各类别提取结果，逐类生成类别块草稿；各类别草稿彼此独立，但都只是最终 report 的中间材料。
 4. 读取全部类别块草稿，一次性合并为一份 report；合并必须综合处理，不能拆成多个独立报告。
 5. 做跨类别去重：重复事件保留在最相关类别，其它类别改为跳转主题。
@@ -97,17 +108,19 @@ Single 校验：
 
 Batch 要点：
 - 本 skill 不强制要求使用子智能体；是否分派给子智能体、后台任务或多次工具调用，由外部调用方决定。
+- 全类别分析时，可优先处理更可能出现主事件和跨类别重复事件的高信息密度类别，例如 `model_vendor`、`ai_infra`、`cloud_platform` 等；这只是效率建议，不改变最终必须覆盖全部类别的要求。
 - 没有「只做逐类草稿、不合并」的 batch；逐类草稿只是中间材料。
 - 跨类别去重不能在单个类别分析里完成，必须在合并 report 时对照全部类别块。
 - 跳转主题的 `事实：` 须含 `详见 <category> 主题 <NN>。本主题不重复展开。`
 - `推文链接：` 仅来自 `extract_posts.py` 输出中的 `[原文: ...]`；不要用官网 / 博客 URL 替代推文链接。
 
 Batch 校验：
-- 是否覆盖全部类别。
+- 是否覆盖 `batch_category_index.json` 中全部类别。
 - 每类主题是否最多 Top 5，且没有硬凑低信息量主题。
 - 是否输出一份 report，而不是 N 份类别报告。
 - 是否完成跨类别去重，跳转主题是否包含「不重复展开」。
 - report 是否含固定头部、类别块、主题字段、推文链接与全文末尾 `今日总判断`。
+- 报告日期是否来自 batch 目录名；推文总数是否只来自可信 `summary.json.total_tweets`，缺失时写 `未知`。
 - `今日总判断` 是否 3-5 条，且来自跨类别归纳。
 
 ## 共用分析规则

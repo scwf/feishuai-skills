@@ -1,6 +1,6 @@
 # Evaluation Rules
 
-Use this reference when judging whether a source is worth collecting as an Agent skill.
+Use this reference when judging whether an existing third-party Agent skill is worth collecting.
 
 ## Recommend "是"
 
@@ -9,6 +9,7 @@ Use this reference when judging whether a source is worth collecting as an Agent
 - The implementation logic is concrete enough to guide another agent.
 - The skill reduces recurring research, writing, coding, analysis, scraping, or tool-operation effort.
 - The material includes usable prompts, APIs, scripts, repo structure, command patterns, or operational steps.
+- The source identifies a concrete skill, such as a GitHub skill folder, prompt workflow, agent tool workflow, or named capability.
 
 ## Recommend "否"
 
@@ -17,6 +18,7 @@ Use this reference when judging whether a source is worth collecting as an Agent
 - The source describes a one-off product feature that cannot be generalized into agent behavior.
 - The repo or article lacks enough implementation detail and no extra research was requested.
 - The skill would require unavailable private data, credentials, or production access.
+- The material does not identify an existing skill; it only suggests a broad topic that would require inventing one.
 
 ## Evidence Discipline
 

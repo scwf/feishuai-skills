@@ -13,12 +13,18 @@ DEFAULT_LIBRARY = Path.home() / ".agents" / "my_skills_library.md"
 
 SECTION_RE = re.compile(r"^##\s+(\d+)(?:[.\s]|$)", re.MULTILINE)
 NAME_RE = re.compile(r"^🛠️\s*技能名称：\s*(.+?)\s*$", re.MULTILINE)
+PACKAGE_NAME_RE = re.compile(r"^🧩\s*技能包名称：\s*(.+?)\s*$", re.MULTILINE)
 FIELD_LABELS = [
     "🛠️ 技能名称",
+    "🧩 技能包名称",
     "技能名称",
+    "技能包名称",
     "来源地址",
     "技能定位",
+    "技能包定位",
+    "收录价值",
     "适用场景",
+    "核心能力",
     "输入",
     "输出",
     "实现逻辑",
@@ -31,12 +37,17 @@ FIELD_RE = re.compile(
 FIELD_ORDER = [
     "来源地址",
     "技能定位",
+    "技能包定位",
+    "收录价值",
     "适用场景",
+    "核心能力",
     "输入",
     "输出",
     "实现逻辑",
 ]
-RECOMMEND_PREFIX_RE = re.compile(r"^是\s*(?:[,，。:：;；]?\s*(?:因为|理由是|原因是)\s*)?")
+RECOMMEND_PREFIX_RE = re.compile(
+    r"^是\s*[,，。:：;；]?\s*(?:因为|理由是|原因是)?\s*"
+)
 
 
 def next_section_number(existing: str) -> int:
@@ -45,7 +56,7 @@ def next_section_number(existing: str) -> int:
 
 
 def extract_title(card: str) -> str:
-    match = NAME_RE.search(card)
+    match = NAME_RE.search(card) or PACKAGE_NAME_RE.search(card)
     if not match:
         return "未命名技能"
     return match.group(1).strip().strip("[]") or "未命名技能"
@@ -57,6 +68,8 @@ def parse_card_fields(card: str) -> dict[str, str]:
         label = match.group("label").replace(" ", "")
         if label.startswith("🛠️"):
             label = "技能名称"
+        if label.startswith("🧩"):
+            label = "技能包名称"
         fields[label] = match.group("value").strip()
     return fields
 
@@ -75,24 +88,27 @@ def render_library_section(section_number: int, card: str) -> str:
     if not fields:
         return f"## {section_number}. {title}\n\n{card.strip()}\n"
 
-    lines = [f"## {section_number}. 🛠️ {title}", ""]
+    is_package = "技能包名称" in fields
+    icon = "🧩" if is_package else "🛠️"
+    lines = [f"## {section_number}. {icon} {title}", ""]
     source_url = fields.get("来源地址")
     if source_url:
         lines.extend([f"**来源地址**：{source_url}", ""])
 
-    positioning = fields.get("技能定位")
+    positioning = fields.get("技能包定位") or fields.get("技能定位")
     if positioning:
         lines.extend([f"> {positioning}", ""])
 
-    collection_value = extract_collection_value(fields)
+    collection_value = fields.get("收录价值") or extract_collection_value(fields)
     if collection_value:
         lines.extend(["### 收录价值", "", collection_value, ""])
 
-    for label in FIELD_ORDER:
+    output_order = ["适用场景", "核心能力"] if is_package else FIELD_ORDER
+    for label in output_order:
         value = fields.get(label)
         if not value:
             continue
-        if label in {"来源地址", "技能定位"}:
+        if label in {"来源地址", "技能定位", "技能包定位", "收录价值"}:
             continue
         lines.extend([f"### {label}", "", value, ""])
 

@@ -36,6 +36,7 @@ FIELD_ORDER = [
     "输出",
     "实现逻辑",
 ]
+RECOMMEND_PREFIX_RE = re.compile(r"^是\s*(?:[,，。:：;；]?\s*(?:因为|理由是|原因是)\s*)?")
 
 
 def next_section_number(existing: str) -> int:
@@ -60,6 +61,14 @@ def parse_card_fields(card: str) -> dict[str, str]:
     return fields
 
 
+def extract_collection_value(fields: dict[str, str]) -> str:
+    recommendation = fields.get("是否推荐收录", "").strip()
+    if not recommendation:
+        return ""
+    value = RECOMMEND_PREFIX_RE.sub("", recommendation).strip()
+    return value or recommendation
+
+
 def render_library_section(section_number: int, card: str) -> str:
     title = extract_title(card)
     fields = parse_card_fields(card)
@@ -74,6 +83,10 @@ def render_library_section(section_number: int, card: str) -> str:
     positioning = fields.get("技能定位")
     if positioning:
         lines.extend([f"> {positioning}", ""])
+
+    collection_value = extract_collection_value(fields)
+    if collection_value:
+        lines.extend(["### 收录价值", "", collection_value, ""])
 
     for label in FIELD_ORDER:
         value = fields.get(label)

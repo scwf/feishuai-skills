@@ -29,6 +29,7 @@ Evaluate an existing Agent skill found in third-party material, judge whether it
    - Do not translate the skill name. Preserve the original source name, project name, product name, method name, or English phrase when one is provided.
    - Keep the skill positioning to one sentence.
    - Separate "适用场景" from "实现逻辑": the former is user pain and workflow fit; the latter is prompt/tool/API/workflow mechanics.
+   - Write "实现逻辑" as reusable operating guidance when evidence allows: core steps, key constraints, tool/API calls, prompt structure, or acceptance checks. Avoid a vague one-sentence summary.
    - Preserve source-specific technical details when they matter, such as API names, repo modules, model types, CLI commands, or integration points.
 
 3. Evaluate collection value.
@@ -56,6 +57,7 @@ Evaluate an existing Agent skill found in third-party material, judge whether it
    - Write each skill as an independent incrementing Markdown section.
    - Let the append script format the stored card as readable Markdown with headings, not as a flat list of field lines.
    - Do not include `是否推荐收录` in the stored Markdown section because every stored card is already recommended.
+   - Convert the reason in `是否推荐收录` into a stored `收录价值` section so the library keeps the decision rationale.
    - Include `来源地址` in the stored Markdown section when available.
    - Use the bundled append script when modifying the library.
 
@@ -68,7 +70,7 @@ Evaluate an existing Agent skill found in third-party material, judge whether it
 适用场景：[什么场景或痛点下适合使用这个技能]
 输入：[该技能运行时需要什么输入，如特定的指令、数据或格式]
 输出：[该技能运行完毕后，产出什么结果或格式]
-实现逻辑：[它是怎么实现的，如：核心 Prompt 结构 / 调用的工具 API / 工作流简述]
+实现逻辑：[它是怎么实现的；优先写成可复用的核心步骤 / 关键约束 / 调用的工具 API / Prompt 结构 / 验收检查]
 是否推荐收录：[是/否，并说明一句话理由]
 ```
 
@@ -86,4 +88,4 @@ To override the target library:
 python <SKILL_DIR>/scripts/append_skill_card.py --card-file <CARD.md> --library <PATH>
 ```
 
-The script creates the parent directory if needed, creates the file if missing, detects the highest existing `## N.` section number, and appends the next section. It formats the stored card as a readable Markdown section with subheadings, keeps `来源地址`, omits `是否推荐收录`, and does not edit existing sections.
+The script creates the parent directory if needed, creates the file if missing, detects the highest existing `## N.` section number, and appends the next section. It formats the stored card as a readable Markdown section with subheadings, keeps `来源地址`, converts the recommendation reason into `收录价值`, omits `是否推荐收录`, and does not edit existing sections.

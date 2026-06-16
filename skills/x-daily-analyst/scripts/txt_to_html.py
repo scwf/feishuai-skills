@@ -42,16 +42,19 @@ def txt_to_html(txt_path: Path, html_path: Path) -> None:
     }
 
     i = 0
-    while i < n and lines[i].strip() != "══════════════":
+    while i < n:
+        s = lines[i].strip()
+        if s and all(c == '═' for c in s):
+            break
         line = lines[i].strip()
         if line.startswith("X 每日情报分析"):
             m = re.search(r"X 每日情报分析 · (\d{4}-\d{2}-\d{2})", line)
             if m:
                 title = f"X 每日情报分析 · {m.group(1)}"
-        elif line.startswith("视角："):
-            perspective = line.replace("视角：", "").strip()
-        elif "：" in line:
-            k, v = line.split("：", 1)
+        elif "视角" in line and (":" in line or "：" in line):
+            perspective = re.split(r"[:：]", line, maxsplit=1)[1].strip()
+        elif ":" in line or "：" in line:
+            k, v = re.split(r"[:：]", line, maxsplit=1)
             if k in meta:
                 meta[k] = v.strip()
         i += 1

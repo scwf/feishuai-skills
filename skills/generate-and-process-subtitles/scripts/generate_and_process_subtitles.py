@@ -164,9 +164,28 @@ def fetch_video_metadata(url: str) -> Dict[str, Any]:
         "title": info.get("title"),
         "channel": info.get("channel") or info.get("uploader") or "",
         "webpage_url": info.get("webpage_url") or url,
+        "description": info.get("description") or "",
         "subtitles": info.get("subtitles") or {},
         "automatic_captions": info.get("automatic_captions") or {},
     }
+
+
+def write_youtube_context(work_dir: Path, metadata: Optional[Dict[str, Any]]) -> Optional[Path]:
+    context_path = work_dir / "context.txt"
+    if context_path.exists():
+        context_path.unlink()
+
+    if not metadata or not (metadata.get("description") or "").strip():
+        return None
+
+    parts = [
+        f"Title: {metadata.get('title') or ''}".rstrip(),
+        f"Channel: {metadata.get('channel') or ''}".rstrip(),
+        "Description:",
+        metadata.get("description", "").strip(),
+    ]
+    context_path.write_text("\n".join(parts).strip() + "\n", encoding="utf-8")
+    return context_path
 
 
 def pick_subtitle_language(subtitles: Dict[str, Any], requested_language: Optional[str]) -> Optional[str]:
@@ -188,11 +207,16 @@ def pick_subtitle_language(subtitles: Dict[str, Any], requested_language: Option
     return available[0]
 
 
-def download_manual_subtitles(url: str, work_dir: Path, requested_language: Optional[str]) -> tuple[Optional[Path], Optional[Dict[str, Any]], Optional[str]]:
+def download_manual_subtitles(
+    url: str,
+    work_dir: Path,
+    requested_language: Optional[str],
+    metadata: Optional[Dict[str, Any]] = None,
+) -> tuple[Optional[Path], Optional[Dict[str, Any]], Optional[str]]:
     if not is_youtube_url(url):
         return None, None, None
 
-    metadata = fetch_video_metadata(url)
+    metadata = metadata or fetch_video_metadata(url)
     selected_language = pick_subtitle_language(metadata.get("subtitles") or {}, requested_language)
     if not selected_language:
         return None, metadata, None
@@ -239,6 +263,8 @@ def run_transcribe(args: argparse.Namespace) -> Dict[str, Any]:
         )
 
     work_dir = get_work_dir(output_dir)
+    video_metadata = fetch_video_metadata(args.input) if is_youtube_url(args.input) else None
+    context_path = write_youtube_context(work_dir, video_metadata)
 
     metadata: Dict[str, Any] = {
         "input": args.input,
@@ -248,10 +274,13 @@ def run_transcribe(args: argparse.Namespace) -> Dict[str, Any]:
         "semantic_split": bool(args.semantic_split),
         "used_manual_subtitles": False,
     }
+    if video_metadata is not None:
+        metadata["video_metadata"] = video_metadata
+    if context_path is not None:
+        metadata["context_file"] = str(context_path)
 
     if not args.force_asr and is_youtube_url(args.input):
-        manual_srt, video_metadata, selected_language = download_manual_subtitles(args.input, work_dir, args.language)
-        metadata["video_metadata"] = video_metadata
+        manual_srt, video_metadata, selected_language = download_manual_subtitles(args.input, work_dir, args.language, video_metadata)
         metadata["manual_subtitle_language"] = selected_language
         if manual_srt is not None:
             asr_data = ASRData.from_srt(manual_srt.read_text(encoding="utf-8"))

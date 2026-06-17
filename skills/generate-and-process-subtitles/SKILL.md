@@ -24,11 +24,21 @@ Typical requests:
 
 Do not perform dubbing, TTS, or voice cloning in this skill.
 
+For YouTube URL transcription requests, ask the user whether they want:
+
+- Transcription only: run `transcribe` and stop after the final `.srt` and `.txt`.
+- Transcription plus description-aware optimization: run `transcribe`, then run `optimize` on the generated SRT using `<output-dir>/_subtitle_work/context.txt` as `--description-file`.
+
+Keep `transcribe` itself ASR/subtitle-extraction focused. Do not add an LLM optimization step to `transcribe`; perform optimization only as a separate follow-up command after the user confirms.
+Only run description-aware optimization when the current `transcribe` result includes a `context_file` and that file exists. If no context file was generated, tell the user the video has no available description context and stop after transcription unless they provide another description file.
+
 ## Output Rules
 
 Write only final user-facing `.srt` and `.txt` files directly in the target output directory.
 
 Write all process artifacts under `<output-dir>/_subtitle_work/`, including downloaded audio, reusable YouTube subtitle downloads, raw ASR JSON, normalized JSON, metadata, and LLM intermediate outputs.
+
+For YouTube inputs, `transcribe` also writes the video's description metadata and, when a description is available, `<output-dir>/_subtitle_work/context.txt`. This context file includes the title, channel, and raw video description for optional later optimization with `optimize --description-file`; it is not used automatically by `transcribe`.
 
 Default output directory is `subtitles/` relative to the current working directory unless the user specifies another target.
 

@@ -17,14 +17,25 @@ Typical requests:
 
 ## Routing
 
-1. Local audio/video file or video URL -> run `transcribe`.
-2. Existing `.srt` with no translation request -> run `clean` for format normalization, or `optimize` when the user asks for correction/cleanup with an LLM.
-3. Existing `.srt` with another language or bilingual output requested -> run `translate`.
-4. Raw Whisper JSON with word timestamps plus a request for better segmentation -> run `split`.
+1. YouTube URL -> apply the YouTube Confirmation Gate before running any command.
+2. Local audio/video file or non-YouTube video URL -> run `transcribe`.
+3. Existing `.srt` with no translation request -> run `clean` for format normalization, or `optimize` when the user asks for correction/cleanup with an LLM.
+4. Existing `.srt` with another language or bilingual output requested -> run `translate`.
+5. Raw Whisper JSON with word timestamps plus a request for better segmentation -> run `split`.
 
 Do not perform dubbing, TTS, or voice cloning in this skill.
 
-For YouTube URL transcription requests, ask the user whether they want:
+## YouTube Confirmation Gate
+
+When the input is a YouTube URL and the user has not already explicitly chosen one path, ask for confirmation before running any command. Do this even when the user says only "提取字幕", "把字幕提取出来", "extract subtitles", or "transcribe this video"; absence of an optimization request is not consent to skip the choice.
+
+Ask a short question like: "这个 YouTube 视频我可以只提取字幕，也可以在提取后用视频简介做一次字幕优化。你要哪一种？"
+
+After asking, stop and wait for the user's answer.
+
+Skip this question only when the user's message already makes the path explicit, such as "只提取字幕 / 不要优化 / transcribe only" or "提取后用简介优化 / optimize with description".
+
+The two paths are:
 
 - Transcription only: run `transcribe` and stop after the final `.srt` and `.txt`.
 - Transcription plus description-aware optimization: run `transcribe`, then run `optimize` on the generated SRT using `<output-dir>/_subtitle_work/context.txt` as `--description-file`.

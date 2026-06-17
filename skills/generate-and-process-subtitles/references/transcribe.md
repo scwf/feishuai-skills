@@ -20,7 +20,17 @@ Behavior:
 - Repeated ASR runs reuse the cached model.
 - Semantic splitting is off by default. Use `--semantic-split` only when requested.
 
-For YouTube URL requests, confirm the desired workflow before running commands:
+## YouTube Confirmation Gate
+
+For YouTube URL requests, confirm the desired workflow before running any command unless the user already explicitly chose one. Treat generic wording like "提取字幕", "把字幕提取出来", "extract subtitles", "生成字幕", or "transcribe this video" as ambiguous because the skill supports both plain transcription and description-aware post-optimization.
+
+Ask a short question like: "这个 YouTube 视频我可以只提取字幕，也可以在提取后用视频简介做一次字幕优化。你要哪一种？"
+
+After asking, stop and wait for the user's answer.
+
+Skip this question only when the user has already said something equivalent to "transcription only / 不要优化" or "use the description to optimize".
+
+Available workflows:
 
 - Transcription only: run `transcribe` and stop.
 - Transcription plus description-aware optimization: run `transcribe`, then run `optimize` on the generated SRT with `--description-file "<target-dir>/_subtitle_work/context.txt"`.

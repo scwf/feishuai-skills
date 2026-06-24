@@ -22,25 +22,25 @@ Behavior:
 
 ## YouTube Confirmation Gate
 
-For YouTube URL requests, confirm the desired workflow before running any command unless the user already explicitly chose one. Treat generic wording like "提取字幕", "把字幕提取出来", "extract subtitles", "生成字幕", or "transcribe this video" as ambiguous because the skill supports both plain transcription and description-aware post-optimization.
+For YouTube URL requests, confirm the desired workflow before running any command unless the user already explicitly chose one. Treat generic wording like "提取字幕", "把字幕提取出来", "extract subtitles", "生成字幕", or "transcribe this video" as ambiguous because the skill supports both plain transcription and description-reference-assisted correction.
 
-Ask a short question like: "这个 YouTube 视频我可以只提取字幕，也可以在提取后用视频简介做一次字幕优化。你要哪一种？"
+Ask a short question like: "这个 YouTube 视频我可以只提取字幕，也可以在提取后用视频简介作为参考做一次保守纠错。你要哪一种？"
 
 After asking, stop and wait for the user's answer.
 
-Skip this question only when the user has already said something equivalent to "transcription only / 不要优化" or "use the description to optimize".
+Skip this question only when the user has already said something equivalent to "transcription only / 不要优化" or "use the description as reference evidence to correct subtitles".
 
 Available workflows:
 
 - Transcription only: run `transcribe` and stop.
-- Transcription plus description-aware optimization: run `transcribe`, then run `optimize` on the generated SRT with `--description-file "<target-dir>/_subtitle_work/context.txt"`.
+- Transcription plus description-reference-assisted correction: run `transcribe`, then run `optimize` on the generated SRT with `--reference-file "<target-dir>/_subtitle_work/context.txt"`.
 
-Before description-aware optimization, verify the `transcribe` JSON includes `context_file` and that the file exists. If no context file was generated, tell the user the video has no available description context and stop after transcription unless they provide another description file.
+Before description-reference-assisted correction, verify the `transcribe` JSON includes `context_file` and that the file exists. If no context file was generated, tell the user the video has no available description context and stop after transcription unless they provide another reference file.
 
 Example follow-up optimization:
 
 ```bash
-python {SKILL_ROOT}/scripts/generate_and_process_subtitles.py optimize "<target-dir>/<base>.srt" --description-file "<target-dir>/_subtitle_work/context.txt" --output-dir "<target-dir>"
+python {SKILL_ROOT}/scripts/generate_and_process_subtitles.py optimize "<target-dir>/<base>.srt" --reference-file "<target-dir>/_subtitle_work/context.txt" --output-dir "<target-dir>"
 ```
 
 Useful options:

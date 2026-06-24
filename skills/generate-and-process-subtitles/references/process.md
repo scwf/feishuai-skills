@@ -20,7 +20,7 @@ python {SKILL_ROOT}/scripts/generate_and_process_subtitles.py optimize input.srt
 
 Configure the LLM with `SUBTITLE_LLM_*` environment variables or the untracked `{SKILL_ROOT}/llm.env` file described in `references/setup.md`.
 
-Add context with `--description` or `--description-file` for names, terminology, or source notes.
+Add reference evidence with `--reference` or `--reference-file` for names, terminology evidence, source notes, or video title/channel/raw description. These options are evidence only; do not use them for task-level correction, rewrite, or style instructions.
 
 ## Translate
 
@@ -35,6 +35,8 @@ Output format choices:
 - `bilingual-trans-first`
 - `bilingual-source-first`
 - `translation-only`
+
+Use `--description` or `--description-file` for reference information, terminology, translation requirements, or style guidance.
 
 ## Semantic Split
 

@@ -109,7 +109,7 @@ class SubtitleOptimizer:
             f"<input_subtitle>{str(subtitle_chunk)}</input_subtitle>"
         )
         if self.custom_prompt:
-            user_prompt += f"\nReference content:\n<reference>{self.custom_prompt}</reference>"
+            user_prompt += f"\nReference evidence:\n<reference_evidence>{self.custom_prompt}</reference_evidence>"
 
         messages = [
             {"role": "system", "content": get_prompt("optimize/subtitle")},

@@ -370,12 +370,14 @@ def run_split(args: argparse.Namespace) -> Dict[str, Any]:
     }
 
 
-def read_reference_text(args: argparse.Namespace) -> str:
+def read_text_inputs(args: argparse.Namespace, inline_attr: str, file_attr: str) -> str:
     parts = []
-    if getattr(args, "description", None):
-        parts.append(args.description)
-    if getattr(args, "description_file", None):
-        parts.append(Path(args.description_file).read_text(encoding="utf-8"))
+    inline_value = getattr(args, inline_attr, None)
+    file_value = getattr(args, file_attr, None)
+    if inline_value:
+        parts.append(inline_value)
+    if file_value:
+        parts.append(Path(file_value).read_text(encoding="utf-8"))
     return "\n\n".join(part.strip() for part in parts if part and part.strip())
 
 
@@ -389,7 +391,7 @@ def run_optimize(args: argparse.Namespace) -> Dict[str, Any]:
     optimized = optimize_subtitle(
         str(input_path),
         model=llm_model(args),
-        custom_prompt=read_reference_text(args),
+        custom_prompt=read_text_inputs(args, "reference", "reference_file"),
         api_key=require_llm_api_key(args, "optimize"),
         base_url=llm_base_url(args),
         thread_num=args.threads,
@@ -420,7 +422,7 @@ def run_translate(args: argparse.Namespace) -> Dict[str, Any]:
         target_language=args.target_language,
         is_reflect=args.reflect,
         model=llm_model(args),
-        custom_prompt=read_reference_text(args),
+        custom_prompt=read_text_inputs(args, "description", "description_file"),
         api_key=require_llm_api_key(args, "translate"),
         base_url=llm_base_url(args),
         thread_num=args.threads,
@@ -506,8 +508,8 @@ def build_parser() -> argparse.ArgumentParser:
     optimize.add_argument("input", help="Input SRT file.")
     optimize.add_argument("--output-dir", "-o", default="subtitles")
     optimize.add_argument("--output-base", help="Base filename for final SRT/TXT outputs.")
-    optimize.add_argument("--description", help="Inline context, terminology, or correction guidance.")
-    optimize.add_argument("--description-file", help="Text file with context, terminology, or correction guidance.")
+    optimize.add_argument("--reference", help="Inline reference evidence such as terminology, source notes, title, channel, or raw video description. Not task or style instructions.")
+    optimize.add_argument("--reference-file", help="Text file with reference evidence such as terminology, source notes, title, channel, or raw video description. Not task or style instructions.")
     optimize.add_argument("--model", help="LLM model.")
     optimize.add_argument("--api-key", help="LLM API key.")
     optimize.add_argument("--base-url", help="LLM API base URL.")
@@ -520,8 +522,8 @@ def build_parser() -> argparse.ArgumentParser:
     translate.add_argument("--target-language", required=True, help="Target language, such as zh-Hans, ja, en.")
     translate.add_argument("--output-dir", "-o", default="subtitles")
     translate.add_argument("--output-base", help="Base filename for final SRT/TXT outputs.")
-    translate.add_argument("--description", help="Inline terminology or style guidance.")
-    translate.add_argument("--description-file", help="Text file with terminology or style guidance.")
+    translate.add_argument("--description", help="Inline reference information, terminology, translation requirements, or style guidance.")
+    translate.add_argument("--description-file", help="Text file with reference information, terminology, translation requirements, or style guidance.")
     translate.add_argument("--reflect", action="store_true", help="Use reflective two-step translation.")
     translate.add_argument("--subtitle-format", choices=["bilingual-trans-first", "bilingual-source-first", "translation-only"], default="bilingual-trans-first")
     translate.add_argument("--model", help="LLM model.")

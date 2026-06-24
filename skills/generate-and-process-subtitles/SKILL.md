@@ -29,19 +29,19 @@ Do not perform dubbing, TTS, or voice cloning in this skill.
 
 When the input is a YouTube URL and the user has not already explicitly chosen one path, ask for confirmation before running any command. Do this even when the user says only "提取字幕", "把字幕提取出来", "extract subtitles", or "transcribe this video"; absence of an optimization request is not consent to skip the choice.
 
-Ask a short question like: "这个 YouTube 视频我可以只提取字幕，也可以在提取后用视频简介做一次字幕优化。你要哪一种？"
+Ask a short question like: "这个 YouTube 视频我可以只提取字幕，也可以在提取后用视频简介作为参考做一次保守纠错。你要哪一种？"
 
 After asking, stop and wait for the user's answer.
 
-Skip this question only when the user's message already makes the path explicit, such as "只提取字幕 / 不要优化 / transcribe only" or "提取后用简介优化 / optimize with description".
+Skip this question only when the user's message already makes the path explicit, such as "只提取字幕 / 不要优化 / transcribe only" or "提取后用简介作为参考纠错 / optimize with description as reference evidence".
 
 The two paths are:
 
 - Transcription only: run `transcribe` and stop after the final `.srt` and `.txt`.
-- Transcription plus description-aware optimization: run `transcribe`, then run `optimize` on the generated SRT using `<output-dir>/_subtitle_work/context.txt` as `--description-file`.
+- Transcription plus description-reference-assisted correction: run `transcribe`, then run `optimize` on the generated SRT using `<output-dir>/_subtitle_work/context.txt` as `--reference-file`.
 
 Keep `transcribe` itself ASR/subtitle-extraction focused. Do not add an LLM optimization step to `transcribe`; perform optimization only as a separate follow-up command after the user confirms.
-Only run description-aware optimization when the current `transcribe` result includes a `context_file` and that file exists. If no context file was generated, tell the user the video has no available description context and stop after transcription unless they provide another description file.
+Only run description-reference-assisted correction when the current `transcribe` result includes a `context_file` and that file exists. If no context file was generated, tell the user the video has no available description context and stop after transcription unless they provide another reference file.
 
 ## Output Rules
 
@@ -49,7 +49,7 @@ Write only final user-facing `.srt` and `.txt` files directly in the target outp
 
 Write all process artifacts under `<output-dir>/_subtitle_work/`, including downloaded audio, reusable YouTube subtitle downloads, raw ASR JSON, normalized JSON, metadata, and LLM intermediate outputs.
 
-For YouTube inputs, `transcribe` also writes the video's description metadata and, when a description is available, `<output-dir>/_subtitle_work/context.txt`. This context file includes the title, channel, and raw video description for optional later optimization with `optimize --description-file`; it is not used automatically by `transcribe`.
+For YouTube inputs, `transcribe` also writes the video's description metadata and, when a description is available, `<output-dir>/_subtitle_work/context.txt`. This context file includes the title, channel, and raw video description for optional later correction with `optimize --reference-file`; it is not used automatically by `transcribe`.
 
 Default output directory is `subtitles/` relative to the current working directory unless the user specifies another target.
 

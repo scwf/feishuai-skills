@@ -2,12 +2,12 @@
 
 Resolve `{SKILL_ROOT}` to this skill folder before running commands.
 
-## Clean
+## Normalize
 
-Normalize an existing SRT and export clean SRT/TXT without LLM calls:
+Normalize an existing SRT and export standard SRT/TXT without LLM calls:
 
 ```bash
-python {SKILL_ROOT}/scripts/generate_and_process_subtitles.py clean input.srt --output-dir ./subtitles
+python {SKILL_ROOT}/scripts/generate_and_process_subtitles.py normalize input.srt --output-dir ./subtitles
 ```
 
 ## Optimize

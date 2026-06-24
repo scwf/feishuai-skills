@@ -441,22 +441,22 @@ def run_translate(args: argparse.Namespace) -> Dict[str, Any]:
     }
 
 
-def run_clean(args: argparse.Namespace) -> Dict[str, Any]:
+def run_normalize(args: argparse.Namespace) -> Dict[str, Any]:
     output_dir = Path(args.output_dir).resolve()
     input_path = Path(args.input).resolve()
     if not input_path.exists():
-        raise SubtitleSkillError(f"Input SRT not found: {input_path}", action="clean", step="validate_input", error_type="missing_input")
+        raise SubtitleSkillError(f"Input SRT not found: {input_path}", action="normalize", step="validate_input", error_type="missing_input")
 
     work_dir = get_work_dir(output_dir)
     asr_data = ASRData.from_srt(input_path.read_text(encoding="utf-8"))
     base_name = args.output_base or input_path.stem
     outputs = save_main_outputs(asr_data, output_dir, base_name)
     shutil.copy2(input_path, work_dir / f"{sanitize_filename(input_path.stem)}.source.srt")
-    work_json = save_work_json(asr_data, work_dir, base_name, "clean")
-    validate_main_outputs(outputs, "clean")
+    work_json = save_work_json(asr_data, work_dir, base_name, "normalize")
+    validate_main_outputs(outputs, "normalize")
     return {
         "ok": True,
-        "action": "clean",
+        "action": "normalize",
         "outputs": {key: str(value) for key, value in outputs.items()},
         "work_dir": str(work_dir),
         "work_json": str(work_json),
@@ -464,7 +464,7 @@ def run_clean(args: argparse.Namespace) -> Dict[str, Any]:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Generate and process subtitles with clean SRT/TXT outputs.")
+    parser = argparse.ArgumentParser(description="Generate and process subtitles with standard SRT/TXT outputs.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     transcribe = subparsers.add_parser("transcribe", help="Generate SRT/TXT from a local media file or video URL.")
@@ -498,13 +498,13 @@ def build_parser() -> argparse.ArgumentParser:
     split.add_argument("--base-url", help="LLM API base URL.")
     split.set_defaults(func=run_split)
 
-    clean = subparsers.add_parser("clean", help="Normalize an existing SRT and export clean SRT/TXT.")
-    clean.add_argument("input", help="Input SRT file.")
-    clean.add_argument("--output-dir", "-o", default="subtitles")
-    clean.add_argument("--output-base", help="Base filename for final SRT/TXT outputs.")
-    clean.set_defaults(func=run_clean)
+    normalize = subparsers.add_parser("normalize", help="Normalize an existing SRT and export standard SRT/TXT.")
+    normalize.add_argument("input", help="Input SRT file.")
+    normalize.add_argument("--output-dir", "-o", default="subtitles")
+    normalize.add_argument("--output-base", help="Base filename for final SRT/TXT outputs.")
+    normalize.set_defaults(func=run_normalize)
 
-    optimize = subparsers.add_parser("optimize", help="Clean recognition errors in an existing SRT using an LLM.")
+    optimize = subparsers.add_parser("optimize", help="Correct recognition errors in an existing SRT using an LLM.")
     optimize.add_argument("input", help="Input SRT file.")
     optimize.add_argument("--output-dir", "-o", default="subtitles")
     optimize.add_argument("--output-base", help="Base filename for final SRT/TXT outputs.")

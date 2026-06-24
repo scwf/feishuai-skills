@@ -5,7 +5,7 @@ Use these checks before publishing meaningful changes.
 ## Positive Triggers
 
 - "Generate subtitles for this local mp4" -> use `transcribe`.
-- "Clean this SRT without changing timing" -> use `clean`.
+- "Normalize this SRT and export TXT" -> use `normalize`.
 - "Translate this SRT to zh-Hans and keep bilingual subtitles" -> use `translate`.
 - "Re-cut this Whisper JSON into natural subtitle segments" -> use `split`.
 

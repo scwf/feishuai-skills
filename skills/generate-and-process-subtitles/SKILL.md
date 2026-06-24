@@ -1,6 +1,6 @@
 ---
 name: generate-and-process-subtitles
-description: Generate and process subtitles from local audio/video files, video URLs, existing SRT files, or raw Whisper word-timestamp JSON. Use when an AI agent needs to create SRT/TXT subtitles, reuse available YouTube human subtitles, transcribe media with cross-platform Python faster-whisper, clean or optimize subtitles, translate subtitles, or optionally apply LLM semantic subtitle segmentation. Do not use for dubbing, TTS, voice cloning.
+description: Generate and process subtitles from local audio/video files, video URLs, existing SRT files, or raw Whisper word-timestamp JSON. Use when an AI agent needs to create SRT/TXT subtitles, reuse available YouTube human subtitles, transcribe media with cross-platform Python faster-whisper, normalize or optimize subtitles, translate subtitles, or optionally apply LLM semantic subtitle segmentation. Do not use for dubbing, TTS, voice cloning.
 ---
 
 # Generate And Process Subtitles
@@ -11,7 +11,7 @@ Typical requests:
 
 - "Generate subtitles for this video/audio file."
 - "Transcribe this YouTube video into SRT and TXT."
-- "Clean or optimize this SRT without changing timing."
+- "Normalize this SRT and export a TXT copy."
 - "Translate this SRT to Chinese and keep bilingual subtitles."
 - "Re-cut this Whisper JSON into natural subtitle segments."
 
@@ -19,7 +19,7 @@ Typical requests:
 
 1. YouTube URL -> apply the YouTube Confirmation Gate before running any command.
 2. Local audio/video file or non-YouTube video URL -> run `transcribe`.
-3. Existing `.srt` with no translation request -> run `clean` for format normalization, or `optimize` when the user asks for correction/cleanup with an LLM.
+3. Existing `.srt` with no translation request -> run `normalize` for format normalization, or `optimize` when the user asks for recognition-error correction with an LLM.
 4. Existing `.srt` with another language or bilingual output requested -> run `translate`.
 5. Raw Whisper JSON with word timestamps plus a request for better segmentation -> run `split`.
 
@@ -47,7 +47,7 @@ Only run description-reference-assisted correction when the current `transcribe`
 
 Write only final user-facing `.srt` and `.txt` files directly in the target output directory.
 
-Write all process artifacts under `<output-dir>/_subtitle_work/`, including downloaded audio, reusable YouTube subtitle downloads, raw ASR JSON, normalized JSON, metadata, and LLM intermediate outputs.
+Write all process artifacts under `<output-dir>/_subtitle_work/`, including downloaded audio, reusable YouTube subtitle downloads, raw ASR JSON, process JSON, metadata, and LLM intermediate outputs.
 
 For YouTube inputs, `transcribe` also writes the video's description metadata and, when a description is available, `<output-dir>/_subtitle_work/context.txt`. This context file includes the title, channel, and raw video description for optional later correction with `optimize --reference-file`; it is not used automatically by `transcribe`.
 
@@ -92,7 +92,7 @@ Useful commands:
 ```bash
 {PYTHON} {SKILL_ROOT}/scripts/generate_and_process_subtitles.py transcribe input.mp4 -o ./subtitles
 {PYTHON} {SKILL_ROOT}/scripts/generate_and_process_subtitles.py transcribe "https://www.youtube.com/watch?v=..." -o ./subtitles
-{PYTHON} {SKILL_ROOT}/scripts/generate_and_process_subtitles.py clean input.srt -o ./subtitles
+{PYTHON} {SKILL_ROOT}/scripts/generate_and_process_subtitles.py normalize input.srt -o ./subtitles
 {PYTHON} {SKILL_ROOT}/scripts/generate_and_process_subtitles.py optimize input.srt -o ./subtitles
 {PYTHON} {SKILL_ROOT}/scripts/generate_and_process_subtitles.py translate input.srt --target-language zh-Hans -o ./subtitles
 {PYTHON} {SKILL_ROOT}/scripts/generate_and_process_subtitles.py split raw-whisper.json -o ./subtitles
@@ -105,6 +105,6 @@ Semantic splitting is supported but not part of the default transcription path. 
 Load only the reference needed for the current task:
 
 - `references/transcribe.md` for local media, URLs, YouTube subtitles, ASR device/model options, and output placement.
-- `references/process.md` for clean, optimize, translate, and semantic split workflows.
+- `references/process.md` for normalize, optimize, translate, and semantic split workflows.
 - `references/setup.md` for dependency installation, ffmpeg notes, and LLM environment variables.
 - `references/eval.md` for minimal trigger, boundary, and output-placement checks before publishing changes.

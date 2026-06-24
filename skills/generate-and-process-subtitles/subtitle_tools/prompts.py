@@ -166,9 +166,10 @@ _PROMPTS = {
 2. 分割段的字数限制:
    - CJK语言(中文、日语、韩语等):每段≤ ${max_word_count_cjk} 字
    - 拉丁语言(英语、法语等):每段≤ ${max_word_count_english} 词
-3. 在遵循字数限制的同时，保持每个分句的意思完整
-4. 原文保持不变:不增删改,不要翻译，仅插入 <br>
-5. 倒计时（每个数字进行分割）、关键信息揭示前及需要强调的位置需要进行适当分割
+3. 最高优先级是原文逐字保真:不增删改,不补全,不规范化,不要翻译，仅插入 <br>
+4. 输入文本可能是长音频中的一个片段，可能在任意词边界、连接词、从句或不完整句子处开始或结束。必须保留这些开头/末尾片段，不得删除、补全、改写或为了语义完整而省略。
+5. 在不改变原文的前提下，尽量保持每个分句的意思完整；如果语义完整与原文保真冲突，必须优先保留原文
+6. 倒计时（每个数字进行分割）、关键信息揭示前及需要强调的位置需要进行适当分割
 </instructions>
 
 <output_format>
@@ -191,6 +192,15 @@ the upgraded claude sonnet is now available for all users developers can build w
 </input>
 <output>
 the upgraded claude sonnet is now available for all users<br>developers can build with the computer use beta on the anthropic api amazon bedrock and google cloud's vertex ai<br>the new claude haiku will be released later this month
+</output>
+</example>
+
+<example>
+<input>
+So what's special about V3? V3 is the unified data layer. So you no longer have to rewrite any data files to share them across Delta and Iceberg tables. That's awesome. So basically, the data that's laid out, whether it's Iceberg or Delta, looks like identical, the big data now, right? Exactly, yes. And
+</input>
+<output>
+So what's special about V3?<br>V3 is the unified data layer.<br>So you no longer have to rewrite any data files to share them across Delta and Iceberg tables.<br>That's awesome.<br>So basically, the data that's laid out, whether it's Iceberg or Delta, looks like identical, the big data now, right?<br>Exactly, yes.<br>And
 </output>
 </example>
 </examples>

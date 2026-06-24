@@ -138,7 +138,16 @@ def split_by_llm(
     )
     messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": text},
+        {
+            "role": "user",
+            "content": (
+                "The following subtitle chunk may start or end at an arbitrary word boundary. "
+                "Preserve leading/trailing fragments exactly, including trailing conjunctions such as And. "
+                "Only insert <br> inside the subtitle text wrapped by <text> tags. "
+                "Return the segmented subtitle text only, without the <text> tags.\n\n"
+                f"<text>\n{text}\n</text>"
+            ),
+        },
     ]
     last_result: Optional[List[str]] = None
 
@@ -173,6 +182,7 @@ def split_by_llm(
                     f"Validation failed: {error_message}\n"
                     "Fix the segmentation by changing `<br>` positions only.\n"
                     "Do NOT add, remove, replace, rewrite, normalize, or reorder any text.\n"
+                    "Do NOT remove trailing partial words, conjunctions, or fragments.\n"
                     "Do NOT add punctuation.\n"
                     "Do NOT complete partial words or partial sentences.\n"
                     "Keep every original token exactly as-is and return the COMPLETE corrected text using `<br>` separators only."

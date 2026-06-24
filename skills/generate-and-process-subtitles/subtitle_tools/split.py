@@ -99,6 +99,9 @@ class SubtitleSplitter:
                 max_retries=self.max_retries,
             )
             result_segments.extend(map_sentences_to_words(chunk_words, sentences))
+        # TODO: Add seam repair after first-pass chunk splitting. Keep chunks as
+        # the broad segmentation pass, then locally re-split only the last
+        # segment before each chunk boundary plus the first segment after it.
         return ASRData(result_segments)
 
     def _chunk_words(self, words: Sequence[ASRWord]) -> List[List[ASRWord]]:

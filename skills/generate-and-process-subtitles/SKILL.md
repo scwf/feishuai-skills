@@ -27,20 +27,26 @@ Do not perform dubbing, TTS, or voice cloning in this skill.
 
 ## YouTube Confirmation Gate
 
-When the input is a YouTube URL and the user has not already explicitly chosen one path, ask for confirmation before running any command. Do this even when the user says only "提取字幕", "把字幕提取出来", "extract subtitles", or "transcribe this video"; absence of an optimization request is not consent to skip the choice.
+When the input is a YouTube URL and the user has not already explicitly chosen the transcription shape and post-transcription correction path, ask for confirmation before running any command. Do this even when the user says only "提取字幕", "把字幕提取出来", "extract subtitles", or "transcribe this video"; absence of an optimization or semantic-split request is not consent to skip either choice.
 
-Ask a short question like: "这个 YouTube 视频我可以只提取字幕，也可以在提取后用视频简介作为参考做一次保守纠错。你要哪一种？"
+Ask two short questions in order:
 
-After asking, stop and wait for the user's answer.
+1. "转录时要不要启用 semantic split，让字幕断句更自然？"
+2. "转录完成后，要不要用视频简介作为参考做一次保守纠错 optimize？"
 
-Skip this question only when the user's message already makes the path explicit, such as "只提取字幕 / 不要优化 / transcribe only" or "提取后用简介作为参考纠错 / optimize with description as reference evidence".
+After asking, stop and wait for the user's answer. If the user answers only the first question, ask the second question before running commands.
 
-The two paths are:
+Skip a question only when the user's message already makes that choice explicit, such as "不要语义切分 / no semantic split", "加 semantic split / natural subtitle breaking", "只提取字幕 / 不要优化 / transcribe only", or "提取后用简介作为参考纠错 / optimize with description as reference evidence".
+
+The available paths are:
 
 - Transcription only: run `transcribe` and stop after the final `.srt` and `.txt`.
+- Transcription plus semantic split: run `transcribe --semantic-split` and stop after the final `.srt` and `.txt`.
 - Transcription plus description-reference-assisted correction: run `transcribe`, then run `optimize` on the generated SRT using `<output-dir>/_subtitle_work/context.txt` as `--reference-file`.
+- Transcription plus semantic split and correction: run `transcribe --semantic-split`, then run `optimize` on that generated SRT using `<output-dir>/_subtitle_work/context.txt` as `--reference-file`.
 
 Keep `transcribe` itself ASR/subtitle-extraction focused. Do not add an LLM optimization step to `transcribe`; perform optimization only as a separate follow-up command after the user confirms.
+Semantic splitting is allowed inside `transcribe` only when the user confirms it or already requested natural subtitle breaking.
 Only run description-reference-assisted correction when the current `transcribe` result includes a `context_file` and that file exists. If no context file was generated, tell the user the video has no available description context and stop after transcription unless they provide another reference file.
 
 ## Output Rules

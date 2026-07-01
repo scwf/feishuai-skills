@@ -5,6 +5,7 @@ Use these checks before publishing meaningful changes.
 ## Positive Triggers
 
 - "Generate subtitles for this local mp4" -> use `transcribe`.
+- "Extract subtitles from this YouTube video" -> ask the YouTube Confirmation Gate questions before running commands: semantic split during transcription, then description-reference-assisted correction after transcription.
 - "Normalize this SRT and export TXT" -> use `normalize`.
 - "Translate this SRT to zh-Hans and keep bilingual subtitles" -> use `translate`.
 - "Re-cut this Whisper JSON into natural subtitle segments" -> use `split`.

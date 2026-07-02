@@ -11,6 +11,10 @@
     "username": "AnthropicAI",
     "categories": ["model_vendor"]
   },
+  "X_ClaudeDevs": {
+    "username": "ClaudeDevs",
+    "categories": ["model_vendor", "devtools_agent"]
+  },
   "X_DeepSeek": {
     "username": "deepseek_ai",
     "categories": ["model_vendor"]

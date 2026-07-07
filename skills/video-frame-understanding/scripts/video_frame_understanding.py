@@ -306,18 +306,8 @@ def rebuild_jsonl(frame_json_dir: Path, jsonl_path: Path) -> list[dict[str, str]
     return records
 
 
-def compact_text(value: str, limit: int = 220) -> str:
-    text = re.sub(r"\s+", " ", value).strip()
-    if len(text) <= limit:
-        return text
-    return text[: limit - 1].rstrip() + "…"
-
-
-def similarity_key(record: dict[str, Any]) -> str:
-    content = str(record.get("frame_content", ""))
-    key = content.lower()
-    key = re.sub(r"\s+", "", key)
-    return key[:240]
+def normalize_summary_text(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip()
 
 
 def build_summary(records: list[dict[str, Any]], summary_path: Path, video_topic: str) -> None:
@@ -333,31 +323,13 @@ def build_summary(records: list[dict[str, Any]], summary_path: Path, video_topic
         "",
     ]
 
-    previous_key = None
-    duplicate_count = 0
-
     for record in records:
-        current_key = similarity_key(record)
-        if current_key and current_key == previous_key:
-            duplicate_count += 1
-            continue
-
-        if duplicate_count:
-            lines.append(f"- 已省略连续相似帧：{duplicate_count}")
-            lines.append("")
-            duplicate_count = 0
-
-        previous_key = current_key
         timestamp = record.get("timestamp", "")
-        content = compact_text(str(record.get("frame_content", "")), 360)
+        content = normalize_summary_text(str(record.get("frame_content", "")))
 
         lines.append(f"### {timestamp}")
         lines.append("")
         lines.append(f"- 发布材料内容：{content or '无法确认'}")
-        lines.append("")
-
-    if duplicate_count:
-        lines.append(f"- 已省略连续相似帧：{duplicate_count}")
         lines.append("")
 
     summary_path.write_text("\n".join(lines), encoding="utf-8")

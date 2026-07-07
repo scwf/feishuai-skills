@@ -216,7 +216,8 @@ Follow these rules:
 
 - stay faithful to frame JSON records
 - prioritize published screen material over stage or venue details
-- merge only obvious duplicate or near-duplicate consecutive frames
+- preserve complete per-frame `frame_content` text in `summary.md`; do not truncate long frame content with ellipses
+- include every frame JSON record in order; do not omit or merge frames based on similarity
 - do not write opinions
 - do not make business judgments
 - do not infer facts outside the visible frame content

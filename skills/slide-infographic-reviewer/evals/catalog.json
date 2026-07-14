@@ -1,0 +1,21 @@
+{
+  "schema_version": 2,
+  "neighbor_skills": [
+    {
+      "name": "infographic-prompt-builder",
+      "description": "Create a new infographic image-generation prompt from a topic or source material. Use for prompt generation, not for reviewing an existing prompt or rendered page."
+    },
+    {
+      "name": "ui-reviewer",
+      "description": "Review application and website UI screenshots for usability, interaction, accessibility, and interface consistency."
+    },
+    {
+      "name": "deck-narrative-reviewer",
+      "description": "Review the narrative coherence, sequencing, and argument across an entire multi-slide presentation deck."
+    },
+    {
+      "name": "infographic-to-editable-ppt",
+      "description": "Recreate a static infographic as an editable one-page PowerPoint slide. Use for implementation and reconstruction, not review-only critique."
+    }
+  ]
+}

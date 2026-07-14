@@ -1,0 +1,136 @@
+{
+  "schema_version": 4,
+  "skill": "slide-infographic-reviewer",
+  "scope": "basic discovery and routing only",
+  "cases": [
+    {
+      "id": "discover_explicit",
+      "layer": "discovery",
+      "category": "explicit_trigger",
+      "request": "Use slide-infographic-reviewer to review this infographic generation prompt.",
+      "artifacts": ["fixtures/sample-prompt.md"],
+      "expected_selected_skill": "slide-infographic-reviewer"
+    },
+    {
+      "id": "discover_rendered",
+      "layer": "discovery",
+      "category": "implicit_trigger",
+      "request": "请检视这张最终生成的信息图，并给出页面优化建议。",
+      "artifacts": ["fixtures/sample-rendered.png"],
+      "expected_selected_skill": "slide-infographic-reviewer"
+    },
+    {
+      "id": "discover_structural",
+      "layer": "discovery",
+      "category": "implicit_trigger",
+      "request": "Review this one-page Markdown layout draft before it becomes a slide.",
+      "artifacts": ["fixtures/sample-layout.md"],
+      "expected_selected_skill": "slide-infographic-reviewer"
+    },
+    {
+      "id": "discover_ui_neighbor",
+      "layer": "discovery",
+      "category": "negative_trigger",
+      "request": "Review this mobile checkout UI screenshot and identify usability problems.",
+      "artifacts": ["fixtures/sample-ui.svg"],
+      "expected_selected_skill": "ui-reviewer"
+    },
+    {
+      "id": "discover_deck_neighbor",
+      "layer": "discovery",
+      "category": "negative_trigger",
+      "request": "Review the narrative coherence of this 30-slide investor deck.",
+      "artifacts": ["fixtures/deck-outline.md"],
+      "expected_selected_skill": "deck-narrative-reviewer"
+    },
+    {
+      "id": "discover_prompt_creation_neighbor",
+      "layer": "discovery",
+      "category": "negative_trigger",
+      "request": "Create a new executive infographic prompt from these source notes.",
+      "artifacts": ["fixtures/source-notes.md"],
+      "expected_selected_skill": "infographic-prompt-builder"
+    },
+    {
+      "id": "route_prompt",
+      "layer": "routing",
+      "category": "implicit_trigger",
+      "request": "检查这段信息图生成提示词，并给出优化建议。",
+      "artifacts": ["fixtures/sample-prompt.md"],
+      "expected_trigger": true,
+      "expected_target": "sample-prompt.md",
+      "expected_mode": "Prompt",
+      "expected_references": ["common-review.md", "prompt-review.md"]
+    },
+    {
+      "id": "route_rendered_with_prompt",
+      "layer": "routing",
+      "category": "combined_input",
+      "request": "请检视最终生成的信息图，同时参考原提示词判断哪里没有执行到位。",
+      "artifacts": ["fixtures/sample-rendered.png", "fixtures/sample-prompt.md"],
+      "expected_trigger": true,
+      "expected_target": "sample-rendered.png",
+      "expected_mode": "Rendered",
+      "expected_references": ["common-review.md", "rendered-review.md", "prompt-review.md"]
+    },
+    {
+      "id": "route_prompt_with_image",
+      "layer": "routing",
+      "category": "combined_input",
+      "request": "这张图是上次的生成结果。这次请只检视并优化原提示词。",
+      "artifacts": ["fixtures/sample-prompt.md", "fixtures/sample-rendered.png"],
+      "expected_trigger": true,
+      "expected_target": "sample-prompt.md",
+      "expected_mode": "Prompt",
+      "expected_references": ["common-review.md", "prompt-review.md", "rendered-review.md"]
+    },
+    {
+      "id": "route_structural",
+      "layer": "routing",
+      "category": "implicit_trigger",
+      "request": "Review this one-page Markdown layout draft before I turn it into a slide.",
+      "artifacts": ["fixtures/sample-layout.md", "fixtures/source-notes.md"],
+      "expected_trigger": true,
+      "expected_target": "sample-layout.md",
+      "expected_mode": "Structural",
+      "expected_references": ["common-review.md"]
+    },
+    {
+      "id": "route_unspecified_fallback",
+      "layer": "routing",
+      "category": "noisy_context",
+      "request": "这些是提示词、内容稿和最终图，帮我做一下单页 review。",
+      "artifacts": ["fixtures/sample-prompt.md", "fixtures/sample-layout.md", "fixtures/sample-rendered.png"],
+      "expected_trigger": true,
+      "expected_target": "sample-rendered.png",
+      "expected_mode": "Rendered",
+      "expected_references": ["common-review.md", "rendered-review.md", "prompt-review.md"]
+    },
+    {
+      "id": "route_unrenderable",
+      "layer": "routing",
+      "category": "exception_path",
+      "request": "Review slide 6 of this PPTX; rendering is unavailable but text and object structure can be extracted.",
+      "artifacts": ["fixtures/pptx-structure.json"],
+      "expected_trigger": true,
+      "expected_target": "slide_6",
+      "expected_mode": "Structural",
+      "expected_references": ["common-review.md"]
+    },
+    {
+      "id": "route_multiple_targets",
+      "layer": "routing",
+      "category": "multi_target",
+      "request": "分别检视这段提示词和最终生成的信息图，给出两份独立结果。",
+      "artifacts": ["fixtures/sample-prompt.md", "fixtures/sample-rendered.png"],
+      "expected_trigger": true,
+      "expected_targets": ["sample-prompt.md", "sample-rendered.png"],
+      "expected_modes": ["Prompt", "Rendered"],
+      "expected_references": ["common-review.md", "prompt-review.md", "rendered-review.md"],
+      "expected_reviews": [
+        {"target": "sample-prompt.md", "mode": "Prompt", "references": ["common-review.md", "prompt-review.md", "rendered-review.md"]},
+        {"target": "sample-rendered.png", "mode": "Rendered", "references": ["common-review.md", "rendered-review.md", "prompt-review.md"]}
+      ]
+    }
+  ]
+}

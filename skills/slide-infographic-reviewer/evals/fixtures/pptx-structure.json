@@ -1,0 +1,10 @@
+{
+  "slide_number": 6,
+  "render_available": false,
+  "title": "Coordination across three layers creates the platform advantage",
+  "objects": [
+    {"type": "text", "region": "title", "content": "Coordination across three layers creates the platform advantage"},
+    {"type": "group", "region": "left", "children": ["Applications", "Model Platform", "Infrastructure"]},
+    {"type": "group", "region": "right", "children": ["Application value", "Coordination core", "Compute foundation"]}
+  ]
+}

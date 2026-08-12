@@ -78,9 +78,9 @@ node "{SKILL_ROOT}/scripts/render_pdf.js" <INPUT_HTML> <OUTPUT_PDF>
 | `INPUT_HTML` | 是 | 输入 HTML 绝对或相对路径，须含 `<meta charset="utf-8">` |
 | `OUTPUT_PDF` | 是 | 输出 PDF 路径 |
 
-**环境**：优先 `PLAYWRIGHT_MODULE_PATH`，否则使用当前 Node 环境中的 `playwright`。
+**环境**：若设置了 `PLAYWRIGHT_MODULE_PATH`，先尝试该路径；路径无效时输出 `WARN` 并自动回退到当前 Node 环境的标准 `require('playwright')` 解析。两种方式都失败时才返回模块加载失败。定时任务通常不需要设置该变量。
 
-**输出**：成功 `OK <pdf路径>`；失败 `FAIL <message>`，exit 1；缺参 exit 2。
+**输出**：成功 `OK <pdf路径>`；自定义模块路径无效但回退成功时先输出 `WARN`、最终仍输出 `OK`；全部加载方式或 PDF 渲染失败时输出 `FAIL <message>`，exit 1；缺参 exit 2。
 
 ## `send_email.py`
 

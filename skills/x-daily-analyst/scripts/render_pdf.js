@@ -15,17 +15,30 @@ const path = require('path');
 
 function loadPlaywright() {
   const custom = process.env.PLAYWRIGHT_MODULE_PATH;
+  let customError;
+
   if (custom) {
-    return require(path.resolve(custom));
+    try {
+      return require(path.resolve(custom));
+    } catch (err) {
+      customError = err;
+      console.warn(
+        `WARN: Cannot load PLAYWRIGHT_MODULE_PATH=${custom}; falling back to Node module resolution.`,
+      );
+    }
   }
+
   try {
     return require('playwright');
   } catch (err) {
     console.error(
       'FAIL: Cannot load playwright. Run npm install playwright in your project,',
     );
-    console.error('     or set PLAYWRIGHT_MODULE_PATH to the playwright package path.');
-    console.error(err.message);
+    console.error('     or set PLAYWRIGHT_MODULE_PATH to a valid playwright package path.');
+    if (customError) {
+      console.error(`Custom path error: ${customError.message}`);
+    }
+    console.error(`Standard resolution error: ${err.message}`);
     process.exit(1);
   }
 }

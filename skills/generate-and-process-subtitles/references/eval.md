@@ -21,3 +21,4 @@ Use these checks before publishing meaningful changes.
 - Downloads, ASR JSON, metadata, cached subtitles, and LLM intermediate data are under `_subtitle_work/`.
 - Faster-whisper model files are outside the target output directory because they use the system Hugging Face cache.
 - Invalid local paths fail with structured JSON before creating `_subtitle_work/`.
+- Targeted recovery requires interval bounds, fixed language, and `--no-vad` together; passes both bounds to faster-whisper; writes distinct interval-named outputs atomically; and refuses existing repair outputs without changing the baseline.

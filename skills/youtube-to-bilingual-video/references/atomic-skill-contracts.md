@@ -35,6 +35,14 @@ Transcription command shape:
 
 Add `--semantic-split` only after confirmation. Do not force ASR unless the user explicitly requests it.
 
+Targeted missing-speech repair command shape:
+
+```bash
+"{SUBTITLE_PYTHON}" "{SUBTITLE_SKILL_ROOT}/scripts/generate_and_process_subtitles.py" transcribe "<local-source-video>" --output-dir "<job-dir>/subtitles/repairs" --language en --start-seconds <start> --end-seconds <end> --no-vad
+```
+
+Pass interval bounds, fixed language, and `--no-vad` together. Prefer the already downloaded local source. Merge only verified missing speech into a copy of the audited English SRT; never overwrite the baseline in place. Then translate the added cues.
+
 Optimization command shape:
 
 ```bash
@@ -57,6 +65,7 @@ Required handoff checks:
 - Process files remain under `_subtitle_work/`.
 - Cue timing survives optimize and translate unless the atomic skill explicitly reports a segmentation operation.
 - Translation output is bilingual with Chinese first.
+- The bilingual result is validated against the audited source SRT, not only against video duration.
 
 ## Composite Ownership
 

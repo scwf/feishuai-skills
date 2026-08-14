@@ -55,5 +55,11 @@ Fail when English is first, Chinese is absent, cues overlap, or numbering is non
 - Run `python -m py_compile` on every bundled script.
 - Run the entity-mutation and clean-punctuation audit fixtures.
 - Run bilingual validation on passing and failing fixtures.
+- Verify source cue/timing mismatches and material video coverage gaps fail validation.
+- Verify coverage-gap issues route to source-language interval repair, not bilingual-only edits.
+- Verify SRT-only validation reports `coverage_checked=false` and is not treated as render-ready.
+- Verify report paths cannot alias any input and silent sources fail unless explicitly allowed.
+- Verify a missing-audio render error asks for user acceptance instead of instructing `--allow-silent` immediately.
+- Run console-output fixtures under a legacy Windows code page without forcing UTF-8 mode.
 - Run the skill-creator `quick_validate.py` with UTF-8 mode enabled.
 - On a real local sample, render a short or full video and verify that the report records video/audio streams, duration tolerance, decode success, and QA frames.

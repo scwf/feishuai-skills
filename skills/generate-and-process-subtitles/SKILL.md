@@ -106,6 +106,21 @@ Useful commands:
 
 Semantic splitting is supported but not part of the default transcription path. Use `--semantic-split` on `transcribe`, or use `split` on an existing raw Whisper JSON, only when the user explicitly asks for semantic segmentation, natural subtitle breaking, or re-segmentation.
 
+## Missing Spoken Audio Without Subtitles
+
+Treat audible speech with no corresponding subtitle cue as a source-transcription coverage failure. Downstream cue-count parity or successful translation does not detect speech that the source SRT never captured.
+
+When this symptom is reported or confirmed:
+
+1. Preserve the current SRT as an immutable baseline and identify the affected time range by listening to the media.
+2. Inspect nearby subtitle gaps, starting with gaps of about 1.5 seconds or longer; do not add a full-video gap audit to the default workflow.
+3. Re-transcribe only the affected interval with the same or a stronger faster-whisper model, fixed language, word timestamps, `--start-seconds`, `--end-seconds`, and `--no-vad`. These controls must be used together. The CLI writes a distinct interval-named repair SRT/TXT and refuses existing repair outputs. Include a small amount of surrounding audio when useful, then keep timestamps inside the actual missing-speech interval. Use the exact command in `references/transcribe.md`.
+4. Compare the result with the preceding and following cues. Reject boundary duplicates, filler-only fragments, hallucinations, and garbled text; do not auto-merge ASR output.
+5. Add only verified missing speech to a copy of the baseline, renumber cues, and validate ordering, overlaps, empty cues, timestamps, and final audio-to-subtitle coverage.
+6. If bilingual subtitles already exist, repair the source-language cue first, translate the verified addition, and re-check Chinese-above-English ordering before rendering again.
+
+Do not globally disable VAD as a preventive default. Use local no-VAD re-transcription as a targeted recovery step because VAD can suppress short, quiet, overlapped, or music-backed speech while also reducing false positives during normal transcription.
+
 ## References
 
 Load only the reference needed for the current task:

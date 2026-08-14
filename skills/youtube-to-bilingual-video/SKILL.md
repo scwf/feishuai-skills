@@ -37,8 +37,8 @@ Use one stable job directory. Keep immutable source files separate from derived 
 4. **Audit optimization changes.** Run `scripts/audit_subtitle_changes.py` against baseline and optimized SRT. Punctuation, whitespace, and case-only changes may pass automatically. Any lexical insertion, deletion, or replacement is `review_required`.
 5. **Resolve lexical changes.** Inspect each flagged cue against reliable evidence. Prefer, in order: visible text in exact timestamp frames, official title/description evidence, then audio. Apply only high-confidence corrections. Keep ambiguous items in a confirmation list. Never let an LLM rewrite an entity solely because a description contains a plausible alternative.
 6. **Translate.** Invoke `generate-and-process-subtitles translate` with `--target-language zh-Hans` and the `bilingual-trans-first` format so Chinese is above English. Use the audited English SRT as the source.
-7. **Validate bilingual SRT.** Run `scripts/validate_bilingual_srt.py`. Stop on invalid timing, overlap, missing language lines, non-sequential numbering, or a material mismatch with video duration.
-8. **Render and verify.** Run `scripts/render_bilingual_video.py` with bottom-safe defaults. It must render to a temporary file, probe and fully decode the result, extract QA frames, and only then promote it to the requested output. Inspect at least one ordinary QA frame and every frame used to resolve a terminology change.
+7. **Validate bilingual SRT.** Run `scripts/validate_bilingual_srt.py` with the audited English SRT as `--source-srt` and `--video`. Stop on source cue/timing mismatch, invalid timing, overlap, missing language lines, non-sequential numbering, or material head/tail coverage gaps. Fix bilingual structure in the bilingual SRT. Route missing-speech coverage gaps to source-language interval repair, then translate the added cues.
+8. **Render and verify.** Run `scripts/render_bilingual_video.py` with bottom-safe defaults. Require source and output audio unless the user explicitly authorizes `--allow-silent`. A missing-audio error is not authorization; ask first. Render to a temporary file, probe and fully decode the result, extract QA frames, and only then promote it to the requested output. Inspect at least one ordinary QA frame and every frame used to resolve a terminology change.
 9. **Deliver.** Report the source video, audited English SRT, bilingual SRT, final MP4, audit JSON, validation JSON, render report, and QA frames.
 
 ## Terminology Review Gate
@@ -73,8 +73,8 @@ Do not call the workflow complete until all are true:
 - The downloaded source and sidecar exist and are coherent.
 - The immutable transcription baseline is retained.
 - Optimization changes were audited; every lexical change is resolved or explicitly left for user confirmation.
-- The bilingual SRT passes deterministic validation and keeps Chinese above English.
-- The final video has video and audio streams, duration is within tolerance, and a full decode scan returns no errors.
+- The bilingual SRT matches the audited English cue count and timing, passes deterministic validation, and keeps Chinese above English.
+- The final video has video and audio streams, duration is within tolerance, and a full decode scan returns no errors. An intentionally silent source requires explicit user authorization and a reported warning.
 - QA frames visibly show readable subtitles near the bottom without clipping.
 - The final response lists absolute artifact paths and any remaining warnings.
 

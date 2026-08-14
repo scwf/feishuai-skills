@@ -19,6 +19,7 @@ class TranscribeConfig:
     output_dir: Optional[str] = None
     vad_filter: bool = True
     vad_threshold: float = 0.5
+    clip_timestamps: Optional[list[float]] = None
     prompt: Optional[str] = None
     split_enabled: bool = False
     split_model: Optional[str] = None

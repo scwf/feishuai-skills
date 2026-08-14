@@ -59,6 +59,18 @@ Useful options:
 --semantic-split
 ```
 
+## Targeted Missing-Speech Recovery
+
+When audible speech is missing from an existing SRT, run ASR only around the confirmed gap and disable VAD:
+
+```bash
+python {SKILL_ROOT}/scripts/generate_and_process_subtitles.py transcribe "<local-media>" \
+  --output-dir "<repair-dir>" --language en \
+  --start-seconds 120.0 --end-seconds 128.0 --no-vad
+```
+
+Pass both interval bounds, a fixed `--language`, and `--no-vad` together. The CLI rejects global `--no-vad`. Bounds are seconds on the original media timeline, so returned cue and word timestamps stay aligned with the source. Outputs use `<media-stem>.repair-<start-ms>-<end-ms>.srt/.txt`; existing repair files are never overwritten. For a YouTube URL, also pass `--force-asr`, or preferably run against the already downloaded local source. Merge only verified missing speech into a copy of the baseline SRT.
+
 For GPU use, keep `--device auto` unless the user asks for a specific device. The script falls back to `cpu/int8` if automatic or GPU loading fails.
 
 On Windows, if GPU transcription fails with a missing CUDA 12 DLL such as `cublas64_12.dll`, install the optional Windows GPU requirements from `references/setup.md`, then retry with `--device cuda --compute-type float16`.

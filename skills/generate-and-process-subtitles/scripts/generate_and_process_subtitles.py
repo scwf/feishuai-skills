@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import sys
+import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import parse_qs, urlparse
@@ -85,6 +86,48 @@ def save_main_outputs(asr_data: ASRData, output_dir: Path, base_name: str, *, su
     asr_data.save(str(paths["srt"]), subtitle_format=subtitle_format)
     asr_data.save(str(paths["txt"]), subtitle_format=subtitle_format)
     return paths
+
+
+def save_repair_outputs(
+    asr_data: ASRData,
+    output_dir: Path,
+    base_name: str,
+    *,
+    subtitle_format: str = "bilingual-trans-first",
+) -> Dict[str, Path]:
+    paths = output_paths(output_dir, base_name)
+    existing = [str(path) for path in paths.values() if path.exists()]
+    if existing:
+        raise SubtitleSkillError(
+            "Targeted repair outputs already exist; existing files were not changed.",
+            action="transcribe",
+            step="validate_output",
+            error_type="output_exists",
+            suggested_fix="Use a different repair directory or a different interval.",
+        )
+
+    token = uuid.uuid4().hex
+    temporary_paths = {
+        key: path.with_name(f".{path.stem}.{token}{path.suffix}")
+        for key, path in paths.items()
+    }
+    promoted: list[Path] = []
+    try:
+        asr_data.save(str(temporary_paths["srt"]), subtitle_format=subtitle_format)
+        asr_data.save(str(temporary_paths["txt"]), subtitle_format=subtitle_format)
+        validate_main_outputs(temporary_paths, "transcribe")
+        for key in ("srt", "txt"):
+            os.link(temporary_paths[key], paths[key])
+            temporary_paths[key].unlink()
+            promoted.append(paths[key])
+        return paths
+    except Exception:
+        for path in promoted:
+            path.unlink(missing_ok=True)
+        raise
+    finally:
+        for path in temporary_paths.values():
+            path.unlink(missing_ok=True)
 
 
 def save_work_json(asr_data: ASRData, work_dir: Path, base_name: str, suffix: str) -> Path:
@@ -247,6 +290,54 @@ def download_manual_subtitles(
     return candidates[0], metadata, selected_language
 
 
+def resolve_clip_timestamps(args: argparse.Namespace) -> Optional[list[float]]:
+    start = args.start_seconds
+    end = args.end_seconds
+    if (start is None) != (end is None):
+        raise SubtitleSkillError(
+            "--start-seconds and --end-seconds must be supplied together.",
+            action="transcribe",
+            step="validate_input",
+            error_type="invalid_clip_interval",
+            suggested_fix="Pass both bounds, for example --start-seconds 120 --end-seconds 128.",
+        )
+    if start is None:
+        if args.no_vad:
+            raise SubtitleSkillError(
+                "--no-vad is only allowed with a targeted clip interval.",
+                action="transcribe",
+                step="validate_input",
+                error_type="invalid_repair_controls",
+                suggested_fix="Pass --start-seconds, --end-seconds, --language, and --no-vad together.",
+            )
+        return None
+    if start < 0 or end <= start:
+        raise SubtitleSkillError(
+            "The clip interval must satisfy 0 <= start-seconds < end-seconds.",
+            action="transcribe",
+            step="validate_input",
+            error_type="invalid_clip_interval",
+            suggested_fix="Use non-negative seconds and make end-seconds greater than start-seconds.",
+        )
+    if not args.no_vad or not args.language:
+        raise SubtitleSkillError(
+            "Targeted repair requires a fixed language and --no-vad.",
+            action="transcribe",
+            step="validate_input",
+            error_type="invalid_repair_controls",
+            suggested_fix="Pass --start-seconds, --end-seconds, --language, and --no-vad together.",
+        )
+    return [float(start), float(end)]
+
+
+def targeted_repair_base_name(
+    base_name: str, clip_timestamps: list[float]
+) -> str:
+    start_ms = round(clip_timestamps[0] * 1000)
+    end_ms = round(clip_timestamps[1] * 1000)
+    return f"{base_name}.repair-{start_ms:010d}-{end_ms:010d}"
+
+
 def run_transcribe(args: argparse.Namespace) -> Dict[str, Any]:
     output_dir = Path(args.output_dir).resolve()
     input_path = Path(args.input)
@@ -262,6 +353,21 @@ def run_transcribe(args: argparse.Namespace) -> Dict[str, Any]:
             suggested_fix="Pass an existing audio/video file path or an http(s) video URL.",
         )
 
+    clip_timestamps = resolve_clip_timestamps(args)
+    effective_vad_filter = clip_timestamps is None
+    if (
+        is_youtube_url(args.input)
+        and not args.force_asr
+        and (clip_timestamps is not None or args.no_vad)
+    ):
+        raise SubtitleSkillError(
+            "Targeted interval and VAD controls require ASR for YouTube inputs.",
+            action="transcribe",
+            step="validate_input",
+            error_type="asr_control_requires_force_asr",
+            suggested_fix="Add --force-asr, or run the targeted repair against the downloaded local media file.",
+        )
+
     work_dir = get_work_dir(output_dir)
     video_metadata = fetch_video_metadata(args.input) if is_youtube_url(args.input) else None
     context_path = write_youtube_context(work_dir, video_metadata)
@@ -271,6 +377,9 @@ def run_transcribe(args: argparse.Namespace) -> Dict[str, Any]:
         "model": args.model,
         "device": args.device,
         "compute_type": args.compute_type,
+        "requested_vad_filter": not args.no_vad,
+        "effective_vad_filter": effective_vad_filter,
+        "clip_timestamps": clip_timestamps,
         "semantic_split": bool(args.semantic_split),
         "used_manual_subtitles": False,
     }
@@ -304,6 +413,17 @@ def run_transcribe(args: argparse.Namespace) -> Dict[str, Any]:
     elif input_is_url:
         parsed = urlparse(args.input)
         base_name = parse_qs(parsed.query).get("v", [""])[0] or Path(parsed.path).stem or "subtitles"
+    if clip_timestamps is not None:
+        base_name = targeted_repair_base_name(base_name, clip_timestamps)
+        repair_paths = output_paths(output_dir, base_name)
+        if any(path.exists() for path in repair_paths.values()):
+            raise SubtitleSkillError(
+                "Targeted repair outputs already exist; existing files were not changed.",
+                action="transcribe",
+                step="validate_output",
+                error_type="output_exists",
+                suggested_fix="Use a different repair directory or a different interval.",
+            )
 
     split_api_key = require_llm_api_key(args, "transcribe") if args.semantic_split else None
     split_base_url = llm_base_url(args) if args.semantic_split else None
@@ -315,6 +435,8 @@ def run_transcribe(args: argparse.Namespace) -> Dict[str, Any]:
         device=args.device,
         compute_type=args.compute_type,
         language=args.language,
+        vad_filter=effective_vad_filter,
+        clip_timestamps=clip_timestamps,
         split_enabled=args.semantic_split,
         split_model=args.split_model,
         split_max_chars_cjk=args.split_max_chars_cjk,
@@ -324,12 +446,15 @@ def run_transcribe(args: argparse.Namespace) -> Dict[str, Any]:
         api_key=split_api_key,
         base_url=split_base_url,
     )
-    outputs = save_main_outputs(asr_data, output_dir, base_name)
     work_json = save_work_json(asr_data, work_dir, base_name, "transcription")
     metadata.update({"work_json": str(work_json)})
     metadata_path = work_dir / f"{sanitize_filename(base_name)}.metadata.json"
     write_json(metadata_path, metadata)
-    validate_main_outputs(outputs, "transcribe")
+    if clip_timestamps is not None:
+        outputs = save_repair_outputs(asr_data, output_dir, base_name)
+    else:
+        outputs = save_main_outputs(asr_data, output_dir, base_name)
+        validate_main_outputs(outputs, "transcribe")
     return {
         "ok": True,
         "action": "transcribe",
@@ -475,6 +600,9 @@ def build_parser() -> argparse.ArgumentParser:
     transcribe.add_argument("--compute-type", default=os.getenv("SUBTITLE_WHISPER_COMPUTE_TYPE", "auto"), help="faster-whisper compute type: auto, float16, int8, etc.")
     transcribe.add_argument("--language", "-l", default=None, help="Optional language hint such as en, zh, ja.")
     transcribe.add_argument("--force-asr", action="store_true", help="Ignore reusable YouTube manual subtitles and run ASR.")
+    transcribe.add_argument("--start-seconds", type=float, help="Start of a targeted ASR interval; requires --end-seconds.")
+    transcribe.add_argument("--end-seconds", type=float, help="End of a targeted ASR interval; requires --start-seconds.")
+    transcribe.add_argument("--no-vad", action="store_true", help="Disable VAD for a targeted interval; not allowed for full-media transcription.")
     transcribe.add_argument("--semantic-split", action="store_true", help="Run LLM semantic subtitle segmentation after ASR. Default is off.")
     transcribe.add_argument("--split-model", default=os.getenv("SUBTITLE_LLM_MODEL", DEFAULT_LLM_MODEL), help="LLM model for semantic splitting.")
     transcribe.add_argument("--split-max-chars-cjk", type=int, default=25)

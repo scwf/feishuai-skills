@@ -70,6 +70,7 @@ class FasterWhisperASR(BaseASR):
             vad_filter=self.config.vad_filter,
             vad_parameters={"threshold": self.config.vad_threshold},
             word_timestamps=True,
+            clip_timestamps=self.config.clip_timestamps or "0",
         )
 
         segments: List[Dict[str, Any]] = []
@@ -102,6 +103,8 @@ class FasterWhisperASR(BaseASR):
             "model": self.config.model_name,
             "device": device,
             "compute_type": compute_type,
+            "vad_filter": self.config.vad_filter,
+            "clip_timestamps": self.config.clip_timestamps,
             "segments": segments,
         }
 

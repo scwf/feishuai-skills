@@ -6,10 +6,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import platform
 import shutil
 import subprocess
 import sys
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -176,9 +178,28 @@ def extract_frames(video: Path, qa_dir: Path, times: list[float]) -> list[str]:
 
 def write_report(report: dict[str, object], report_path: Path) -> None:
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(
-        json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    temporary = report_path.with_name(
+        f".{report_path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
     )
+    try:
+        temporary.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        temporary.replace(report_path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def print_json(report: dict[str, object]) -> None:
+    print(json.dumps(report, ensure_ascii=True, indent=2))
+
+
+class RenderError(RuntimeError):
+    def __init__(self, message: str, *, reason: str, suggested_fix: str | None = None) -> None:
+        super().__init__(message)
+        self.reason = reason
+        self.suggested_fix = suggested_fix
 
 
 def render(args: argparse.Namespace) -> dict[str, object]:
@@ -204,6 +225,15 @@ def render(args: argparse.Namespace) -> dict[str, object]:
     source_types = stream_types(source_probe)
     if "video" not in source_types:
         raise RuntimeError("input has no video stream")
+    if "audio" not in source_types and not args.allow_silent:
+        raise RenderError(
+            "input has no audio stream",
+            reason="missing_audio_stream",
+            suggested_fix=(
+                "Ask the user whether a silent final video is acceptable. "
+                "Retry with --allow-silent only after explicit acceptance."
+            ),
+        )
 
     staged_subtitle = work_dir / f"render-subtitle-{datetime.now():%Y%m%d-%H%M%S-%f}.srt"
     shutil.copy2(subtitle, staged_subtitle)
@@ -311,6 +341,11 @@ def render(args: argparse.Namespace) -> dict[str, object]:
         "source_stream_types": source_types,
         "output_stream_types": output_types,
         "full_decode_scan": "ok",
+        "warnings": (
+            ["source and rendered output are intentionally silent"]
+            if "audio" not in source_types
+            else []
+        ),
         "qa_frames": frame_paths,
         "output_size_bytes": output.stat().st_size,
         "output_sha256": sha256(output),
@@ -330,12 +365,54 @@ def main() -> int:
     parser.add_argument("--encoder", choices=["auto", "h264_nvenc", "libx264"], default="auto")
     parser.add_argument("--qa-time", action="append", type=float, default=[])
     parser.add_argument("--replace-existing", action="store_true")
+    parser.add_argument(
+        "--allow-silent",
+        action="store_true",
+        help="Allow a source with no audio stream. Use only after the user explicitly accepts a silent final video.",
+    )
     parser.add_argument("--report", type=Path, help="Defaults to <work-dir>/render-report.json")
     args = parser.parse_args()
     report_path = (args.report or args.work_dir / "render-report.json").resolve()
+    resolved_paths = {
+        "input_video": args.input_video.resolve(),
+        "subtitle": args.subtitle.resolve(),
+        "output": args.output.resolve(),
+        "report": report_path,
+    }
+    protected_paths = {
+        args.input_video.resolve(),
+        args.subtitle.resolve(),
+        args.output.resolve(),
+    }
+    if len(set(resolved_paths.values())) != len(resolved_paths):
+        report = {
+            "status": "error",
+            "reason": "path_collision",
+            "message": "input video, subtitle, rendered output, and report paths must all differ",
+            "input_video": str(args.input_video),
+            "subtitle": str(args.subtitle),
+            "output": str(args.output),
+            "report": str(report_path),
+        }
+        if report_path not in protected_paths:
+            write_report(report, report_path)
+        print_json(report)
+        return 1
     try:
         report = render(args)
         exit_code = 0
+    except RenderError as exc:
+        report = {
+            "status": "error",
+            "reason": exc.reason,
+            "message": str(exc),
+            "input_video": str(args.input_video),
+            "subtitle": str(args.subtitle),
+            "output": str(args.output),
+        }
+        if exc.suggested_fix:
+            report["suggested_fix"] = exc.suggested_fix
+        exit_code = 1
     except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
         report = {
             "status": "error",
@@ -346,7 +423,7 @@ def main() -> int:
         }
         exit_code = 1
     write_report(report, report_path)
-    print(json.dumps(report, ensure_ascii=False, indent=2))
+    print_json(report)
     return exit_code
 
 

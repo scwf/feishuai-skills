@@ -6,8 +6,11 @@ from __future__ import annotations
 import argparse
 import difflib
 import json
+import os
 import re
 import sys
+import unicodedata
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,10 +19,10 @@ TIMING_RE = re.compile(
     r"^(?P<start>\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*"
     r"(?P<end>\d{2}:\d{2}:\d{2},\d{3})$"
 )
-TOKEN_RE = re.compile(
-    r"[#@$]?[A-Za-z0-9]+"
-    r"(?:['’._:/@#&-][A-Za-z0-9]+|\++|#)*"
-    r"|[\u3400-\u9fff]+"
+WORD_TOKEN_RE = re.compile(
+    r"[#@$]?[^\W_]+"
+    r"(?:['’._:/@#&-][^\W_]+|\++|#)*",
+    flags=re.UNICODE,
 )
 
 
@@ -54,7 +57,34 @@ def parse_srt(path: Path) -> list[Cue]:
 
 
 def tokens(text: str) -> list[str]:
-    return TOKEN_RE.findall(text)
+    normalized_text = unicodedata.normalize("NFC", text)
+    items: list[str] = []
+
+    def append_meaningful_unmatched(start: int, end: int) -> None:
+        for index in range(start, end):
+            char = normalized_text[index]
+            category = unicodedata.category(char)
+            adjacent_to_digit = (
+                (index > 0 and normalized_text[index - 1].isdigit())
+                or (
+                    index + 1 < len(normalized_text)
+                    and normalized_text[index + 1].isdigit()
+                )
+            )
+            if (
+                category.startswith(("S", "M"))
+                or char in "%‰‱"
+                or (char in "-−" and adjacent_to_digit)
+            ):
+                items.append(char)
+
+    cursor = 0
+    for match in WORD_TOKEN_RE.finditer(normalized_text):
+        append_meaningful_unmatched(cursor, match.start())
+        items.append(match.group(0))
+        cursor = match.end()
+    append_meaningful_unmatched(cursor, len(normalized_text))
+    return items
 
 
 def normalized(items: list[str]) -> list[str]:
@@ -156,12 +186,27 @@ def audit(before_path: Path, after_path: Path) -> tuple[dict[str, object], int]:
     return report, 2 if review_required else 0
 
 
+def write_text_atomic(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(
+        f".{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
+    )
+    try:
+        temporary.write_text(text, encoding="utf-8")
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def print_json(report: dict[str, object]) -> None:
+    print(json.dumps(report, ensure_ascii=True, indent=2))
+
+
 def write_report(report: dict[str, object], output: Path | None) -> None:
     rendered = json.dumps(report, ensure_ascii=False, indent=2)
     if output:
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(rendered + "\n", encoding="utf-8")
-    print(rendered)
+        write_text_atomic(output, rendered + "\n")
+    print_json(report)
 
 
 def main() -> int:
@@ -172,8 +217,23 @@ def main() -> int:
     parser.add_argument("after", type=Path, help="Corrected or optimized SRT")
     parser.add_argument("--output", type=Path, help="Write the JSON report here")
     args = parser.parse_args()
+    before_path = args.before.resolve()
+    after_path = args.after.resolve()
+    output_path = args.output.resolve() if args.output else None
+    if output_path and output_path in {before_path, after_path}:
+        print_json(
+            {
+                "status": "error",
+                "reason": "path_collision",
+                "message": "report output must differ from both SRT inputs",
+                "before_path": str(before_path),
+                "after_path": str(after_path),
+                "output_path": str(output_path),
+            }
+        )
+        return 1
     try:
-        report, exit_code = audit(args.before, args.after)
+        report, exit_code = audit(before_path, after_path)
     except (OSError, UnicodeError, ValueError) as exc:
         report = {
             "status": "error",
@@ -183,7 +243,7 @@ def main() -> int:
             "after_path": str(args.after),
         }
         exit_code = 1
-    write_report(report, args.output)
+    write_report(report, output_path)
     return exit_code
 
 

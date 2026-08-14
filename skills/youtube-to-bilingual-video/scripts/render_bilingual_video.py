@@ -1,0 +1,354 @@
+#!/usr/bin/env python3
+"""Burn bilingual SRT subtitles into a video and verify before promotion."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import platform
+import shutil
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+
+
+def run(
+    command: list[str], *, check: bool = True, cwd: Path | None = None
+) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        cwd=cwd,
+    )
+    if check and result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(f"command failed ({result.returncode}): {detail}")
+    return result
+
+
+def require_tool(name: str) -> str:
+    resolved = shutil.which(name)
+    if not resolved:
+        raise RuntimeError(f"required executable not found on PATH: {name}")
+    return resolved
+
+
+def probe(path: Path) -> dict[str, object]:
+    result = run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_streams",
+            "-show_format",
+            "-of",
+            "json",
+            str(path),
+        ]
+    )
+    return json.loads(result.stdout)
+
+
+def duration_seconds(data: dict[str, object]) -> float:
+    format_data = data.get("format", {})
+    if not isinstance(format_data, dict) or "duration" not in format_data:
+        raise RuntimeError("ffprobe did not report media duration")
+    return float(format_data["duration"])
+
+
+def stream_types(data: dict[str, object]) -> list[str]:
+    streams = data.get("streams", [])
+    if not isinstance(streams, list):
+        return []
+    return [
+        str(item.get("codec_type"))
+        for item in streams
+        if isinstance(item, dict) and item.get("codec_type")
+    ]
+
+
+def default_font() -> str:
+    system = platform.system()
+    if system == "Windows":
+        return "Microsoft YaHei"
+    if system == "Darwin":
+        return "PingFang SC"
+    return "Noto Sans CJK SC"
+
+
+def encoder_available(encoder: str) -> bool:
+    listed = run(["ffmpeg", "-hide_banner", "-encoders"], check=False)
+    if encoder not in listed.stdout:
+        return False
+    if encoder != "h264_nvenc":
+        return True
+    probe_result = run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=size=32x32:rate=1:duration=0.1",
+            "-c:v",
+            "h264_nvenc",
+            "-f",
+            "null",
+            "-",
+        ],
+        check=False,
+    )
+    return probe_result.returncode == 0
+
+
+def choose_encoder(requested: str) -> str:
+    if requested == "auto":
+        return "h264_nvenc" if encoder_available("h264_nvenc") else "libx264"
+    if not encoder_available(requested):
+        raise RuntimeError(f"requested encoder is unavailable: {requested}")
+    return requested
+
+
+def escape_filter_path(path: Path) -> str:
+    value = str(path.resolve() if path.is_absolute() else path).replace("\\", "/")
+    value = value.replace("'", r"\'").replace(":", r"\:")
+    value = value.replace("[", r"\[").replace("]", r"\]")
+    return value
+
+
+def subtitle_filter(
+    subtitle: Path, font: str, font_size: float, margin_v: int, outline: float
+) -> str:
+    safe_font = font.replace("'", "").replace(",", " ")
+    style = (
+        f"FontName={safe_font},FontSize={font_size:g},"
+        "PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
+        f"BorderStyle=1,Outline={outline:g},Shadow=0,Alignment=2,MarginV={margin_v}"
+    )
+    return f"subtitles=filename='{escape_filter_path(subtitle)}':force_style='{style}'"
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def qa_times(duration: float, requested: list[float]) -> list[float]:
+    candidates = requested or [min(5.0, duration / 4), duration / 2, max(0.0, duration - 5)]
+    valid = {round(value, 3) for value in candidates if 0 <= value < duration}
+    return sorted(valid)
+
+
+def extract_frames(video: Path, qa_dir: Path, times: list[float]) -> list[str]:
+    qa_dir.mkdir(parents=True, exist_ok=True)
+    paths: list[str] = []
+    for number, timestamp in enumerate(times, start=1):
+        frame = qa_dir / f"qa-{number:02d}-{timestamp:.3f}s.png"
+        run(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-ss",
+                f"{timestamp:.3f}",
+                "-i",
+                str(video),
+                "-frames:v",
+                "1",
+                "-y",
+                str(frame),
+            ]
+        )
+        paths.append(str(frame.resolve()))
+    return paths
+
+
+def write_report(report: dict[str, object], report_path: Path) -> None:
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+
+
+def render(args: argparse.Namespace) -> dict[str, object]:
+    require_tool("ffmpeg")
+    require_tool("ffprobe")
+    source = args.input_video.resolve()
+    subtitle = args.subtitle.resolve()
+    output = args.output.resolve()
+    work_dir = args.work_dir.resolve()
+    if not source.is_file():
+        raise RuntimeError(f"input video does not exist: {source}")
+    if not subtitle.is_file():
+        raise RuntimeError(f"subtitle does not exist: {subtitle}")
+    if output.exists() and not args.replace_existing:
+        raise RuntimeError("output already exists; pass --replace-existing to archive and replace it")
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    partial = work_dir / f"{output.stem}.{datetime.now():%Y%m%d-%H%M%S}.partial.mp4"
+    selected_encoder = choose_encoder(args.encoder)
+    source_probe = probe(source)
+    source_duration = duration_seconds(source_probe)
+    source_types = stream_types(source_probe)
+    if "video" not in source_types:
+        raise RuntimeError("input has no video stream")
+
+    staged_subtitle = work_dir / f"render-subtitle-{datetime.now():%Y%m%d-%H%M%S-%f}.srt"
+    shutil.copy2(subtitle, staged_subtitle)
+    command = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        str(source),
+        "-map",
+        "0:v:0",
+        "-map",
+        "0:a?",
+        "-vf",
+        subtitle_filter(
+            Path(staged_subtitle.name),
+            args.font_name or default_font(),
+            args.font_size,
+            args.margin_v,
+            args.outline,
+        ),
+        "-c:v",
+        selected_encoder,
+    ]
+    if selected_encoder == "h264_nvenc":
+        command.extend(["-preset", "p7", "-tune", "hq", "-rc", "vbr", "-cq", "18", "-b:v", "0"])
+    else:
+        command.extend(["-preset", "medium", "-crf", "18"])
+    command.extend(
+        [
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-movflags",
+            "+faststart",
+            "-y",
+            str(partial),
+        ]
+    )
+    try:
+        run(command, cwd=work_dir)
+    finally:
+        staged_subtitle.unlink(missing_ok=True)
+
+    output_probe = probe(partial)
+    output_duration = duration_seconds(output_probe)
+    output_types = stream_types(output_probe)
+    if "video" not in output_types:
+        raise RuntimeError("rendered file has no video stream")
+    if "audio" in source_types and "audio" not in output_types:
+        raise RuntimeError("rendered file lost the source audio stream")
+    tolerance = max(1.0, source_duration * 0.005)
+    if abs(source_duration - output_duration) > tolerance:
+        raise RuntimeError(
+            f"duration mismatch: source={source_duration:.3f}s output={output_duration:.3f}s"
+        )
+
+    decode = run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-v",
+            "error",
+            "-i",
+            str(partial),
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a?",
+            "-f",
+            "null",
+            "-",
+        ],
+        check=False,
+    )
+    if decode.returncode != 0 or decode.stderr.strip():
+        raise RuntimeError(f"full decode scan failed: {decode.stderr.strip()}")
+
+    frame_paths = extract_frames(
+        partial, work_dir / "qa", qa_times(output_duration, args.qa_time)
+    )
+    archived: str | None = None
+    if output.exists():
+        archive_dir = work_dir / "archive"
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        archive = archive_dir / f"{output.stem}.previous-{datetime.now():%Y%m%d-%H%M%S}{output.suffix}"
+        output.replace(archive)
+        archived = str(archive.resolve())
+    partial.replace(output)
+    return {
+        "status": "ok",
+        "input_video": str(source),
+        "subtitle": str(subtitle),
+        "output": str(output),
+        "archived_previous_output": archived,
+        "encoder": selected_encoder,
+        "font_name": args.font_name or default_font(),
+        "font_size": args.font_size,
+        "margin_v": args.margin_v,
+        "source_duration_seconds": source_duration,
+        "output_duration_seconds": output_duration,
+        "duration_tolerance_seconds": tolerance,
+        "source_stream_types": source_types,
+        "output_stream_types": output_types,
+        "full_decode_scan": "ok",
+        "qa_frames": frame_paths,
+        "output_size_bytes": output.stat().st_size,
+        "output_sha256": sha256(output),
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Render and verify a bilingual subtitled MP4.")
+    parser.add_argument("--input-video", type=Path, required=True)
+    parser.add_argument("--subtitle", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--work-dir", type=Path, required=True)
+    parser.add_argument("--font-name")
+    parser.add_argument("--font-size", type=float, default=16.0)
+    parser.add_argument("--margin-v", type=int, default=8)
+    parser.add_argument("--outline", type=float, default=1.5)
+    parser.add_argument("--encoder", choices=["auto", "h264_nvenc", "libx264"], default="auto")
+    parser.add_argument("--qa-time", action="append", type=float, default=[])
+    parser.add_argument("--replace-existing", action="store_true")
+    parser.add_argument("--report", type=Path, help="Defaults to <work-dir>/render-report.json")
+    args = parser.parse_args()
+    report_path = (args.report or args.work_dir / "render-report.json").resolve()
+    try:
+        report = render(args)
+        exit_code = 0
+    except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
+        report = {
+            "status": "error",
+            "message": str(exc),
+            "input_video": str(args.input_video),
+            "subtitle": str(args.subtitle),
+            "output": str(args.output),
+        }
+        exit_code = 1
+    write_report(report, report_path)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return exit_code
+
+
+if __name__ == "__main__":
+    sys.exit(main())

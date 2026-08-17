@@ -110,6 +110,48 @@ We use C and C.
             self.assertEqual(report["status"], "review_required")
             self.assertEqual(report["lexical_change_count"], 1)
 
+    def test_fluency_rewrite_requires_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            baseline = root / "baseline.srt"
+            optimized = root / "optimized.srt"
+            report_path = root / "audit.json"
+            write_srt(
+                baseline,
+                """
+1
+00:00:00,000 --> 00:00:02,000
+The product works good for our customers.
+""",
+            )
+            write_srt(
+                optimized,
+                """
+1
+00:00:00,000 --> 00:00:02,000
+The product works well for our customers.
+""",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(AUDIT_SCRIPT),
+                    str(baseline),
+                    str(optimized),
+                    "--output",
+                    str(report_path),
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+
+            self.assertEqual(result.returncode, 2, result.stderr or result.stdout)
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["status"], "review_required")
+            self.assertEqual(report["lexical_change_count"], 1)
+
     def test_unicode_letter_and_symbol_changes_require_review(self) -> None:
         cases = [
             ("Use α and x ≥ 4.", "Use β and x > 4."),
@@ -761,6 +803,22 @@ Hello
             allowed_report = json.loads(allowed.stdout)
             self.assertTrue(output.is_file())
             self.assertIn("intentionally silent", allowed_report["warnings"][0])
+
+
+class WorkflowContractRegressionTests(unittest.TestCase):
+    def test_final_english_qc_is_required_after_audit_and_before_translation(self) -> None:
+        skill_text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        workflow_text = (SKILL_ROOT / "references" / "workflow.md").read_text(
+            encoding="utf-8"
+        )
+
+        audit_position = skill_text.index("**Audit optimization changes.**")
+        final_qc_position = skill_text.index("**Re-run final English QC.**")
+        translate_position = skill_text.index("**Translate.**")
+        self.assertLess(audit_position, final_qc_position)
+        self.assertLess(final_qc_position, translate_position)
+        self.assertIn("exact downstream English SRT returns QC exit code `0`", workflow_text)
+        self.assertIn("punctuation or case changes can create a new orphan", workflow_text)
 
 
 if __name__ == "__main__":

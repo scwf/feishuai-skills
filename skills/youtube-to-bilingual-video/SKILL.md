@@ -29,17 +29,18 @@ Skip only choices the user has already answered. Do not download or transcribe u
 
 ## Default Workflow
 
-Use one stable job directory. Keep immutable source files separate from derived artifacts. See [workflow.md](references/workflow.md) for names and failure recovery.
+Use one stable job directory. Keep immutable source files separate from derived artifacts. See [workflow.md](references/workflow.md) for names, manual revision, and failure recovery. A command timeout is not a failure: inspect existing artifacts and resume from the latest complete stage.
 
 1. **Download source video.** Invoke `youtube-scraper` with its explicit video-download command and a stable output directory. Validate the media file and `.download.json` sidecar.
-2. **Generate English subtitles.** Invoke `generate-and-process-subtitles transcribe` on the YouTube URL. Add `--semantic-split` only when confirmed. Preserve the first final SRT as the immutable transcription baseline before any optimization.
+2. **Generate English subtitles.** Invoke `generate-and-process-subtitles transcribe` on the YouTube URL. Add `--semantic-split` only when confirmed. Preserve the first final SRT as the immutable transcription baseline before any optimization. If semantic split was used, run `qc` on the English SRT and stop on unresolved high-risk orphans.
 3. **Optimize only when confirmed.** Require the generated `_subtitle_work/context.txt`; otherwise stop after transcription unless the user supplies reference evidence. Write optimized output to a distinct directory.
 4. **Audit optimization changes.** Run `scripts/audit_subtitle_changes.py` against baseline and optimized SRT. Punctuation, whitespace, and case-only changes may pass automatically. Any lexical insertion, deletion, or replacement is `review_required`.
 5. **Resolve lexical changes.** Inspect each flagged cue against reliable evidence. Prefer, in order: visible text in exact timestamp frames, official title/description evidence, then audio. Apply only high-confidence corrections. Keep ambiguous items in a confirmation list. Never let an LLM rewrite an entity solely because a description contains a plausible alternative.
-6. **Translate.** Invoke `generate-and-process-subtitles translate` with `--target-language zh-Hans` and the `bilingual-trans-first` format so Chinese is above English. Use the audited English SRT as the source.
-7. **Validate bilingual SRT.** Run `scripts/validate_bilingual_srt.py` with the audited English SRT as `--source-srt` and `--video`. Stop on source cue/timing mismatch, invalid timing, overlap, missing language lines, non-sequential numbering, or material head/tail coverage gaps. Fix bilingual structure in the bilingual SRT. Route missing-speech coverage gaps to source-language interval repair, then translate the added cues.
-8. **Render and verify.** Run `scripts/render_bilingual_video.py` with bottom-safe defaults. Require source and output audio unless the user explicitly authorizes `--allow-silent`. A missing-audio error is not authorization; ask first. Render to a temporary file, probe and fully decode the result, extract QA frames, and only then promote it to the requested output. Inspect at least one ordinary QA frame and every frame used to resolve a terminology change.
-9. **Deliver.** Report the source video, audited English SRT, bilingual SRT, final MP4, audit JSON, validation JSON, render report, and QA frames.
+6. **Re-run final English QC.** After optimization and every manual lexical resolution, run `qc` on the exact audited English SRT that will be translated. Reuse the original `seam_times_path` plus any still-valid approved-cues and resolved-seams files. Stop on exit `2`; stale approval entries are input errors and must be removed or updated, never ignored.
+7. **Translate.** Invoke `generate-and-process-subtitles translate` with `--target-language zh-Hans` and the `bilingual-trans-first` format so Chinese is above English. Use only the final English SRT that passed step 6.
+8. **Validate bilingual SRT.** Run `scripts/validate_bilingual_srt.py` with the audited English SRT as `--source-srt` and `--video`. Stop on source cue/timing mismatch, invalid timing, overlap, missing language lines, non-sequential numbering, or material head/tail coverage gaps. Also run `qc --bilingual` so English fragments are not hidden by Chinese. Fix bilingual structure in the bilingual SRT. Route missing-speech coverage gaps to source-language interval repair, then translate the added cues.
+9. **Render and verify.** Run `scripts/render_bilingual_video.py` with bottom-safe defaults. Require source and output audio unless the user explicitly authorizes `--allow-silent`. A missing-audio error is not authorization; ask first. Render to a temporary file, probe and fully decode the result, extract QA frames, and only then promote it to the requested output. Inspect at least one ordinary QA frame, every frame used to resolve a terminology change, and a frame at any repaired orphan timestamp.
+10. **Deliver.** Report the source video, audited English SRT, bilingual SRT, final MP4, audit JSON, validation JSON, QC reports, render report, and QA frames.
 
 ## Terminology Review Gate
 
@@ -73,9 +74,10 @@ Do not call the workflow complete until all are true:
 - The downloaded source and sidecar exist and are coherent.
 - The immutable transcription baseline is retained.
 - Optimization changes were audited; every lexical change is resolved or explicitly left for user confirmation.
-- The bilingual SRT matches the audited English cue count and timing, passes deterministic validation, and keeps Chinese above English.
+- The exact final English SRT used for translation passed QC after all optimization and manual review changes, with semantic seam failures and approvals inherited and revalidated. Chunk-seam cues were inspected. Every very short cue is classified as a complete utterance (`ok_short`) or has been repaired.
+- The bilingual SRT matches the audited English cue count and timing, passes deterministic validation, keeps Chinese above English, and passes the same English-line orphan QC.
 - The final video has video and audio streams, duration is within tolerance, and a full decode scan returns no errors. An intentionally silent source requires explicit user authorization and a reported warning.
-- QA frames visibly show readable subtitles near the bottom without clipping.
+- QA frames visibly show readable subtitles near the bottom without clipping, including frames at repaired orphan timestamps.
 - The final response lists absolute artifact paths and any remaining warnings.
 
 ## References

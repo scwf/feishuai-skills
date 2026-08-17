@@ -1,6 +1,6 @@
 ---
 name: generate-and-process-subtitles
-description: Generate and process subtitles from local audio/video files, video URLs, existing SRT files, or raw Whisper word-timestamp JSON. Use when an AI agent needs to create SRT/TXT subtitles, reuse available YouTube human subtitles, transcribe media with cross-platform Python faster-whisper, normalize or optimize subtitles, translate subtitles, or optionally apply LLM semantic subtitle segmentation. Do not use for dubbing, TTS, voice cloning.
+description: Generate and process subtitles from local audio/video files, video URLs, existing SRT files, or raw Whisper word-timestamp JSON. Use when an AI agent needs to create SRT/TXT subtitles, reuse available YouTube human subtitles, transcribe media with cross-platform Python faster-whisper, normalize or optimize subtitles, translate subtitles, optionally apply LLM semantic subtitle segmentation, or run semantic-orphan QC after a split. Do not use for dubbing, TTS, voice cloning.
 ---
 
 # Generate And Process Subtitles
@@ -14,6 +14,7 @@ Typical requests:
 - "Normalize this SRT and export a TXT copy."
 - "Translate this SRT to Chinese and keep bilingual subtitles."
 - "Re-cut this Whisper JSON into natural subtitle segments."
+- "Check this SRT for semantic orphan cues."
 
 ## Routing
 
@@ -22,6 +23,7 @@ Typical requests:
 3. Existing `.srt` with no translation request -> run `normalize` for format normalization, or `optimize` when the user asks for recognition-error correction with an LLM.
 4. Existing `.srt` with another language or bilingual output requested -> run `translate`.
 5. Raw Whisper JSON with word timestamps plus a request for better segmentation -> run `split`.
+6. Existing `.srt` plus a semantic-orphan / readability QC request -> run `qc`.
 
 Do not perform dubbing, TTS, or voice cloning in this skill.
 
@@ -41,12 +43,13 @@ Skip a question only when the user's message already makes that choice explicit,
 The available paths are:
 
 - Transcription only: run `transcribe` and stop after the final `.srt` and `.txt`.
-- Transcription plus semantic split: run `transcribe --semantic-split` and stop after the final `.srt` and `.txt`.
+- Transcription plus semantic split: run `transcribe --semantic-split`. Keep the `.srt` and `.txt`, then stop if nested QC reports `review_required` (exit code `2`). That is a quality gate, not a transcription failure. Do not continue to optimize, translate, or treat the run as complete.
 - Transcription plus description-reference-assisted correction: run `transcribe`, then run `optimize` on the generated SRT using `<output-dir>/_subtitle_work/context.txt` as `--reference-file`.
-- Transcription plus semantic split and correction: run `transcribe --semantic-split`, then run `optimize` on that generated SRT using `<output-dir>/_subtitle_work/context.txt` as `--reference-file`.
+- Transcription plus semantic split and correction: run `transcribe --semantic-split`, stop on `review_required`, and only then run `optimize` using `<output-dir>/_subtitle_work/context.txt` as `--reference-file`.
 
 Keep `transcribe` itself ASR/subtitle-extraction focused. Do not add an LLM optimization step to `transcribe`; perform optimization only as a separate follow-up command after the user confirms.
 Semantic splitting is allowed inside `transcribe` only when the user confirms it or already requested natural subtitle breaking.
+For a YouTube URL, confirmed semantic splitting uses ASR even when human subtitles are available, because seam repair requires word-level timestamps. Human subtitles remain the default only when semantic splitting is off.
 Only run description-reference-assisted correction when the current `transcribe` result includes a `context_file` and that file exists. If no context file was generated, tell the user the video has no available description context and stop after transcription unless they provide another reference file.
 
 ## Output Rules
@@ -102,9 +105,14 @@ Useful commands:
 {PYTHON} {SKILL_ROOT}/scripts/generate_and_process_subtitles.py optimize input.srt -o ./subtitles
 {PYTHON} {SKILL_ROOT}/scripts/generate_and_process_subtitles.py translate input.srt --target-language zh-Hans -o ./subtitles
 {PYTHON} {SKILL_ROOT}/scripts/generate_and_process_subtitles.py split raw-whisper.json -o ./subtitles
+{PYTHON} {SKILL_ROOT}/scripts/generate_and_process_subtitles.py qc input.srt --output ./subtitles/_subtitle_work/semantic-orphan-qc.json
 ```
 
+Standalone `qc` always atomically writes the full report. If `--output` is omitted, it uses `<input-dir>/_subtitle_work/<safe-input-stem>-<stable-digest>.semantic-orphan-qc.json`; every default name is collision-resistant and component-length-safe. The normalized output path is checked against every input before writing. Stdout remains a bounded ASCII-safe status summary.
+
 Semantic splitting is supported but not part of the default transcription path. Use `--semantic-split` on `transcribe`, or use `split` on an existing raw Whisper JSON, only when the user explicitly asks for semantic segmentation, natural subtitle breaking, or re-segmentation.
+
+`split` repairs chunk seams after the first pass. It does not rely on the prompt seeing neighboring chunks, does not let one repaired singleton window cascade across later seams, and rejects repaired cues above configured length limits or with zero duration. A failed or overlapping seam repair is itself a high-risk QC item and is persisted in a digest-suffixed `*.chunk-seams.json`; consume the exact `seam_times_path` returned by the command. After split, `transcribe --semantic-split` and `split` validate the unreordered cue list and the serialized SRT before writing final files, write QC under `_subtitle_work/`, and exit `2` when status is `review_required`. Treat that as a stop gate. Zero-duration, overlapping, reverse-timeline, or blank-line cues are structured `invalid_srt` and must not be treated as a complete transcription. A later standalone `qc --seam-times-file` inherits persisted seam failures until each reviewed repair is explicitly recorded with `--resolved-seams-file`. Do not auto-merge high-risk orphan cues. Legal short utterances such as `Yes.` or `Great.` are `ok_short` and may remain. For a reviewed complete short utterance outside the built-in deterministic set, record its exact cue number, text, and review reason in an approved-cues JSON file and rerun `qc --approved-cues-file`; continue only when QC returns exit `0`. Every approval entry must exactly match and be consumed by a currently approvable cue. Approvals cannot waive hanging words or lowercase continuations.
 
 ## Missing Spoken Audio Without Subtitles
 
@@ -128,4 +136,4 @@ Load only the reference needed for the current task:
 - `references/transcribe.md` for local media, URLs, YouTube subtitles, ASR device/model options, and output placement.
 - `references/process.md` for normalize, optimize, translate, and semantic split workflows.
 - `references/setup.md` for dependency installation, ffmpeg notes, and LLM environment variables.
-- `references/eval.md` for minimal trigger, boundary, and output-placement checks before publishing changes.
+- `references/eval.md` for trigger, boundary, seam-repair, orphan-QC, and output-placement checks before publishing changes.

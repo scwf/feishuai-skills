@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 import tempfile
 import types
@@ -20,7 +21,7 @@ assert CLI_SPEC and CLI_SPEC.loader
 CLI = importlib.util.module_from_spec(CLI_SPEC)
 CLI_SPEC.loader.exec_module(CLI)
 
-from subtitle_tools import core  # noqa: E402
+from subtitle_tools import ASRData, ASRDataSeg, core  # noqa: E402
 from subtitle_tools.asr.faster_whisper import FasterWhisperASR  # noqa: E402
 from subtitle_tools.config import TranscribeConfig  # noqa: E402
 
@@ -163,6 +164,116 @@ class TranscribeControlTests(unittest.TestCase):
             config = create_asr.call_args.args[1]
             self.assertFalse(config.vad_filter)
             self.assertEqual(config.clip_timestamps, [12.5, 18.0])
+
+    def test_youtube_semantic_split_uses_asr_instead_of_manual_subtitles(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            args = CLI.build_parser().parse_args(
+                [
+                    "transcribe",
+                    "https://www.youtube.com/watch?v=abc",
+                    "--semantic-split",
+                    "--api-key",
+                    "test-key",
+                    "--output-dir",
+                    temp_dir,
+                ]
+            )
+            split_result = ASRData(
+                [ASRDataSeg("Complete sentence.", 0, 1000)]
+            )
+            metadata = {
+                "id": "abc",
+                "title": "Example",
+                "channel": "Channel",
+                "description": "",
+                "subtitles": {"en": [{"ext": "srt"}]},
+            }
+
+            with (
+                patch.object(CLI, "fetch_video_metadata", return_value=metadata),
+                patch.object(CLI, "download_manual_subtitles") as download_manual,
+                patch.object(CLI, "process_media", return_value=split_result) as process_media,
+            ):
+                result = CLI.run_transcribe(args)
+
+            download_manual.assert_not_called()
+            self.assertTrue(process_media.call_args.kwargs["split_enabled"])
+            self.assertEqual(result["status"], "ok")
+            seams_path = Path(result["seam_times_path"])
+            self.assertTrue(seams_path.is_file())
+            self.assertEqual(
+                json.loads(seams_path.read_text(encoding="utf-8")),
+                {"seam_times_ms": [], "seam_repair_failures": []},
+            )
+
+    def test_semantic_split_zero_duration_is_structured_and_leaves_no_final_srt(self) -> None:
+        cases = {
+            "zero-duration": ASRData([ASRDataSeg("No duration.", 1000, 1000)]),
+            "overlap": ASRData(
+                [
+                    ASRDataSeg("First cue.", 0, 2000),
+                    ASRDataSeg("Second cue.", 1500, 3000),
+                ]
+            ),
+        }
+        for name, split_result in cases.items():
+            with self.subTest(name=name):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    root = Path(temp_dir)
+                    media = root / "source.wav"
+                    media.touch()
+                    args = CLI.build_parser().parse_args(
+                        [
+                            "transcribe",
+                            str(media),
+                            "--semantic-split",
+                            "--api-key",
+                            "test-key",
+                            "--output-dir",
+                            str(root / "out"),
+                        ]
+                    )
+                    with patch.object(CLI, "process_media", return_value=split_result):
+                        with self.assertRaises(CLI.SubtitleSkillError) as raised:
+                            CLI.run_transcribe(args)
+                    self.assertEqual(raised.exception.error_type, "invalid_srt")
+                    self.assertEqual(raised.exception.step, "validate_output")
+                    self.assertEqual(list((root / "out").glob("*.srt")), [])
+                    self.assertEqual(
+                        list((root / "out").rglob("*.semantic-orphan-qc.json")),
+                        [],
+                    )
+                    self.assertEqual(
+                        list((root / "out").rglob("*.chunk-seams.json")),
+                        [],
+                    )
+
+    def test_semantic_split_blank_line_cue_does_not_write_final_srt(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "source.wav"
+            media.touch()
+            args = CLI.build_parser().parse_args(
+                [
+                    "transcribe",
+                    str(media),
+                    "--semantic-split",
+                    "--api-key",
+                    "test-key",
+                    "--output-dir",
+                    str(root / "out"),
+                ]
+            )
+            split_result = ASRData([ASRDataSeg("Hello\n\nWorld", 0, 1000)])
+            with patch.object(CLI, "process_media", return_value=split_result):
+                with self.assertRaises(CLI.SubtitleSkillError) as raised:
+                    CLI.run_transcribe(args)
+            self.assertEqual(raised.exception.error_type, "invalid_srt")
+            self.assertEqual(raised.exception.action, "transcribe")
+            self.assertEqual(raised.exception.step, "validate_output")
+            self.assertEqual(list((root / "out").glob("*.srt")), [])
+            self.assertEqual(list((root / "out").rglob("*.semantic-orphan-qc.json")), [])
+            self.assertEqual(list((root / "out").rglob("*.chunk-seams.json")), [])
 
     def test_faster_whisper_receives_clip_and_no_vad(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

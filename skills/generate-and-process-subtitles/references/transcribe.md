@@ -11,7 +11,7 @@ Behavior:
 
 - Final outputs are `<target-dir>/<base>.srt` and `<target-dir>/<base>.txt`.
 - Process files go to `<target-dir>/_subtitle_work/`.
-- YouTube human subtitles are reused by default when available.
+- YouTube human subtitles are reused by default when available, except when `--semantic-split` is requested. Semantic splitting uses ASR because seam repair requires word-level timestamps.
 - YouTube video descriptions are saved in metadata and mirrored to `<target-dir>/_subtitle_work/context.txt` when available.
 - The context file contains the video title, channel, and raw description. It does not include the source URL.
 - The context file is not used by `transcribe`; it exists for optional follow-up optimization.
@@ -35,10 +35,10 @@ Skip a question only when the user has already answered that part, such as "дЄНи
 
 Available workflows:
 
-- Transcription only: run `transcribe` and stop.
-- Transcription plus semantic split: run `transcribe --semantic-split` and stop.
+- Transcription only: run `transcribe` and stop after the final `.srt` and `.txt`.
+- Transcription plus semantic split: run `transcribe --semantic-split`. Keep the `.srt` and `.txt`, then stop if nested QC reports `review_required` (exit code `2`). That is a quality gate, not a transcription failure. Do not continue to optimize, translate, or treat the run as complete.
 - Transcription plus description-reference-assisted correction: run `transcribe`, then run `optimize` on the generated SRT with `--reference-file "<target-dir>/_subtitle_work/context.txt"`.
-- Transcription plus semantic split and correction: run `transcribe --semantic-split`, then run `optimize` on that generated SRT with `--reference-file "<target-dir>/_subtitle_work/context.txt"`.
+- Transcription plus semantic split and correction: run `transcribe --semantic-split`, stop on `review_required`, and only then run `optimize` with `--reference-file "<target-dir>/_subtitle_work/context.txt"`.
 
 Before description-reference-assisted correction, verify the `transcribe` JSON includes `context_file` and that the file exists. If no context file was generated, tell the user the video has no available description context and stop after transcription unless they provide another reference file.
 

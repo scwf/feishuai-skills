@@ -35,6 +35,10 @@ I have an Omnigent agent to help with store operations.
 
 `audit_subtitle_changes.py` must return exit code `2`, status `review_required`, and a lexical-change item. The pipeline must not translate or render until evidence resolves the change.
 
+A fluency-only rewrite such as `works good` -> `works well` is also `review_required`.
+
+A punctuation- or case-only optimization may pass the lexical audit but still create a semantic orphan boundary, such as `Next` -> `next` after a preceding cue. The exact reviewed English SRT must therefore rerun QC after all optimization/manual changes and before translation; exit `2` blocks translation.
+
 ## Structural Failure Case
 
 If optimize silently changes a cue timestamp or removes a cue, the audit must return exit code `1` and status `error`.
@@ -50,11 +54,19 @@ I have a Genie Agent to help with store operations.
 
 Fail when English is first, Chinese is absent, cues overlap, or numbering is non-sequential.
 
+## Semantic Readability Cases
+
+Pass: a legal `Yes.` classified as `ok_short`.
+
+Fail: a chunk-seam `customers.` fragment, a hanging `our`, or a bilingual cue whose Chinese line is complete while the English line is a short fragment. Structural SRT validation is not sufficient.
+
 ## Completion Checks
 
 - Run `python -m py_compile` on every bundled script.
-- Run the entity-mutation and clean-punctuation audit fixtures.
+- Run the entity-mutation, fluency-rewrite, and clean-punctuation audit fixtures.
 - Run bilingual validation on passing and failing fixtures.
+- Run semantic orphan QC on initial English, post-optimization final English, and bilingual fixtures; high-risk alerts at any stage block completion.
+- Verify `transcribe --semantic-split` / `split` exit `2` when nested QC is `review_required`.
 - Verify source cue/timing mismatches and material video coverage gaps fail validation.
 - Verify coverage-gap issues route to source-language interval repair, not bilingual-only edits.
 - Verify SRT-only validation reports `coverage_checked=false` and is not treated as render-ready.

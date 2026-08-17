@@ -11,6 +11,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, NoReturn, Optional
 
+from console_output import emit_stdout_json
+
 
 class SmartDefaultsFormatter(argparse.ArgumentDefaultsHelpFormatter):
     """Show defaults only when they add signal for end users."""
@@ -55,18 +57,15 @@ def exit_with_error(
     retryable: bool,
     suggestion: Optional[str] = None,
     details: Optional[Dict[str, Any]] = None,
-) -> "NoReturn":
-    print(
-        json.dumps(
-            structured_error(
-                error_type=error_type,
-                failed_step=failed_step,
-                message=message,
-                retryable=retryable,
-                suggestion=suggestion,
-                details=details,
-            ),
-            ensure_ascii=False,
+) -> NoReturn:
+    emit_stdout_json(
+        structured_error(
+            error_type=error_type,
+            failed_step=failed_step,
+            message=message,
+            retryable=retryable,
+            suggestion=suggestion,
+            details=details,
         )
     )
     raise SystemExit(1)
@@ -195,19 +194,89 @@ def parse_child_stdout(stdout: str) -> Dict[str, Any]:
         )
 
 
-def read_validation_from_child_json(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def read_child_artifacts(
+    payload: Dict[str, Any],
+) -> tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
     json_path = payload.get("json_path")
-    if not json_path:
-        return None
+    markdown_path = payload.get("markdown_path")
+    if not isinstance(json_path, str) or not json_path or not isinstance(markdown_path, str) or not markdown_path:
+        return None, structured_error(
+            error_type="missing_child_artifact",
+            failed_step="validate_child_artifacts",
+            message="Successful child output must include JSON and Markdown artifact paths.",
+            retryable=True,
+        )
     path = Path(json_path)
-    if not path.exists():
-        return None
+    markdown = Path(markdown_path)
+    missing = [str(candidate) for candidate in (path, markdown) if not candidate.is_file()]
+    if missing:
+        return None, structured_error(
+            error_type="missing_child_artifact",
+            failed_step="validate_child_artifacts",
+            message="Child scraper reported success but required artifacts are missing.",
+            retryable=True,
+            details={"missing_paths": missing},
+        )
     try:
         with path.open("r", encoding="utf-8") as handle:
             child_payload = json.load(handle)
-    except (OSError, json.JSONDecodeError):
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        return None, structured_error(
+            error_type="invalid_child_artifact",
+            failed_step="validate_child_artifacts",
+            message=f"Could not read child JSON artifact: {exc}",
+            retryable=True,
+        )
+    if not isinstance(child_payload, dict):
+        return None, structured_error(
+            error_type="invalid_child_artifact",
+            failed_step="validate_child_artifacts",
+            message="Child JSON artifact must contain an object.",
+            retryable=True,
+        )
+    if child_payload.get("status") not in ("ok", "ok_with_warnings"):
+        return None, structured_error(
+            error_type="child_artifact_not_successful",
+            failed_step="validate_child_artifacts",
+            message="Child JSON artifact does not record a successful status.",
+            retryable=True,
+            details={"artifact_status": child_payload.get("status")},
+        )
+    return child_payload, None
+
+
+def read_validation_from_child_json(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    child_payload, error = read_child_artifacts(payload)
+    if error is not None or child_payload is None:
         return None
-    return child_payload.get("validation")
+    validation = child_payload.get("validation")
+    return validation if isinstance(validation, dict) else None
+
+
+def build_child_summary_from_disk(
+    child_payload: Dict[str, Any],
+    locator_payload: Dict[str, Any],
+) -> Dict[str, Any]:
+    rss_fetch = child_payload.get("rss_fetch")
+    if not isinstance(rss_fetch, dict):
+        rss_fetch = {}
+    return {
+        "status": child_payload.get("status"),
+        "query_target": child_payload.get("query_target"),
+        "resolved_channel_id": child_payload.get("resolved_channel_id"),
+        "resolved_alias": child_payload.get("resolved_alias"),
+        "resolution_source": child_payload.get("resolution_source"),
+        "since_date": child_payload.get("since_date"),
+        "until_date": child_payload.get("until_date"),
+        "effective_limit": child_payload.get("effective_limit"),
+        "include_duration": child_payload.get("include_duration"),
+        "video_count": child_payload.get("video_count"),
+        "rss_feed_type": rss_fetch.get("selected_feed_type"),
+        "rss_url": rss_fetch.get("selected_feed_url"),
+        "json_path": locator_payload.get("json_path"),
+        "markdown_path": locator_payload.get("markdown_path"),
+        "validation": child_payload.get("validation"),
+    }
 
 
 def run_one_target(args: argparse.Namespace, target: str, output_dir: Path) -> Dict[str, Any]:
@@ -221,14 +290,57 @@ def run_one_target(args: argparse.Namespace, target: str, output_dir: Path) -> D
         errors="replace",
     )
     payload = parse_child_stdout(completed.stdout)
-    validation = read_validation_from_child_json(payload)
-    if validation is not None:
-        payload["validation"] = validation
+    artifact_error = None
+    disk_success = False
+    has_artifact_reference = bool(payload.get("json_path") or payload.get("markdown_path"))
+    stdout_claims_success = payload.get("status") in ("ok", "ok_with_warnings")
+    if completed.returncode == 0 and (has_artifact_reference or stdout_claims_success):
+        child_payload, artifact_error = read_child_artifacts(payload)
+        if artifact_error is not None:
+            payload = artifact_error
+        elif child_payload is not None:
+            items = child_payload.get("items")
+            video_count = child_payload.get("video_count")
+            validation = child_payload.get("validation")
+            if child_payload.get("query_target") != target:
+                artifact_error = structured_error(
+                    error_type="child_artifact_target_mismatch",
+                    failed_step="validate_child_artifacts",
+                    message="Child JSON artifact target does not match the requested target.",
+                    retryable=True,
+                    details={
+                        "requested_target": target,
+                        "artifact_target": child_payload.get("query_target"),
+                    },
+                )
+                payload = artifact_error
+            elif (
+                not isinstance(items, list)
+                or isinstance(video_count, bool)
+                or not isinstance(video_count, int)
+                or video_count != len(items)
+                or not isinstance(validation, dict)
+            ):
+                artifact_error = structured_error(
+                    error_type="invalid_child_artifact",
+                    failed_step="validate_child_artifacts",
+                    message="Child JSON artifact counts or validation payload are inconsistent.",
+                    retryable=True,
+                )
+                payload = artifact_error
+            else:
+                payload = build_child_summary_from_disk(child_payload, payload)
+                disk_success = True
     return {
         "target": target,
         "returncode": completed.returncode,
         "status": payload.get("status", "error"),
-        "ok": completed.returncode == 0 and payload.get("status") in ("ok", "ok_with_warnings"),
+        "ok": (
+            completed.returncode == 0
+            and disk_success
+            and artifact_error is None
+            and payload.get("status") in ("ok", "ok_with_warnings")
+        ),
         "payload": payload,
         "stderr_tail": completed.stderr[-4000:] if completed.stderr else "",
     }
@@ -301,6 +413,19 @@ def write_summary(output_dir: Path, summary: Dict[str, Any]) -> Dict[str, str]:
     with md_path.open("w", encoding="utf-8") as handle:
         handle.write(render_markdown(summary))
     return {"batch_json_path": str(json_path), "batch_markdown_path": str(md_path)}
+
+
+def build_console_summary(summary: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "status": summary.get("status"),
+        "target_count": summary.get("target_count"),
+        "attempted_count": summary.get("attempted_count"),
+        "success_count": summary.get("success_count"),
+        "failure_count": summary.get("failure_count"),
+        "output_dir": summary.get("output_dir"),
+        "batch_json_path": summary.get("batch_json_path"),
+        "batch_markdown_path": summary.get("batch_markdown_path"),
+    }
 
 
 def parse_args() -> argparse.Namespace:
@@ -465,7 +590,7 @@ def main() -> int:
         "results": results,
     }
     summary.update(write_summary(output_dir, summary))
-    print(json.dumps(summary, ensure_ascii=False))
+    emit_stdout_json(build_console_summary(summary))
     return 1 if status == "partial_failure" else 0
 
 

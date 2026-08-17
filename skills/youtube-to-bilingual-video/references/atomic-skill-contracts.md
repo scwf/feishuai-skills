@@ -33,7 +33,7 @@ Transcription command shape:
 "{SUBTITLE_PYTHON}" "{SUBTITLE_SKILL_ROOT}/scripts/generate_and_process_subtitles.py" transcribe "<youtube-url>" --output-dir "<job-dir>/subtitles/transcribed"
 ```
 
-Add `--semantic-split` only after confirmation. Do not force ASR unless the user explicitly requests it.
+Add `--semantic-split` only after confirmation. That confirmed option uses ASR because semantic seam repair requires word-level timestamps; otherwise, do not force ASR and allow reusable YouTube human subtitles.
 
 Targeted missing-speech repair command shape:
 
@@ -66,6 +66,20 @@ Required handoff checks:
 - Cue timing survives optimize and translate unless the atomic skill explicitly reports a segmentation operation.
 - Translation output is bilingual with Chinese first.
 - The bilingual result is validated against the audited source SRT, not only against video duration.
+- Semantic orphan QC on the initial semantic-split English SRT, again on the exact final English SRT after optimization/manual review and before translation, and again on the bilingual English line has no unresolved high-risk alerts.
+- `transcribe --semantic-split` / `split` exit code `2` is `review_required`; do not continue to optimize, translate, or render.
+
+QC command shape:
+
+```bash
+"{SUBTITLE_PYTHON}" "{SUBTITLE_SKILL_ROOT}/scripts/generate_and_process_subtitles.py" qc "<final-reviewed-english.srt>" --output "<job-dir>/audit/final-english-orphan-qc.json" --seam-times-file "<seam_times_path returned by transcribe/split>"
+```
+
+For a source-verified complete short utterance that is not in the deterministic `ok_short` set, add `--approved-cues-file "<approvals.json>"`. Every entry must match and be consumed by an exact currently approvable cue and include a review reason; stale entries are input errors. It cannot waive hanging-word or lowercase-continuation findings, and the handoff remains blocked until final English QC exits `0`.
+
+```bash
+"{SUBTITLE_PYTHON}" "{SUBTITLE_SKILL_ROOT}/scripts/generate_and_process_subtitles.py" qc "<bilingual.srt>" --bilingual --output "<job-dir>/audit/bilingual-orphan-qc.json"
+```
 
 ## Composite Ownership
 
@@ -76,6 +90,7 @@ The composite skill owns only:
 - optimization lexical-change audit;
 - exact-timestamp evidence review;
 - bilingual SRT structural validation;
+- semantic orphan QC on initial English, final post-review English, and bilingual English lines;
 - subtitle burn-in, media verification, QA frames, and final artifact reporting.
 
 This boundary allows each atomic skill to evolve independently while keeping the end-to-end workflow reproducible.

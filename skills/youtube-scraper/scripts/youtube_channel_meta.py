@@ -18,6 +18,8 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree as ET
 
+from console_output import emit_stdout_json
+
 
 class SmartDefaultsFormatter(argparse.ArgumentDefaultsHelpFormatter):
     """Show defaults only when they add signal for end users."""
@@ -129,17 +131,14 @@ def exit_with_error(
     suggestion: Optional[str] = None,
     details: Optional[Dict[str, Any]] = None,
 ) -> "NoReturn":
-    print(
-        json.dumps(
-            structured_error(
-                error_type=error_type,
-                failed_step=failed_step,
-                message=message,
-                retryable=retryable,
-                suggestion=suggestion,
-                details=details,
-            ),
-            ensure_ascii=False,
+    emit_stdout_json(
+        structured_error(
+            error_type=error_type,
+            failed_step=failed_step,
+            message=message,
+            retryable=retryable,
+            suggestion=suggestion,
+            details=details,
         )
     )
     raise SystemExit(1)
@@ -857,26 +856,23 @@ def main() -> int:
     with md_path.open("w", encoding="utf-8") as handle:
         handle.write(markdown)
 
-    print(
-        json.dumps(
-            {
-                "status": "ok" if validation["ok"] else "ok_with_warnings",
-                "resolved_channel_id": resolved_channel_id,
-                "resolved_alias": resolved_alias,
-                "resolution_source": resolution_source,
-                "since_date": since_date,
-                "until_date": args.until_date,
-                "effective_limit": final_limit,
-                "include_duration": include_duration,
-                "video_count": len(exports),
-                "rss_feed_type": feed_fetch["selected_feed_type"],
-                "rss_url": rss_url,
-                "json_path": str(json_path),
-                "markdown_path": str(md_path),
-                "validation": validation,
-            },
-            ensure_ascii=False,
-        )
+    emit_stdout_json(
+        {
+            "status": "ok" if validation["ok"] else "ok_with_warnings",
+            "resolved_channel_id": resolved_channel_id,
+            "resolved_alias": resolved_alias,
+            "resolution_source": resolution_source,
+            "since_date": since_date,
+            "until_date": args.until_date,
+            "effective_limit": final_limit,
+            "include_duration": include_duration,
+            "video_count": len(exports),
+            "rss_feed_type": feed_fetch["selected_feed_type"],
+            "rss_url": rss_url,
+            "json_path": str(json_path),
+            "markdown_path": str(md_path),
+            "validation": validation,
+        }
     )
     return 0
 

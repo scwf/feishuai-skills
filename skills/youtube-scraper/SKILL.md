@@ -251,6 +251,8 @@ For batch metadata scraping, omitted `--output-dir` creates a timestamped direct
 
 ## Validate Result
 
+Read the JSON file written to disk; do not treat console encoding or stdout as the source of truth. Console JSON is ASCII status only. Do not ask the caller to set `PYTHONIOENCODING` or UTF-8 mode.
+
 For channel metadata runs, check all of the following before you trust the result:
 
 - the JSON `status` field is `ok` or `ok_with_warnings` (read the JSON file; do not rely only on stdout)
@@ -266,6 +268,8 @@ For batch runs, also check:
 - `attempted_count`, `success_count`, and `failure_count` match the per-target results
 - every successful target has per-target JSON and Markdown paths
 - for each successful target, validate the per-target JSON using the single-target checklist above
+
+The batch runner uses child stdout only to locate JSON and Markdown artifacts. After validation, all per-target business fields and counts in the batch summary come from the child JSON on disk; stale or contradictory stdout fields are ignored.
 - `partial_failure` is reported to the user with the failed targets and structured error messages
 
 For single-video metadata runs, check all of the following before you trust the result:

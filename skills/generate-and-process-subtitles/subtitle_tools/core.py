@@ -32,6 +32,8 @@ def process_media(
     split_max_retries: int = 2,
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
+    seam_times_out: Optional[list[int]] = None,
+    seam_failures_out: Optional[list[dict]] = None,
 ) -> ASRData:
     if os.path.exists(media_url_or_path):
         audio_path = media_url_or_path
@@ -71,6 +73,8 @@ def process_media(
             max_word_count_english=split_max_words_en,
             chunk_word_limit=split_chunk_word_limit,
             max_retries=split_max_retries,
+            seam_times_out=seam_times_out,
+            seam_failures_out=seam_failures_out,
         )
 
     return asr_data

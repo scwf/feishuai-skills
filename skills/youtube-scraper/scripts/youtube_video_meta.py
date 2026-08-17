@@ -10,6 +10,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from console_output import emit_stdout_json
+
 
 class SmartDefaultsFormatter(argparse.ArgumentDefaultsHelpFormatter):
     """Show defaults only when they add signal for end users."""
@@ -55,17 +57,14 @@ def exit_with_error(
     suggestion: Optional[str] = None,
     details: Optional[Dict[str, Any]] = None,
 ) -> "NoReturn":
-    print(
-        json.dumps(
-            structured_error(
-                error_type=error_type,
-                failed_step=failed_step,
-                message=message,
-                retryable=retryable,
-                suggestion=suggestion,
-                details=details,
-            ),
-            ensure_ascii=False,
+    emit_stdout_json(
+        structured_error(
+            error_type=error_type,
+            failed_step=failed_step,
+            message=message,
+            retryable=retryable,
+            suggestion=suggestion,
+            details=details,
         )
     )
     raise SystemExit(1)
@@ -164,6 +163,17 @@ def collect_payload(
         "extractor": info.get("extractor"),
         "json_path": str(json_path),
         "markdown_path": str(markdown_path),
+    }
+
+
+def build_console_summary(payload: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "status": payload.get("status"),
+        "mode": payload.get("mode"),
+        "video_id": payload.get("video_id"),
+        "json_path": payload.get("json_path"),
+        "markdown_path": payload.get("markdown_path"),
+        "validation": payload.get("validation"),
     }
 
 
@@ -317,7 +327,7 @@ def main() -> int:
     with markdown_path.open("w", encoding="utf-8") as handle:
         handle.write(markdown)
 
-    print(json.dumps(payload, ensure_ascii=False))
+    emit_stdout_json(build_console_summary(payload))
     return 0
 
 

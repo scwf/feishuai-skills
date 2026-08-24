@@ -30,10 +30,10 @@ Use the Python environment prescribed by that skill. Resolve it as `{SUBTITLE_PY
 Transcription command shape:
 
 ```bash
-"{SUBTITLE_PYTHON}" "{SUBTITLE_SKILL_ROOT}/scripts/generate_and_process_subtitles.py" transcribe "<youtube-url>" --output-dir "<job-dir>/subtitles/transcribed"
+"{SUBTITLE_PYTHON}" "{SUBTITLE_SKILL_ROOT}/scripts/generate_and_process_subtitles.py" transcribe "<youtube-url>" --require-language en --output-dir "<job-dir>/subtitles/transcribed"
 ```
 
-Add `--semantic-split` only after confirmation. That confirmed option uses ASR because semantic seam repair requires word-level timestamps; otherwise, do not force ASR and allow reusable YouTube human subtitles.
+Add `--semantic-split` only after confirmation. That confirmed option uses ASR because semantic seam repair requires word-level timestamps; otherwise, do not force ASR and allow a reusable English YouTube human subtitle. `--require-language en` rejects a non-English manual track, a mismatched ASR detection, or low-confidence automatic language evidence. Preserve the returned metadata path; it contains the required language, evidence origin/confidence, and SHA-256 of the exact emitted source SRT. Rebind reviewed source bytes with `bind_reviewed_source_metadata.py` after evidence-approved edits.
 
 Targeted missing-speech repair command shape:
 
@@ -62,11 +62,13 @@ Before execution, use the current atomic skill's `--help` if an option name may 
 Required handoff checks:
 
 - Final user-facing SRT/TXT files are in the requested output directory.
+- SRT/TXT publish as a validated pair, refuse existing targets by default, and archive before an explicitly authorized `--replace-existing` replacement.
 - Process files remain under `_subtitle_work/`.
 - Cue timing survives optimize and translate unless the atomic skill explicitly reports a segmentation operation.
 - Translation output is bilingual with Chinese first.
-- The bilingual result is validated against the audited source SRT, not only against video duration.
-- Semantic orphan QC on the initial semantic-split English SRT, again on the exact final English SRT after optimization/manual review and before translation, and again on the bilingual English line has no unresolved high-risk alerts.
+- Source metadata identifies English, records the required-language evidence, and its SHA-256 matches the exact source SRT handed to the bilingual validator; Latin-script presence alone is insufficient.
+- The bilingual result is validated against the audited source SRT for cue count, numbering, timing, and exact normalized English text, not only against video duration.
+- Semantic orphan/viewer QC on the initial semantic-split English SRT, again on the exact final English SRT after optimization/manual review and before translation, and again on the bilingual English line has no unresolved high-risk alerts, including dependent sub-second tails, adjacent duplicate suffixes, and unfinished modifiers before long subtitle gaps.
 - `transcribe --semantic-split` / `split` exit code `2` is `review_required`; do not continue to optimize, translate, or render.
 
 QC command shape:
@@ -75,7 +77,7 @@ QC command shape:
 "{SUBTITLE_PYTHON}" "{SUBTITLE_SKILL_ROOT}/scripts/generate_and_process_subtitles.py" qc "<final-reviewed-english.srt>" --output "<job-dir>/audit/final-english-orphan-qc.json" --seam-times-file "<seam_times_path returned by transcribe/split>"
 ```
 
-For a source-verified complete short utterance that is not in the deterministic `ok_short` set, add `--approved-cues-file "<approvals.json>"`. Every entry must match and be consumed by an exact currently approvable cue and include a review reason; stale entries are input errors. It cannot waive hanging-word or lowercase-continuation findings, and the handoff remains blocked until final English QC exits `0`.
+For a source-verified complete short utterance that is not in the deterministic `ok_short` set, add `--approved-cues-file "<approvals.json>"`. Every entry must match and be consumed by an exact currently approvable cue and include a review reason; stale entries are input errors. It cannot waive hanging-word, lowercase-continuation, or overlong-display-line findings, and the handoff remains blocked until final English QC exits `0`.
 
 ```bash
 "{SUBTITLE_PYTHON}" "{SUBTITLE_SKILL_ROOT}/scripts/generate_and_process_subtitles.py" qc "<bilingual.srt>" --bilingual --output "<job-dir>/audit/bilingual-orphan-qc.json"

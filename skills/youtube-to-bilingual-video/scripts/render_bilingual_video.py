@@ -12,8 +12,16 @@ import shutil
 import subprocess
 import sys
 import uuid
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
+from typing import BinaryIO, Iterator
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from path_safety import file_identity
 
 
 def run(
@@ -178,9 +186,7 @@ def extract_frames(video: Path, qa_dir: Path, times: list[float]) -> list[str]:
 
 def write_report(report: dict[str, object], report_path: Path) -> None:
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = report_path.with_name(
-        f".{report_path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
-    )
+    temporary = report_path.parent / f".report-{uuid.uuid4().hex}.tmp"
     try:
         temporary.write_text(
             json.dumps(report, ensure_ascii=False, indent=2) + "\n",
@@ -192,7 +198,54 @@ def write_report(report: dict[str, object], report_path: Path) -> None:
 
 
 def print_json(report: dict[str, object]) -> None:
-    print(json.dumps(report, ensure_ascii=True, indent=2))
+    rendered = json.dumps(report, ensure_ascii=True, indent=2)
+    try:
+        print(rendered, flush=True)
+    except (BrokenPipeError, OSError, UnicodeEncodeError, ValueError):
+        try:
+            stdout_fd = sys.stdout.fileno()
+            null_fd = os.open(os.devnull, os.O_WRONLY)
+            try:
+                os.dup2(null_fd, stdout_fd)
+            finally:
+                os.close(null_fd)
+        except Exception:
+            pass
+
+
+def bounded_text(value: object, limit: int = 1000) -> object:
+    if not isinstance(value, str) or len(value) <= limit:
+        return value
+    return value[:limit] + "...[truncated]"
+
+
+def print_report_summary(report: dict[str, object], report_path: Path) -> None:
+    warnings = report.get("warnings", [])
+    bounded_warnings = (
+        [bounded_text(item, 500) for item in warnings[:10]]
+        if isinstance(warnings, list)
+        else []
+    )
+    print_json(
+        {
+            "status": report.get("status"),
+            "reason": report.get("reason"),
+            "message": bounded_text(report.get("message")),
+            "suggested_fix": bounded_text(report.get("suggested_fix")),
+            "output": report.get("output"),
+            "warnings": bounded_warnings,
+            "report_path": str(report_path),
+        }
+    )
+
+
+def report_write_failure(report_path: Path, exc: Exception) -> dict[str, object]:
+    return {
+        "status": "error",
+        "reason": "report_write_failure",
+        "message": str(exc),
+        "report_path": str(report_path),
+    }
 
 
 class RenderError(RuntimeError):
@@ -200,6 +253,68 @@ class RenderError(RuntimeError):
         super().__init__(message)
         self.reason = reason
         self.suggested_fix = suggested_fix
+
+
+def _lock_handle(handle: BinaryIO) -> None:
+    handle.seek(0)
+    if not handle.read(1):
+        handle.seek(0)
+        handle.write(b"0")
+        handle.flush()
+    handle.seek(0)
+    if os.name == "nt":
+        import msvcrt
+
+        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def _unlock_handle(handle: BinaryIO) -> None:
+    handle.seek(0)
+    if os.name == "nt":
+        import msvcrt
+
+        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+@contextmanager
+def output_lock(output: Path) -> Iterator[Path]:
+    lock_key = file_identity(output)
+    digest = hashlib.sha256(lock_key.encode("utf-8")).hexdigest()[:16]
+    lock_path = output.parent / f".render-{digest}.lock"
+    handle = lock_path.open("a+b")
+    try:
+        try:
+            _lock_handle(handle)
+        except OSError as exc:
+            raise RenderError(
+                f"another render is already targeting this output: {output}",
+                reason="output_locked",
+                suggested_fix="Wait for the active render to finish, then retry.",
+            ) from exc
+        try:
+            yield lock_path
+        finally:
+            try:
+                _unlock_handle(handle)
+            except OSError:
+                pass
+    finally:
+        try:
+            handle.close()
+        except OSError:
+            pass
+
+
+def render_run_id() -> str:
+    return f"{datetime.now():%Y%m%d-%H%M%S-%f}-{os.getpid()}-{uuid.uuid4().hex}"
 
 
 def render(args: argparse.Namespace) -> dict[str, object]:
@@ -213,12 +328,24 @@ def render(args: argparse.Namespace) -> dict[str, object]:
         raise RuntimeError(f"input video does not exist: {source}")
     if not subtitle.is_file():
         raise RuntimeError(f"subtitle does not exist: {subtitle}")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    with output_lock(output):
+        return render_locked(args, source, subtitle, output, work_dir)
+
+
+def render_locked(
+    args: argparse.Namespace,
+    source: Path,
+    subtitle: Path,
+    output: Path,
+    work_dir: Path,
+) -> dict[str, object]:
     if output.exists() and not args.replace_existing:
         raise RuntimeError("output already exists; pass --replace-existing to archive and replace it")
 
-    output.parent.mkdir(parents=True, exist_ok=True)
-    work_dir.mkdir(parents=True, exist_ok=True)
-    partial = work_dir / f"{output.stem}.{datetime.now():%Y%m%d-%H%M%S}.partial.mp4"
+    run_id = render_run_id()
+    partial = work_dir / f".render-{run_id}.partial.mp4"
     selected_encoder = choose_encoder(args.encoder)
     source_probe = probe(source)
     source_duration = duration_seconds(source_probe)
@@ -235,7 +362,7 @@ def render(args: argparse.Namespace) -> dict[str, object]:
             ),
         )
 
-    staged_subtitle = work_dir / f"render-subtitle-{datetime.now():%Y%m%d-%H%M%S-%f}.srt"
+    staged_subtitle = work_dir / f".render-subtitle-{run_id}.srt"
     shutil.copy2(subtitle, staged_subtitle)
     command = [
         "ffmpeg",
@@ -321,7 +448,8 @@ def render(args: argparse.Namespace) -> dict[str, object]:
     if output.exists():
         archive_dir = work_dir / "archive"
         archive_dir.mkdir(parents=True, exist_ok=True)
-        archive = archive_dir / f"{output.stem}.previous-{datetime.now():%Y%m%d-%H%M%S}{output.suffix}"
+        output_digest = hashlib.sha256(str(output).encode("utf-8")).hexdigest()[:12]
+        archive = archive_dir / f"previous-{output_digest}-{run_id}{output.suffix}"
         output.replace(archive)
         archived = str(archive.resolve())
     partial.replace(output)
@@ -384,7 +512,9 @@ def main() -> int:
         args.subtitle.resolve(),
         args.output.resolve(),
     }
-    if len(set(resolved_paths.values())) != len(resolved_paths):
+    path_identities = {name: file_identity(path) for name, path in resolved_paths.items()}
+    protected_path_identities = {file_identity(path) for path in protected_paths}
+    if len(set(path_identities.values())) != len(path_identities):
         report = {
             "status": "error",
             "reason": "path_collision",
@@ -394,9 +524,12 @@ def main() -> int:
             "output": str(args.output),
             "report": str(report_path),
         }
-        if report_path not in protected_paths:
-            write_report(report, report_path)
-        print_json(report)
+        try:
+            if file_identity(report_path) not in protected_path_identities:
+                write_report(report, report_path)
+            print_report_summary(report, report_path)
+        except (OSError, UnicodeError, ValueError) as exc:
+            print_json(report_write_failure(report_path, exc))
         return 1
     try:
         report = render(args)
@@ -422,9 +555,13 @@ def main() -> int:
             "output": str(args.output),
         }
         exit_code = 1
-    write_report(report, report_path)
-    print_json(report)
-    return exit_code
+    try:
+        write_report(report, report_path)
+        print_report_summary(report, report_path)
+        return exit_code
+    except (OSError, UnicodeError, ValueError) as exc:
+        print_json(report_write_failure(report_path, exc))
+        return 1
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -16,6 +17,8 @@ from subtitle_tools.split import (
     is_clean_sentence_seam,
     is_sentence_end,
     split_subtitle,
+    split_by_llm,
+    validate_split_result,
 )
 
 
@@ -281,6 +284,39 @@ class SplitSeamTests(unittest.TestCase):
             splitter._seam_window_is_valid(words, left, right, [merged])
         )
 
+    def test_oversized_display_repaired_cue_is_rejected(self) -> None:
+        left_token = "a" * 40
+        right_token = "b" * 40
+        words = make_words(left_token, right_token)
+        left = ASRDataSeg(left_token, 0, 200, words=words[:1])
+        right = ASRDataSeg(right_token, 200, 400, words=words[1:])
+        merged = ASRDataSeg(f"{left_token} {right_token}", 0, 400, words=words)
+        splitter = SubtitleSplitter(model="test")
+
+        self.assertEqual(len(merged.text), 81)
+        self.assertFalse(splitter._seam_window_is_valid(words, left, right, [merged]))
+
+    def test_english_display_character_limit_is_enforced(self) -> None:
+        overlong = "This sentence is intentionally quite long so that it wraps on a 1080p screen at FontSize 16."
+        valid = "a" * 79
+        overlong_ok, overlong_message = validate_split_result(
+            original_text=overlong,
+            split_result=[overlong],
+            max_word_count_cjk=25,
+            max_word_count_english=21,
+        )
+        valid_ok, valid_message = validate_split_result(
+            original_text=valid,
+            split_result=[valid],
+            max_word_count_cjk=25,
+            max_word_count_english=21,
+        )
+
+        self.assertGreater(len(overlong), 79)
+        self.assertFalse(overlong_ok)
+        self.assertIn("display character limit", overlong_message)
+        self.assertTrue(valid_ok, valid_message)
+
     def test_reverse_repaired_cues_are_rejected_before_sorting(self) -> None:
         words = make_words("Later", "sentence.", "Earlier", "now.")
         later = ASRDataSeg(
@@ -306,6 +342,126 @@ class SplitSeamTests(unittest.TestCase):
                 splitter.split_subtitle(asr_from_words(words))
         wrapped = ASRData([later, earlier])
         self.assertEqual(wrapped.segments[0].text, earlier.text)
+
+    def test_reverse_whisper_segments_are_rejected_before_asrdata_sorts(self) -> None:
+        payload = {
+            "segments": [
+                {
+                    "text": "Later.",
+                    "start": 10.0,
+                    "end": 11.0,
+                    "words": [{"word": "Later.", "start": 10.0, "end": 11.0}],
+                },
+                {
+                    "text": "Earlier.",
+                    "start": 0.0,
+                    "end": 1.0,
+                    "words": [{"word": "Earlier.", "start": 0.0, "end": 1.0}],
+                },
+            ]
+        }
+
+        with self.assertRaisesRegex(ValueError, "reverse-timeline"):
+            ASRData.from_whisper_json(payload)
+
+    def test_reverse_or_overlapping_whisper_words_are_rejected(self) -> None:
+        payload = {
+            "segments": [
+                {
+                    "text": "Later earlier",
+                    "start": 0.0,
+                    "end": 2.0,
+                    "words": [
+                        {"word": "Later", "start": 1.0, "end": 2.0},
+                        {"word": "earlier", "start": 0.0, "end": 1.0},
+                    ],
+                }
+            ]
+        }
+
+        with self.assertRaisesRegex(ValueError, "reverse-timeline"):
+            ASRData.from_whisper_json(payload)
+
+    def test_reverse_punctuation_word_is_rejected_before_normalization(self) -> None:
+        payload = {
+            "segments": [
+                {
+                    "text": "Hello,",
+                    "start": 0.0,
+                    "end": 2.0,
+                    "words": [
+                        {"word": "Hello", "start": 1.0, "end": 2.0},
+                        {"word": ",", "start": 0.5, "end": 1.5},
+                    ],
+                }
+            ]
+        }
+
+        with self.assertRaisesRegex(ValueError, "reverse-timeline"):
+            ASRData.from_whisper_json(payload)
+
+    def test_cross_segment_word_overlap_is_rejected(self) -> None:
+        payload = {
+            "segments": [
+                {
+                    "text": "First",
+                    "start": 0.0,
+                    "end": 1.2,
+                    "words": [
+                        {"word": "First", "start": 0.8, "end": 1.2},
+                    ],
+                },
+                {
+                    "text": "Second",
+                    "start": 1.0,
+                    "end": 2.0,
+                    "words": [
+                        {"word": "Second", "start": 1.0, "end": 1.1},
+                    ],
+                },
+            ]
+        }
+
+        with self.assertRaisesRegex(ValueError, "segment 2.*overlaps"):
+            ASRData.from_whisper_json(payload)
+
+    def test_word_outside_its_segment_is_rejected(self) -> None:
+        payload = {
+            "segments": [
+                {
+                    "text": "Outside",
+                    "start": 1.0,
+                    "end": 2.0,
+                    "words": [
+                        {"word": "Outside", "start": 0.8, "end": 1.2},
+                    ],
+                }
+            ]
+        }
+
+        with self.assertRaisesRegex(ValueError, "outside its segment"):
+            ASRData.from_whisper_json(payload)
+
+    def test_llm_length_overflow_is_not_accepted_after_retries(self) -> None:
+        tokens = ["w"] * 22
+        words = make_words(*tokens)
+        text = " ".join(tokens)
+        response = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=text))]
+        )
+
+        with patch("subtitle_tools.split.call_llm", return_value=response):
+            with self.assertRaisesRegex(
+                SubtitleSplitValidationError, "exceeds length limit"
+            ):
+                split_by_llm(
+                    text,
+                    words=words,
+                    model="test",
+                    api_key="test",
+                    max_word_count_english=21,
+                    max_retries=1,
+                )
 
 
 if __name__ == "__main__":

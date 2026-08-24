@@ -361,6 +361,400 @@ I agree.
         first = next(item for item in report["review_items"] if item["cue"] == 1)
         self.assertIn("lowercase_continuation", first["reasons"])
 
+    def test_full_word_budget_lowercase_continuation_is_a_length_wrap(self) -> None:
+        text = " ".join(["I"] * 21)
+        report = inspect_asr_data(
+            ASRData(
+                [
+                    ASRDataSeg(text, 0, 4000),
+                    ASRDataSeg("and the next clause continues.", 4000, 6000),
+                ]
+            )
+        )
+        self.assertEqual(report["status"], "ok")
+        self.assertEqual(report["high_risk_count"], 0)
+
+    def test_full_display_budget_lowercase_continuation_is_a_length_wrap(self) -> None:
+        text = ("abcdefghij " * 7) + "ok"
+        self.assertEqual(len(text), 79)
+        report = inspect_asr_data(
+            ASRData(
+                [
+                    ASRDataSeg(text, 0, 4000),
+                    ASRDataSeg("and the next clause continues.", 4000, 6000),
+                ]
+            )
+        )
+        self.assertEqual(report["status"], "ok")
+        first = next((item for item in report["findings"] if item["cue"] == 1), None)
+        if first is not None:
+            self.assertNotIn("lowercase_continuation", first["reasons"])
+
+    def test_hanging_our_at_word_budget_is_still_high_risk(self) -> None:
+        text = " ".join(["I"] * 20 + ["our"])
+        report = inspect_asr_data(
+            ASRData(
+                [
+                    ASRDataSeg(text, 0, 4000),
+                    ASRDataSeg("customers around the world.", 4000, 6000),
+                ]
+            )
+        )
+        first = next(item for item in report["review_items"] if item["cue"] == 1)
+        self.assertIn("hanging_function_word", first["reasons"])
+        self.assertNotIn("lowercase_continuation", first["reasons"])
+
+    def test_hanging_auxiliary_contraction_is_high_risk(self) -> None:
+        report = inspect_asr_data(
+            ASRData(
+                [
+                    ASRDataSeg(
+                        "First, we will see what agent memory systems are, and then we're",
+                        0,
+                        4000,
+                    ),
+                    ASRDataSeg(
+                        "Going to be taking a deep dive into a popular memory system.",
+                        4000,
+                        7000,
+                    ),
+                ]
+            )
+        )
+
+        self.assertEqual(report["status"], "review_required")
+        first = next(item for item in report["review_items"] if item["cue"] == 1)
+        self.assertIn("hanging_auxiliary_contraction", first["reasons"])
+
+    def test_terminal_punctuation_does_not_hide_auxiliary_contraction(self) -> None:
+        report = inspect_asr_data(
+            ASRData([ASRDataSeg("That's where we're.", 0, 1200)])
+        )
+        self.assertEqual(report["status"], "review_required")
+        self.assertIn(
+            "hanging_auxiliary_contraction",
+            report["review_items"][0]["reasons"],
+        )
+
+    def test_viewer_qc_flags_short_infinitive_tail_with_context(self) -> None:
+        report = inspect_asr_data(
+            ASRData(
+                [
+                    ASRDataSeg(
+                        "All the memories are going",
+                        0,
+                        4320,
+                    ),
+                    ASRDataSeg("To be stored.", 4320, 4720),
+                ]
+            )
+        )
+
+        tail = next(item for item in report["review_items"] if item["cue"] == 2)
+        self.assertIn("short_dependent_fragment", tail["reasons"])
+        self.assertEqual(tail["start_timestamp"], "00:00:04,320")
+        self.assertEqual(tail["previous_text"], "All the memories are going")
+        self.assertEqual(tail["gap_before_ms"], 0)
+
+    def test_viewer_qc_flags_short_relative_clause_tail(self) -> None:
+        report = inspect_asr_data(
+            ASRData(
+                [
+                    ASRDataSeg("They come from the SQLite database that", 0, 3160),
+                    ASRDataSeg("We mentioned before.", 3160, 3860),
+                ]
+            )
+        )
+
+        tail = next(item for item in report["review_items"] if item["cue"] == 2)
+        self.assertIn("short_dependent_fragment", tail["reasons"])
+
+    def test_viewer_qc_flags_adjacent_duplicate_suffix(self) -> None:
+        report = inspect_asr_data(
+            ASRData(
+                [
+                    ASRDataSeg("The memories were returned from here.", 0, 5800),
+                    ASRDataSeg("Returned from here.", 5800, 6520),
+                ]
+            )
+        )
+
+        duplicate = next(item for item in report["review_items"] if item["cue"] == 2)
+        self.assertIn("adjacent_duplicate_suffix", duplicate["reasons"])
+
+    def test_viewer_qc_flags_1100ms_adjacent_duplicate_suffix(self) -> None:
+        report = inspect_asr_data(
+            ASRData(
+                [
+                    ASRDataSeg("The memories were returned from here.", 0, 5800),
+                    ASRDataSeg("Returned from here.", 5800, 6900),
+                ]
+            )
+        )
+
+        duplicate = next(item for item in report["review_items"] if item["cue"] == 2)
+        self.assertIn("adjacent_duplicate_suffix", duplicate["reasons"])
+
+    def test_viewer_qc_flags_lowercase_short_tail(self) -> None:
+        report = inspect_asr_data(
+            ASRData(
+                [
+                    ASRDataSeg("Fine-tune the model in order to make", 0, 5780),
+                    ASRDataSeg("it more accurate.", 5780, 6420),
+                ]
+            )
+        )
+
+        tail = next(item for item in report["review_items"] if item["cue"] == 2)
+        self.assertIn("short_dependent_fragment", tail["reasons"])
+
+    def test_viewer_qc_flags_hanging_modifier_before_long_pause_and_tail(self) -> None:
+        report = inspect_asr_data(
+            ASRData(
+                [
+                    ASRDataSeg(
+                        "A reputable benchmark for a bunch of different",
+                        0,
+                        4080,
+                    ),
+                    ASRDataSeg(
+                        "Embedding models for multilingual and English.",
+                        5900,
+                        10380,
+                    ),
+                    ASRDataSeg(
+                        "Depending on which one you're trying",
+                        10540,
+                        14140,
+                    ),
+                    ASRDataSeg("To figure out.", 14140, 14760),
+                ]
+            )
+        )
+
+        before_pause = next(item for item in report["review_items"] if item["cue"] == 1)
+        self.assertIn("incomplete_before_long_gap", before_pause["reasons"])
+        self.assertEqual(before_pause["gap_after_ms"], 1820)
+        tail = next(item for item in report["review_items"] if item["cue"] == 4)
+        self.assertIn("short_dependent_fragment", tail["reasons"])
+
+    def test_complete_short_sentence_is_not_a_dependent_fragment(self) -> None:
+        report = inspect_asr_data(
+            ASRData(
+                [
+                    ASRDataSeg("The task is complete.", 0, 1200),
+                    ASRDataSeg("And there you go.", 1200, 1800),
+                ]
+            )
+        )
+
+        self.assertEqual(report["status"], "ok")
+        self.assertEqual(report["high_risk_count"], 0)
+
+    def test_complete_short_to_sentences_are_not_dependent_fragments(self) -> None:
+        for text in ("To be clear, yes.", "To the moon!"):
+            with self.subTest(text=text):
+                report = inspect_asr_data(
+                    ASRData(
+                        [
+                            ASRDataSeg("The previous thought is complete.", 0, 1200),
+                            ASRDataSeg(text, 1200, 2100),
+                        ]
+                    )
+                )
+                self.assertEqual(report["status"], "ok")
+                self.assertEqual(report["high_risk_count"], 0)
+
+    def test_discourse_to_opening_is_independent_after_ambiguous_endings(self) -> None:
+        for previous in (
+            "That is what this talk is about",
+            "How is it going",
+            "There is hope",
+            "This is our plan",
+        ):
+            with self.subTest(previous=previous):
+                report = inspect_asr_data(
+                    ASRData(
+                        [
+                            ASRDataSeg(previous, 0, 1200),
+                            ASRDataSeg("To clarify, no.", 1200, 2100),
+                        ]
+                    )
+                )
+                self.assertEqual(report["status"], "ok")
+
+    def test_short_infinitive_after_complement_verb_requires_review(self) -> None:
+        for previous in (
+            "We need",
+            "We try",
+            "We hope",
+            "She needs",
+            "He tries",
+            "She hopes",
+            "We are hoping",
+            "Teams need",
+            "She will need",
+            "We still hope",
+            "They may try",
+            "She needs.",
+            "She tries!",
+            "We are hoping.",
+            "They have been hoping",
+            "She has been trying",
+            "We had been planning",
+            "She keeps trying",
+        ):
+            with self.subTest(previous=previous):
+                report = inspect_asr_data(
+                    ASRData(
+                        [
+                            ASRDataSeg(previous, 0, 1200),
+                            ASRDataSeg("To be ready.", 1200, 1900),
+                        ]
+                    )
+                )
+                tail = next(
+                    item for item in report["review_items"] if item["cue"] == 2
+                )
+                self.assertIn("short_dependent_fragment", tail["reasons"])
+
+    def test_comma_does_not_hide_a_dependent_to_tail(self) -> None:
+        report = inspect_asr_data(
+            ASRData(
+                [
+                    ASRDataSeg("She needs", 0, 1200),
+                    ASRDataSeg("To be ready, finally.", 1200, 1900),
+                ]
+            )
+        )
+
+        tail = next(item for item in report["review_items"] if item["cue"] == 2)
+        self.assertIn("short_dependent_fragment", tail["reasons"])
+
+    def test_independent_to_opening_cannot_override_complement_evidence(self) -> None:
+        cases = (
+            ("She needs", "To be clear."),
+            ("She hopes", "To start, tomorrow."),
+            ("We plan", "To summarize, finally."),
+            ("She tries", "To clarify, finally."),
+        )
+        for previous, current in cases:
+            with self.subTest(previous=previous, current=current):
+                report = inspect_asr_data(
+                    ASRData(
+                        [
+                            ASRDataSeg(previous, 0, 1200),
+                            ASRDataSeg(current, 1200, 1900),
+                        ]
+                    )
+                )
+                tail = next(
+                    item for item in report["review_items"] if item["cue"] == 2
+                )
+                self.assertIn("short_dependent_fragment", tail["reasons"])
+
+    def test_terminal_punctuation_does_not_hide_modifier_before_long_gap(self) -> None:
+        report = inspect_asr_data(
+            ASRData(
+                [
+                    ASRDataSeg(
+                        "A benchmark for a bunch of different.",
+                        0,
+                        4080,
+                    ),
+                    ASRDataSeg("Embedding models.", 5900, 7900),
+                ]
+            )
+        )
+
+        before_pause = next(item for item in report["review_items"] if item["cue"] == 1)
+        self.assertIn("incomplete_before_long_gap", before_pause["reasons"])
+
+    def test_quantified_other_before_long_gap_requires_review(self) -> None:
+        report = inspect_asr_data(
+            ASRData(
+                [
+                    ASRDataSeg("A benchmark for many other.", 0, 1200),
+                    ASRDataSeg("Embedding models.", 2800, 4000),
+                ]
+            )
+        )
+
+        before_pause = next(item for item in report["review_items"] if item["cue"] == 1)
+        self.assertIn("incomplete_before_long_gap", before_pause["reasons"])
+
+    def test_group_quantified_other_before_long_gap_requires_review(self) -> None:
+        phrases = (
+            "a whole bunch of other",
+            "a large number of other",
+            "a wide variety of other",
+            "a lot of other",
+            "a collection of other",
+            "a series of other",
+            "a couple of other",
+        )
+        for phrase in phrases:
+            with self.subTest(phrase=phrase):
+                report = inspect_asr_data(
+                    ASRData(
+                        [
+                            ASRDataSeg(
+                                f"A benchmark for {phrase}.",
+                                0,
+                                1200,
+                            ),
+                            ASRDataSeg("Embedding models.", 2800, 4000),
+                        ]
+                    )
+                )
+                before_pause = next(
+                    item for item in report["review_items"] if item["cue"] == 1
+                )
+                self.assertIn("incomplete_before_long_gap", before_pause["reasons"])
+
+    def test_complete_predicative_or_pronominal_sentence_before_gap_is_ok(self) -> None:
+        for text in (
+            "These methods are different.",
+            "There are many.",
+            "This is another.",
+        ):
+            with self.subTest(text=text):
+                report = inspect_asr_data(
+                    ASRData(
+                        [
+                            ASRDataSeg(text, 0, 1200),
+                            ASRDataSeg("We continue.", 2800, 4000),
+                        ]
+                    )
+                )
+                self.assertEqual(report["status"], "ok")
+
+    def test_overlong_english_display_line_is_high_risk(self) -> None:
+        report = inspect_asr_data(
+            ASRData(
+                [
+                    ASRDataSeg("a" * 80, 0, 2000),
+                ]
+            )
+        )
+        self.assertEqual(report["status"], "review_required")
+        first = report["review_items"][0]
+        self.assertIn("overlong_display_line", first["reasons"])
+
+    def test_bilingual_overlong_english_line_is_high_risk(self) -> None:
+        report = inspect_asr_data(
+            ASRData(
+                [
+                    ASRDataSeg("这是中文。\n" + ("a" * 80), 0, 2000),
+                ]
+            ),
+            bilingual=True,
+        )
+        self.assertEqual(report["status"], "review_required")
+        first = report["review_items"][0]
+        self.assertEqual(first["text"], "a" * 80)
+        self.assertIn("overlong_display_line", first["reasons"])
+
     def test_bilingual_english_fragment_is_not_hidden_by_chinese(self) -> None:
         asr_data = ASRData(
             [
@@ -1050,6 +1444,271 @@ Second cue.
                         CLI.run_qc(args)
                     self.assertEqual(raised.exception.error_type, "invalid_srt")
 
+    def test_to_complement_ambiguity_matrix_avoids_hard_false_positives(self) -> None:
+        cases = (
+            ("How are we going", "To be fully ready?", "ambiguous_short_dependent_fragment"),
+            ("She needs, you know.", "To be ready.", "short_dependent_fragment"),
+            ("So how is it going", "To clarify, no.", None),
+            ("That is all we need", "To clarify, no.", None),
+            (
+                "The situation has been trying",
+                "To clarify, no.",
+                "ambiguous_short_dependent_fragment",
+            ),
+            ("There are several plans", "To clarify, no.", None),
+            ("The team plans.", "To clarify, no.", None),
+            (
+                "The team plans",
+                "To clarify, no.",
+                "ambiguous_short_dependent_fragment",
+            ),
+            ("The team is planning.", "To clarify, no.", None),
+            (
+                "The team is planning",
+                "To clarify, no.",
+                "ambiguous_short_dependent_fragment",
+            ),
+            ("Our strategic plan.", "To clarify, no.", None),
+            ("Our strategic plan", "To clarify, no.", None),
+        )
+        for previous, current, expected_reason in cases:
+            with self.subTest(previous=previous, current=current):
+                report = inspect_asr_data(
+                    ASRData(
+                        [
+                            ASRDataSeg(previous, 0, 1200),
+                            ASRDataSeg(current, 1200, 2100),
+                        ]
+                    )
+                )
+                reasons = {
+                    reason
+                    for item in report["review_items"]
+                    if item["cue"] == 2
+                    for reason in item["reasons"]
+                }
+                if expected_reason is None:
+                    self.assertNotIn("short_dependent_fragment", reasons)
+                    self.assertNotIn("ambiguous_short_dependent_fragment", reasons)
+                else:
+                    self.assertIn(expected_reason, reasons)
+
+    def test_other_long_gap_handles_pronouns_and_trailing_fillers(self) -> None:
+        legal = (
+            "This model is faster than any other.",
+            "This is like any other.",
+            "This differs from any other.",
+            "Choose any other.",
+            "Choose some other.",
+            "This model is like no other.",
+            "This compares to no other.",
+        )
+        for text in legal:
+            with self.subTest(text=text):
+                report = inspect_asr_data(
+                    ASRData(
+                        [
+                            ASRDataSeg(text, 0, 1000),
+                            ASRDataSeg("Next topic.", 2600, 3600),
+                        ]
+                    )
+                )
+                reasons = {
+                    reason
+                    for item in report["review_items"]
+                    if item["cue"] == 1
+                    for reason in item["reasons"]
+                }
+                self.assertNotIn("incomplete_before_long_gap", reasons)
+
+        report = inspect_asr_data(
+            ASRData(
+                [
+                    ASRDataSeg("A benchmark for a lot of other, you know.", 0, 1000),
+                    ASRDataSeg("Next topic.", 2600, 3600),
+                ]
+            )
+        )
+        reasons = {
+            reason
+            for item in report["review_items"]
+            if item["cue"] == 1
+            for reason in item["reasons"]
+        }
+        self.assertIn("incomplete_before_long_gap", reasons)
+
+        for text in (
+            "A benchmark for a few other.",
+            "A benchmark for few other.",
+            "A benchmark for numerous other.",
+            "A benchmark for many other, actually.",
+            "A benchmark for countless other.",
+            "A benchmark for multiple other.",
+            "A benchmark for several other, basically.",
+            "A benchmark for many other, in fact.",
+            "A benchmark for many other; in fact.",
+            "A benchmark for numerous other — basically.",
+        ):
+            with self.subTest(text=text):
+                report = inspect_asr_data(
+                    ASRData(
+                        [
+                            ASRDataSeg(text, 0, 1000),
+                            ASRDataSeg("Next topic.", 2600, 3600),
+                        ]
+                    )
+                )
+                reasons = {
+                    reason
+                    for item in report["review_items"]
+                    if item["cue"] == 1
+                    for reason in item["reasons"]
+                }
+                self.assertIn("incomplete_before_long_gap", reasons)
+
+    def test_multiword_subject_and_parenthetical_to_dependencies_are_hard(self) -> None:
+        previous_texts = (
+            "The teams need",
+            "All teams need",
+            "Engineering teams need",
+            "The team is hoping",
+            "Today she needs",
+            "Yesterday she needed",
+            "She hopes, I think.",
+            "She needs, as you know.",
+            "She needs, perhaps.",
+            "She needs (I think).",
+            "The team keeps trying",
+            "The team is trying",
+            "Almost all teams need",
+            "Unfortunately she needs",
+            "In fact she needs",
+            "She needs, in my view.",
+            "She needs, or so I think.",
+            "All teams keep trying",
+            "She continued trying",
+            "The team has been hoping",
+            "Perhaps she needs",
+            "Of course she needs",
+            "She needs — in my view.",
+            "She needs; in my view.",
+            "She started trying",
+            "She began trying",
+            "She resumed trying",
+            "She stopped trying",
+            "The teams plan",
+            "Our teams plan",
+        )
+        for previous_text in previous_texts:
+            with self.subTest(previous_text=previous_text):
+                report = inspect_asr_data(
+                    ASRData(
+                        [
+                            ASRDataSeg(previous_text, 0, 1200),
+                            ASRDataSeg("To be ready.", 1200, 1900),
+                        ]
+                    )
+                )
+                tail = next(
+                    item for item in report["review_items"] if item["cue"] == 2
+                )
+                self.assertIn("short_dependent_fragment", tail["reasons"])
+                self.assertNotIn(
+                    "ambiguous_short_dependent_fragment", tail["reasons"]
+                )
+                with self.assertRaises(ApprovalValidationError):
+                    inspect_asr_data(
+                        ASRData(
+                            [
+                                ASRDataSeg(previous_text, 0, 1200),
+                                ASRDataSeg("To be ready.", 1200, 1900),
+                            ]
+                        ),
+                        approved_cues={
+                            2: {"text": "To be ready.", "reason": "cannot waive hard gate"}
+                        },
+                    )
+
+    def test_noun_subject_discourse_openings_are_ambiguous_not_hard(self) -> None:
+        cases = (
+            ("The team plans", "To be clear."),
+            ("The team plans", "To start, tomorrow."),
+            ("The team hopes", "To clarify, no."),
+            ("The team tries", "To clarify, no."),
+            ("The situation is trying", "To clarify, no."),
+            ("The team is planning", "To start, tomorrow."),
+            ("The team has been trying", "To be clear."),
+        )
+        for previous, current in cases:
+            with self.subTest(previous=previous, current=current):
+                report = inspect_asr_data(
+                    ASRData(
+                        [
+                            ASRDataSeg(previous, 0, 1200),
+                            ASRDataSeg(current, 1200, 1900),
+                        ]
+                    )
+                )
+                tail = next(
+                    item for item in report["review_items"] if item["cue"] == 2
+                )
+                self.assertIn(
+                    "ambiguous_short_dependent_fragment", tail["reasons"]
+                )
+                self.assertNotIn("short_dependent_fragment", tail["reasons"])
+
+    def test_strong_discourse_boundaries_are_not_hard_dependencies(self) -> None:
+        cases = (
+            ("She hopes;", "To clarify, no.", None),
+            (
+                "She hopes—",
+                "To clarify, no.",
+                "ambiguous_short_dependent_fragment",
+            ),
+        )
+        for previous, current, expected in cases:
+            with self.subTest(previous=previous):
+                report = inspect_asr_data(
+                    ASRData(
+                        [
+                            ASRDataSeg(previous, 0, 1200),
+                            ASRDataSeg(current, 1200, 1900),
+                        ]
+                    )
+                )
+                reasons = {
+                    reason
+                    for item in report["review_items"]
+                    if item["cue"] == 2
+                    for reason in item["reasons"]
+                }
+                self.assertNotIn("short_dependent_fragment", reasons)
+                if expected is None:
+                    self.assertNotIn("ambiguous_short_dependent_fragment", reasons)
+                else:
+                    self.assertIn(expected, reasons)
+
+    def test_ambiguous_to_attachment_requires_exact_review_then_can_be_approved(self) -> None:
+        data = ASRData(
+            [
+                ASRDataSeg("How are we going", 0, 1200),
+                ASRDataSeg("To be fully ready?", 1200, 2100),
+            ]
+        )
+        blocked = inspect_asr_data(data)
+        self.assertEqual(blocked["status"], "review_required")
+        approved = inspect_asr_data(
+            data,
+            approved_cues={
+                2: {
+                    "text": "To be fully ready?",
+                    "reason": "Audio confirms a new speaker's complete question.",
+                }
+            },
+        )
+        self.assertEqual(approved["status"], "ok")
+        self.assertEqual(approved["approved_short_count"], 1)
+
     def test_argparse_failures_use_structured_json_and_exit_one(self) -> None:
         completed = subprocess.run(
             [sys.executable, str(CLI_PATH), "qc"],
@@ -1108,6 +1767,32 @@ Second cue.
                 "review_required",
             )
             self.assertNotIn("Exception ignored", stderr)
+
+    def test_qc_report_write_failure_is_structured(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            srt = root / "source.srt"
+            blocked_parent = root / "not-a-directory"
+            write_srt(srt, "1\n00:00:00,000 --> 00:00:01,000\nHello.")
+            blocked_parent.write_text("block", encoding="utf-8")
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(CLI_PATH),
+                    "qc",
+                    str(srt),
+                    "--output",
+                    str(blocked_parent / "report.json"),
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+            self.assertEqual(result.returncode, 1)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["error_type"], "report_write_failure")
+            self.assertEqual(payload["output_path"], str((blocked_parent / "report.json").resolve()))
+            self.assertEqual(result.stderr, "")
 
 
 if __name__ == "__main__":

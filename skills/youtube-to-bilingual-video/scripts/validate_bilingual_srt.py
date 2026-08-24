@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import math
 import os
 import re
 import subprocess
@@ -14,6 +16,12 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from path_safety import file_identity
+
 
 TIMING_RE = re.compile(
     r"^(?P<sh>[0-9]{2}):(?P<sm>[0-5][0-9]):(?P<ss>[0-5][0-9]),(?P<sms>[0-9]{3})"
@@ -21,6 +29,35 @@ TIMING_RE = re.compile(
     r"(?P<eh>[0-9]{2}):(?P<em>[0-5][0-9]):(?P<es>[0-5][0-9]),(?P<ems>[0-9]{3})$"
 )
 CJK_RE = re.compile(r"[\u3400-\u9fff]")
+
+
+class SourceLanguageError(ValueError):
+    pass
+
+
+class SourceMetadataError(ValueError):
+    pass
+
+
+ALLOWED_SOURCE_LANGUAGE_ORIGINS = {
+    "asr_detection",
+    "fixed_asr_language",
+    "manual_subtitle_track",
+    "reviewed_source_handoff",
+}
+MIN_ASR_LANGUAGE_PROBABILITY = 0.5
+
+
+def language_matches(actual: object, expected: str) -> bool:
+    if not isinstance(actual, str) or not actual.strip():
+        return False
+    actual_normalized = actual.lower().replace("_", "-")
+    expected_normalized = expected.lower().replace("_", "-")
+    return (
+        actual_normalized == expected_normalized
+        or actual_normalized.startswith(f"{expected_normalized}-")
+        or expected_normalized.startswith(f"{actual_normalized}-")
+    )
 
 
 @dataclass(frozen=True)
@@ -89,6 +126,23 @@ def script_counts(text: str) -> tuple[int, int]:
     return cjk_count, latin_count
 
 
+def normalized_lines(lines: list[str]) -> list[str]:
+    return [
+        re.sub(r"\s+", " ", unicodedata.normalize("NFC", line)).strip()
+        for line in lines
+    ]
+
+
+def require_finite_nonnegative(
+    name: str, value: float | None, *, allow_zero: bool = True
+) -> None:
+    if value is None:
+        return
+    if not math.isfinite(value) or value < 0 or (not allow_zero and value == 0):
+        qualifier = "a positive finite number" if not allow_zero else "a finite non-negative number"
+        raise ValueError(f"{name} must be {qualifier}")
+
+
 def validate(
     cues: list[Cue],
     source_cues: list[Cue],
@@ -98,6 +152,11 @@ def validate(
     max_head_gap: float | None,
     max_tail_gap: float | None,
 ) -> dict[str, object]:
+    require_finite_nonnegative("duration", duration, allow_zero=False)
+    require_finite_nonnegative("duration tolerance", tolerance)
+    require_finite_nonnegative("timing tolerance", timing_tolerance)
+    require_finite_nonnegative("maximum head gap", max_head_gap)
+    require_finite_nonnegative("maximum tail gap", max_tail_gap)
     issues: list[dict[str, object]] = []
     for position, cue in enumerate(cues, start=1):
         if cue.index != position:
@@ -168,6 +227,38 @@ def validate(
                     "tolerance": timing_tolerance,
                 }
             )
+        source_lines = normalized_lines(source.lines)
+        source_line_count = len(source_lines)
+        bilingual_source_lines = (
+            normalized_lines(bilingual.lines[-source_line_count:])
+            if len(bilingual.lines) >= source_line_count
+            else []
+        )
+        if bilingual_source_lines != source_lines:
+            issues.append(
+                {
+                    "cue": bilingual.index,
+                    "type": "source_text_mismatch",
+                    "expected_source_lines": source_lines,
+                    "bilingual_source_lines": bilingual_source_lines,
+                }
+            )
+        translation_lines = (
+            bilingual.lines[:-source_line_count]
+            if len(bilingual.lines) >= source_line_count
+            else []
+        )
+        for line_number, line in enumerate(translation_lines, start=1):
+            cjk_count, latin_count = script_counts(line)
+            if not cjk_count and latin_count:
+                issues.append(
+                    {
+                        "cue": bilingual.index,
+                        "type": "unexpected_english_line_before_source",
+                        "line": line_number,
+                        "text": line,
+                    }
+                )
 
     first_start = cues[0].start
     last_end = cues[-1].end
@@ -237,9 +328,7 @@ def validate(
 
 def write_text_atomic(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(
-        f".{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
-    )
+    temporary = path.parent / f".report-{uuid.uuid4().hex}.tmp"
     try:
         temporary.write_text(text, encoding="utf-8")
         temporary.replace(path)
@@ -248,13 +337,82 @@ def write_text_atomic(path: Path, text: str) -> None:
 
 
 def print_json(report: dict[str, object]) -> None:
-    print(json.dumps(report, ensure_ascii=True, indent=2))
+    rendered = json.dumps(report, ensure_ascii=True, indent=2, allow_nan=False)
+    try:
+        print(rendered, flush=True)
+    except (BrokenPipeError, OSError, UnicodeEncodeError, ValueError):
+        try:
+            stdout_fd = sys.stdout.fileno()
+            null_fd = os.open(os.devnull, os.O_WRONLY)
+            try:
+                os.dup2(null_fd, stdout_fd)
+            finally:
+                os.close(null_fd)
+        except Exception:
+            pass
+
+
+def validate_source_metadata(
+    metadata: dict[str, object],
+    source_srt_path: Path,
+    expected_language: str,
+) -> None:
+    source_language = metadata.get("source_language")
+    if not language_matches(source_language, expected_language):
+        raise SourceLanguageError(
+            f"source language {source_language!r} does not match required {expected_language!r}"
+        )
+    required_language = metadata.get("required_source_language")
+    if not language_matches(required_language, expected_language):
+        raise SourceMetadataError(
+            "source metadata was not produced under the expected required-language gate"
+        )
+    origin = metadata.get("source_language_origin")
+    if origin not in ALLOWED_SOURCE_LANGUAGE_ORIGINS:
+        raise SourceMetadataError(f"unsupported source language origin: {origin!r}")
+    if origin == "asr_detection":
+        probability = metadata.get("source_language_probability")
+        if (
+            not isinstance(probability, (int, float))
+            or isinstance(probability, bool)
+            or not math.isfinite(float(probability))
+            or float(probability) < MIN_ASR_LANGUAGE_PROBABILITY
+        ):
+            raise SourceMetadataError(
+                f"ASR source language probability must be at least {MIN_ASR_LANGUAGE_PROBABILITY}"
+            )
+    if origin == "reviewed_source_handoff":
+        required_fields = (
+            "reviewed_by",
+            "review_note",
+            "upstream_metadata_sha256",
+        )
+        missing = [field for field in required_fields if not metadata.get(field)]
+        if missing:
+            raise SourceMetadataError(
+                f"reviewed source handoff is missing evidence fields: {', '.join(missing)}"
+            )
+        audit_reports = metadata.get("audit_reports")
+        if not isinstance(audit_reports, list) or not audit_reports:
+            raise SourceMetadataError(
+                "reviewed source handoff must include a non-empty audit report chain"
+            )
+    if metadata.get("source_srt_hash_algorithm") != "sha256":
+        raise SourceMetadataError("source metadata must declare sha256")
+    expected_hash = metadata.get("source_srt_sha256")
+    actual_hash = hashlib.sha256(source_srt_path.read_bytes()).hexdigest()
+    if not isinstance(expected_hash, str) or expected_hash.lower() != actual_hash:
+        raise SourceMetadataError(
+            "source metadata SHA-256 does not match the supplied source SRT"
+        )
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate a Chinese-first bilingual SRT.")
     parser.add_argument("srt", type=Path)
     parser.add_argument("--source-srt", type=Path, required=True)
+    parser.add_argument("--source-metadata", type=Path, required=True, help="Transcription metadata proving the source language.")
+    parser.add_argument("--expected-source-language", default="en")
     parser.add_argument("--video", type=Path, help="Optional video for duration validation")
     parser.add_argument("--duration", type=float, help="Video duration in seconds")
     parser.add_argument("--duration-tolerance", type=float, default=1.0)
@@ -265,19 +423,20 @@ def main() -> int:
     args = parser.parse_args()
     srt_path = args.srt.resolve()
     source_srt_path = args.source_srt.resolve()
+    source_metadata_path = args.source_metadata.resolve()
     video_path = args.video.resolve() if args.video else None
     output_path = args.output.resolve() if args.output else None
-    resolved_paths = [srt_path, source_srt_path]
+    resolved_paths = [srt_path, source_srt_path, source_metadata_path]
     if video_path:
         resolved_paths.append(video_path)
     if output_path:
         resolved_paths.append(output_path)
-    if len(set(resolved_paths)) != len(resolved_paths):
+    if len({file_identity(path) for path in resolved_paths}) != len(resolved_paths):
         print_json(
             {
                 "status": "error",
                 "reason": "path_collision",
-                "message": "bilingual SRT, source SRT, video, and report paths must all differ",
+                "message": "bilingual SRT, source SRT, source metadata, video, and report paths must all differ",
                 "output_path": None if output_path is None else str(output_path),
             }
         )
@@ -286,6 +445,15 @@ def main() -> int:
         if args.video and args.duration is not None:
             raise ValueError("use either --video or --duration, not both")
         duration = probe_duration(video_path) if video_path else args.duration
+        source_metadata = json.loads(source_metadata_path.read_text(encoding="utf-8-sig"))
+        if not isinstance(source_metadata, dict):
+            raise ValueError("source metadata must be a JSON object")
+        source_language = source_metadata.get("source_language")
+        validate_source_metadata(
+            source_metadata,
+            source_srt_path,
+            args.expected_source_language,
+        )
         default_gap_limit = None if duration is None else max(30.0, duration * 0.1)
         max_head_gap = (
             args.max_head_gap_seconds
@@ -310,9 +478,31 @@ def main() -> int:
         )
         report["srt_path"] = str(srt_path)
         report["source_srt_path"] = str(source_srt_path)
+        report["source_metadata_path"] = str(source_metadata_path)
+        report["source_language"] = source_language
+        report["expected_source_language"] = args.expected_source_language
         if video_path:
             report["video_path"] = str(video_path)
         exit_code = 0 if report["status"] == "ok" else 1
+    except SourceLanguageError as exc:
+        report = {
+            "status": "error",
+            "reason": "source_language_mismatch",
+            "message": str(exc),
+            "srt_path": str(args.srt),
+            "source_metadata_path": str(source_metadata_path),
+        }
+        exit_code = 1
+    except SourceMetadataError as exc:
+        report = {
+            "status": "error",
+            "reason": "source_metadata_mismatch",
+            "message": str(exc),
+            "srt_path": str(args.srt),
+            "source_srt_path": str(source_srt_path),
+            "source_metadata_path": str(source_metadata_path),
+        }
+        exit_code = 1
     except (OSError, UnicodeError, ValueError) as exc:
         report = {
             "status": "error",
@@ -321,11 +511,33 @@ def main() -> int:
             "srt_path": str(args.srt),
         }
         exit_code = 1
-    rendered = json.dumps(report, ensure_ascii=False, indent=2)
-    if output_path:
-        write_text_atomic(output_path, rendered + "\n")
-    print_json(report)
-    return exit_code
+    rendered = json.dumps(report, ensure_ascii=False, indent=2, allow_nan=False)
+    try:
+        if output_path:
+            write_text_atomic(output_path, rendered + "\n")
+            print_json(
+                {
+                    "status": report.get("status"),
+                    "reason": report.get("reason"),
+                    "cue_count": report.get("cue_count"),
+                    "source_cue_count": report.get("source_cue_count"),
+                    "issue_count": len(report.get("issues", [])),
+                    "report_path": str(output_path),
+                }
+            )
+        else:
+            print_json(report)
+        return exit_code
+    except (OSError, UnicodeError, ValueError) as exc:
+        print_json(
+            {
+                "status": "error",
+                "reason": "report_write_failure",
+                "message": str(exc),
+                "output_path": None if output_path is None else str(output_path),
+            }
+        )
+        return 1
 
 
 if __name__ == "__main__":

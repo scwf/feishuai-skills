@@ -9,7 +9,13 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 from .data import ASRData, ASRDataSeg, ASRWord, join_word_texts
 from .llm import call_llm
 from .prompts import get_prompt
-from .qc import normalize_seam_times, validate_asr_timeline
+from .qc import (
+    DEFAULT_MAX_DISPLAY_CHARS_ENGLISH,
+    DEFAULT_MAX_WORD_COUNT_ENGLISH,
+    display_line_length,
+    normalize_seam_times,
+    validate_asr_timeline,
+)
 from .utils import count_words, is_mainly_cjk, setup_logger
 
 
@@ -17,7 +23,6 @@ logger = setup_logger("subtitle_splitter")
 
 DEFAULT_CHUNK_WORD_LIMIT = 350
 DEFAULT_MAX_WORD_COUNT_CJK = 25
-DEFAULT_MAX_WORD_COUNT_ENGLISH = 21
 MAX_STEPS = 2
 CHUNK_CUT_MIN_FRACTION = 0.7
 SEAM_PAUSE_MS = 400
@@ -52,6 +57,7 @@ def split_subtitle(
     base_url: Optional[str] = None,
     max_word_count_cjk: int = DEFAULT_MAX_WORD_COUNT_CJK,
     max_word_count_english: int = DEFAULT_MAX_WORD_COUNT_ENGLISH,
+    max_display_chars_english: int = DEFAULT_MAX_DISPLAY_CHARS_ENGLISH,
     chunk_word_limit: int = DEFAULT_CHUNK_WORD_LIMIT,
     max_retries: int = MAX_STEPS,
     split_fn: Optional[SplitFn] = None,
@@ -64,6 +70,7 @@ def split_subtitle(
         base_url=base_url,
         max_word_count_cjk=max_word_count_cjk,
         max_word_count_english=max_word_count_english,
+        max_display_chars_english=max_display_chars_english,
         chunk_word_limit=chunk_word_limit,
         max_retries=max_retries,
         split_fn=split_fn,
@@ -115,6 +122,7 @@ class SubtitleSplitter:
         base_url: Optional[str] = None,
         max_word_count_cjk: int = DEFAULT_MAX_WORD_COUNT_CJK,
         max_word_count_english: int = DEFAULT_MAX_WORD_COUNT_ENGLISH,
+        max_display_chars_english: int = DEFAULT_MAX_DISPLAY_CHARS_ENGLISH,
         chunk_word_limit: int = DEFAULT_CHUNK_WORD_LIMIT,
         max_retries: int = MAX_STEPS,
         split_fn: Optional[SplitFn] = None,
@@ -124,6 +132,7 @@ class SubtitleSplitter:
         self.base_url = base_url
         self.max_word_count_cjk = max_word_count_cjk
         self.max_word_count_english = max_word_count_english
+        self.max_display_chars_english = max_display_chars_english
         self.chunk_word_limit = chunk_word_limit
         self.max_retries = max_retries
         self.split_fn = split_fn or split_by_llm
@@ -162,6 +171,7 @@ class SubtitleSplitter:
             base_url=self.base_url,
             max_word_count_cjk=self.max_word_count_cjk,
             max_word_count_english=self.max_word_count_english,
+            max_display_chars_english=self.max_display_chars_english,
             max_retries=self.max_retries,
         )
         return map_sentences_to_words(chunk_words, sentences)
@@ -336,13 +346,14 @@ class SubtitleSplitter:
         if original_norm != repaired_norm:
             return False
         for segment in window_segments:
-            max_allowed = (
-                self.max_word_count_cjk
-                if is_mainly_cjk(segment.text)
-                else self.max_word_count_english
-            )
-            if count_words(segment.text) > max_allowed:
-                return False
+            if is_mainly_cjk(segment.text):
+                if count_words(segment.text) > self.max_word_count_cjk:
+                    return False
+            else:
+                if count_words(segment.text) > self.max_word_count_english:
+                    return False
+                if display_line_length(segment.text) > self.max_display_chars_english:
+                    return False
         if window_segments[0].start_time != left.start_time:
             return False
         if window_segments[-1].end_time != right.end_time:
@@ -367,12 +378,14 @@ def split_by_llm(
     base_url: Optional[str] = None,
     max_word_count_cjk: int = DEFAULT_MAX_WORD_COUNT_CJK,
     max_word_count_english: int = DEFAULT_MAX_WORD_COUNT_ENGLISH,
+    max_display_chars_english: int = DEFAULT_MAX_DISPLAY_CHARS_ENGLISH,
     max_retries: int = MAX_STEPS,
 ) -> List[str]:
     system_prompt = get_prompt(
         "split/sentence",
         max_word_count_cjk=max_word_count_cjk,
         max_word_count_english=max_word_count_english,
+        max_display_chars_english=max_display_chars_english,
     )
     messages = [
         {"role": "system", "content": system_prompt},
@@ -405,6 +418,7 @@ def split_by_llm(
             split_result=split_result,
             max_word_count_cjk=max_word_count_cjk,
             max_word_count_english=max_word_count_english,
+            max_display_chars_english=max_display_chars_english,
         )
         if is_valid:
             return split_result
@@ -428,21 +442,6 @@ def split_by_llm(
             }
         )
 
-    if (
-        last_result is not None
-        and words is not None
-        and _is_length_only_validation_error(error_message if last_result is not None else "")
-        and _preserves_original_text(text, last_result)
-    ):
-        try:
-            map_sentences_to_words(words, last_result)
-            logger.warning(
-                "Accepting final split result despite length overflow because content is preserved and word alignment still succeeds."
-            )
-            return last_result
-        except RuntimeError:
-            pass
-
     candidate_output: Optional[ASRData] = None
     if last_result is not None and words is not None:
         try:
@@ -464,6 +463,7 @@ def validate_split_result(
     split_result: Sequence[str],
     max_word_count_cjk: int,
     max_word_count_english: int,
+    max_display_chars_english: int = DEFAULT_MAX_DISPLAY_CHARS_ENGLISH,
 ) -> Tuple[bool, str]:
     if not split_result:
         return False, "No segments found."
@@ -477,10 +477,18 @@ def validate_split_result(
         similarity = difflib.SequenceMatcher(None, original_norm, merged_norm).ratio()
         return False, f"Content changed during segmentation (similarity={similarity:.2%})."
 
-    max_allowed = max_word_count_cjk if text_is_cjk else max_word_count_english
     for idx, segment in enumerate(split_result, 1):
-        if count_words(segment) > max_allowed:
-            return False, f"Segment {idx} exceeds length limit {max_allowed}: {segment[:40]}"
+        if is_mainly_cjk(segment):
+            if count_words(segment) > max_word_count_cjk:
+                return False, f"Segment {idx} exceeds length limit {max_word_count_cjk}: {segment[:40]}"
+            continue
+        if display_line_length(segment) > max_display_chars_english:
+            return (
+                False,
+                f"Segment {idx} exceeds display character limit {max_display_chars_english}: {segment[:40]}",
+            )
+        if count_words(segment) > max_word_count_english:
+            return False, f"Segment {idx} exceeds length limit {max_word_count_english}: {segment[:40]}"
 
     return True, ""
 
@@ -489,10 +497,6 @@ def _preserves_original_text(original_text: str, split_result: Sequence[str]) ->
     text_is_cjk = is_mainly_cjk(original_text)
     merged = "".join(split_result) if text_is_cjk else " ".join(split_result)
     return normalize_text_for_match(original_text) == normalize_text_for_match(merged)
-
-
-def _is_length_only_validation_error(error_message: str) -> bool:
-    return "exceeds length limit" in (error_message or "")
 
 
 def _describe_content_change(original_text: str, split_result: Sequence[str]) -> str:

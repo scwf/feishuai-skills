@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import hashlib
 import json
 import os
 import re
@@ -13,6 +14,12 @@ import unicodedata
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from path_safety import file_identity
 
 
 TIMING_RE = re.compile(
@@ -23,6 +30,12 @@ WORD_TOKEN_RE = re.compile(
     r"[#@$]?[^\W_]+"
     r"(?:['’._:/@#&-][^\W_]+|\++|#)*",
     flags=re.UNICODE,
+)
+BALANCED_NUMERIC_QUOTE_PATTERNS = (
+    re.compile(r"(?<!\d)(?P<open>')\s*[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)\s*(?P<close>')(?!\d)"),
+    re.compile(r'(?<!\d)(?P<open>")\s*[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)\s*(?P<close>")(?!\d)'),
+    re.compile(r"(?<!\d)(?P<open>‘)\s*[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)\s*(?P<close>’)(?!\d)"),
+    re.compile(r"(?<!\d)(?P<open>“)\s*[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)\s*(?P<close>”)(?!\d)"),
 )
 
 
@@ -59,9 +72,16 @@ def parse_srt(path: Path) -> list[Cue]:
 def tokens(text: str) -> list[str]:
     normalized_text = unicodedata.normalize("NFC", text)
     items: list[str] = []
+    balanced_numeric_quotes: set[int] = set()
+    for pattern in BALANCED_NUMERIC_QUOTE_PATTERNS:
+        for match in pattern.finditer(normalized_text):
+            balanced_numeric_quotes.add(match.start("open"))
+            balanced_numeric_quotes.add(match.start("close"))
 
     def append_meaningful_unmatched(start: int, end: int) -> None:
         for index in range(start, end):
+            if index in balanced_numeric_quotes:
+                continue
             char = normalized_text[index]
             category = unicodedata.category(char)
             adjacent_to_digit = (
@@ -71,10 +91,19 @@ def tokens(text: str) -> list[str]:
                     and normalized_text[index + 1].isdigit()
                 )
             )
+            leading_decimal_separator = (
+                char in ".,"
+                and index + 1 < len(normalized_text)
+                and normalized_text[index + 1].isdigit()
+                and (index == 0 or not normalized_text[index - 1].isalnum())
+            )
+            measurement_prime = char in "'\"‘’“”′″" and adjacent_to_digit
             if (
                 category.startswith(("S", "M"))
                 or char in "%‰‱"
                 or (char in "-−" and adjacent_to_digit)
+                or leading_decimal_separator
+                or measurement_prime
             ):
                 items.append(char)
 
@@ -145,6 +174,8 @@ def audit(before_path: Path, after_path: Path) -> tuple[dict[str, object], int]:
                 "reason": "structural_change",
                 "before_path": str(before_path.resolve()),
                 "after_path": str(after_path.resolve()),
+                "before_sha256": hashlib.sha256(before_path.read_bytes()).hexdigest(),
+                "after_sha256": hashlib.sha256(after_path.read_bytes()).hexdigest(),
                 "structural_changes": structural,
             },
             1,
@@ -173,6 +204,8 @@ def audit(before_path: Path, after_path: Path) -> tuple[dict[str, object], int]:
         "status": "review_required" if review_required else "ok",
         "before_path": str(before_path.resolve()),
         "after_path": str(after_path.resolve()),
+        "before_sha256": hashlib.sha256(before_path.read_bytes()).hexdigest(),
+        "after_sha256": hashlib.sha256(after_path.read_bytes()).hexdigest(),
         "cue_count": len(before),
         "changed_cue_count": len(changed_cues),
         "lexical_change_count": len(lexical_changes),
@@ -188,9 +221,7 @@ def audit(before_path: Path, after_path: Path) -> tuple[dict[str, object], int]:
 
 def write_text_atomic(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(
-        f".{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
-    )
+    temporary = path.parent / f".report-{uuid.uuid4().hex}.tmp"
     try:
         temporary.write_text(text, encoding="utf-8")
         temporary.replace(path)
@@ -199,14 +230,37 @@ def write_text_atomic(path: Path, text: str) -> None:
 
 
 def print_json(report: dict[str, object]) -> None:
-    print(json.dumps(report, ensure_ascii=True, indent=2))
+    rendered = json.dumps(report, ensure_ascii=True, indent=2)
+    try:
+        print(rendered, flush=True)
+    except (BrokenPipeError, OSError, UnicodeEncodeError, ValueError):
+        try:
+            stdout_fd = sys.stdout.fileno()
+            null_fd = os.open(os.devnull, os.O_WRONLY)
+            try:
+                os.dup2(null_fd, stdout_fd)
+            finally:
+                os.close(null_fd)
+        except Exception:
+            pass
 
 
-def write_report(report: dict[str, object], output: Path | None) -> None:
+def print_report(report: dict[str, object], output: Path | None) -> None:
     rendered = json.dumps(report, ensure_ascii=False, indent=2)
     if output:
         write_text_atomic(output, rendered + "\n")
-    print_json(report)
+        print_json(
+            {
+                "status": report.get("status"),
+                "reason": report.get("reason"),
+                "cue_count": report.get("cue_count"),
+                "changed_cue_count": report.get("changed_cue_count"),
+                "lexical_change_count": report.get("lexical_change_count"),
+                "report_path": str(output),
+            }
+        )
+    else:
+        print_json(report)
 
 
 def main() -> int:
@@ -220,7 +274,10 @@ def main() -> int:
     before_path = args.before.resolve()
     after_path = args.after.resolve()
     output_path = args.output.resolve() if args.output else None
-    if output_path and output_path in {before_path, after_path}:
+    if output_path and file_identity(output_path) in {
+        file_identity(before_path),
+        file_identity(after_path),
+    }:
         print_json(
             {
                 "status": "error",
@@ -243,8 +300,19 @@ def main() -> int:
             "after_path": str(args.after),
         }
         exit_code = 1
-    write_report(report, output_path)
-    return exit_code
+    try:
+        print_report(report, output_path)
+        return exit_code
+    except (OSError, UnicodeError, ValueError) as exc:
+        print_json(
+            {
+                "status": "error",
+                "reason": "report_write_failure",
+                "message": str(exc),
+                "output_path": None if output_path is None else str(output_path),
+            }
+        )
+        return 1
 
 
 if __name__ == "__main__":

@@ -163,13 +163,14 @@ _PROMPTS = {
 
 <instructions>
 1. 在句子边界处插入 <br> (句号、逗号、分号等标点符号应出现的位置)
-2. 分割段的字数限制:
+2. 分割段的字数/宽度限制:
    - CJK语言(中文、日语、韩语等):每段≤ ${max_word_count_cjk} 字
-   - 拉丁语言(英语、法语等):每段≤ ${max_word_count_english} 词
+   - 拉丁语言(英语、法语等):每段≤ ${max_word_count_english} 词，且每段一行显示宽度≤ ${max_display_chars_english} 字符（1080p FontSize 16 下 80 字符会折成两行）
 3. 最高优先级是原文逐字保真:不增删改,不补全,不规范化,不要翻译，仅插入 <br>
 4. 输入文本可能是长音频中的一个片段，可能在任意词边界、连接词、从句或不完整句子处开始或结束。必须保留这些开头/末尾片段，不得删除、补全、改写或为了语义完整而省略。
 5. 在不改变原文的前提下，尽量保持每个分句的意思完整；如果语义完整与原文保真冲突，必须优先保留原文
 6. 倒计时（每个数字进行分割）、关键信息揭示前及需要强调的位置需要进行适当分割
+7. 不要为了语义完整而把已达到词数或显示宽度上限的分句重新合并；下一句可以小写开头。不要把分句结束在冠词、连词、所有格或仍需谓语/补语的助动词缩写上（a, an, the, and, or, our, we're, we'll, we've 等）
 </instructions>
 
 <output_format>
@@ -191,7 +192,7 @@ _PROMPTS = {
 the upgraded claude sonnet is now available for all users developers can build with the computer use beta on the anthropic api amazon bedrock and google cloud's vertex ai the new claude haiku will be released later this month
 </input>
 <output>
-the upgraded claude sonnet is now available for all users<br>developers can build with the computer use beta on the anthropic api amazon bedrock and google cloud's vertex ai<br>the new claude haiku will be released later this month
+the upgraded claude sonnet is now available for all users<br>developers can build with the computer use beta<br>on the anthropic api amazon bedrock and google cloud's vertex ai<br>the new claude haiku will be released later this month
 </output>
 </example>
 

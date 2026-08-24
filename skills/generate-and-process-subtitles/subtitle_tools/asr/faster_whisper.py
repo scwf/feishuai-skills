@@ -107,6 +107,11 @@ class FasterWhisperASR(BaseASR):
             "clip_timestamps": self.config.clip_timestamps,
             "segments": segments,
         }
+        self.result_metadata = {
+            "language": raw_payload["language"],
+            "language_probability": raw_payload["language_probability"],
+            "duration": raw_payload["duration"],
+        }
 
         output_dir = Path(self.config.output_dir or Path(self.audio_input).parent)
         output_dir.mkdir(parents=True, exist_ok=True)

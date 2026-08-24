@@ -28,12 +28,14 @@ def process_media(
     split_model: Optional[str] = None,
     split_max_chars_cjk: int = 25,
     split_max_words_en: int = 21,
+    split_max_chars_en: int = 79,
     split_chunk_word_limit: int = 350,
     split_max_retries: int = 2,
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
     seam_times_out: Optional[list[int]] = None,
     seam_failures_out: Optional[list[dict]] = None,
+    asr_metadata_out: Optional[dict] = None,
 ) -> ASRData:
     if os.path.exists(media_url_or_path):
         audio_path = media_url_or_path
@@ -54,6 +56,7 @@ def process_media(
         split_model=split_model,
         split_max_chars_cjk=split_max_chars_cjk,
         split_max_words_en=split_max_words_en,
+        split_max_chars_en=split_max_chars_en,
         split_chunk_word_limit=split_chunk_word_limit,
         split_max_retries=split_max_retries,
         api_key=api_key,
@@ -62,6 +65,8 @@ def process_media(
 
     asr = create_asr(audio_path, config)
     asr_data = asr.run(callback=lambda progress, _message: logger.info("Progress: %s%%", progress))
+    if asr_metadata_out is not None:
+        asr_metadata_out.update(getattr(asr, "result_metadata", {}) or {})
 
     if split_enabled:
         asr_data = split_subtitle(
@@ -71,6 +76,7 @@ def process_media(
             base_url=base_url,
             max_word_count_cjk=split_max_chars_cjk,
             max_word_count_english=split_max_words_en,
+            max_display_chars_english=split_max_chars_en,
             chunk_word_limit=split_chunk_word_limit,
             max_retries=split_max_retries,
             seam_times_out=seam_times_out,

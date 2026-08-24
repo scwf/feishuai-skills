@@ -244,7 +244,7 @@ class ASRData:
             text_lines.append(line)
         text = "\n".join(text_lines)
         if save_path:
-            with open(save_path, "w", encoding="utf-8") as f:
+            with open(save_path, "w", encoding="utf-8", newline="\n") as f:
                 f.write(text)
         return text
 
@@ -265,7 +265,7 @@ class ASRData:
             srt_lines.append(f"{n}\n{seg.to_srt_ts()}\n{content}\n")
         srt_text = "\n".join(srt_lines)
         if save_path:
-            with open(save_path, "w", encoding="utf-8") as f:
+            with open(save_path, "w", encoding="utf-8", newline="\n") as f:
                 f.write(srt_text)
         return srt_text
 
@@ -332,7 +332,48 @@ class ASRData:
         if not segments:
             raise RuntimeError("Whisper JSON did not contain any transcription segments.")
 
+        cls._validate_original_timeline(segments)
+        for segment in segments:
+            segment.words = normalize_words(segment.words)
+
         return cls(segments)
+
+    @staticmethod
+    def _validate_original_timeline(segments: List[ASRDataSeg]) -> None:
+        previous_segment_end: Optional[int] = None
+        previous_word_end: Optional[int] = None
+        for segment_index, segment in enumerate(segments, start=1):
+            if segment.start_time < 0 or segment.end_time <= segment.start_time:
+                raise ValueError(
+                    f"Whisper segment {segment_index} has non-positive duration."
+                )
+            if (
+                previous_segment_end is not None
+                and segment.start_time < previous_segment_end
+            ):
+                raise ValueError(
+                    f"Whisper segment {segment_index} is reverse-timeline or overlaps the previous segment."
+                )
+
+            for word_index, word in enumerate(segment.words, start=1):
+                if word.start_time < 0 or word.end_time <= word.start_time:
+                    raise ValueError(
+                        f"Whisper segment {segment_index} word {word_index} has non-positive duration."
+                    )
+                if previous_word_end is not None and word.start_time < previous_word_end:
+                    raise ValueError(
+                        f"Whisper segment {segment_index} word {word_index} is reverse-timeline or overlaps the previous word."
+                    )
+                if (
+                    word.start_time < segment.start_time
+                    or word.end_time > segment.end_time
+                ):
+                    raise ValueError(
+                        f"Whisper segment {segment_index} word {word_index} falls outside its segment."
+                    )
+                previous_word_end = word.end_time
+
+            previous_segment_end = segment.end_time
 
     @staticmethod
     def _extract_segments_payload(payload: Any) -> List[Dict[str, Any]]:
@@ -357,10 +398,8 @@ class ASRData:
                 continue
             start_time = ASRData._seconds_to_ms(item.get("start"))
             end_time = ASRData._seconds_to_ms(item.get("end"))
-            if end_time < start_time:
-                end_time = start_time
             words.append(ASRWord(text=text, start_time=start_time, end_time=end_time))
-        return normalize_words(words)
+        return words
 
     @staticmethod
     def _seconds_to_ms(value: Any) -> int:

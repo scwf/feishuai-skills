@@ -25,6 +25,7 @@ class TranscribeConfig:
     split_model: Optional[str] = None
     split_max_chars_cjk: int = 25
     split_max_words_en: int = 21
+    split_max_chars_en: int = 79
     split_chunk_word_limit: int = 350
     split_max_retries: int = 2
     api_key: Optional[str] = None

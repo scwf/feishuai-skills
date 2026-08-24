@@ -11,8 +11,18 @@ from .data import ASRData, ASRDataSeg
 
 SHORT_WORD_LIMIT = 3
 SHORT_DURATION_MS = 800
+VIEWER_SHORT_DURATION_MS = 1000
+LONG_PAUSE_GAP_MS = 1500
+DUPLICATE_SUFFIX_MAX_WORDS = 6
+DUPLICATE_SUFFIX_MAX_DURATION_MS = 1500
 SEAM_TOLERANCE_MS = 20
-APPROVABLE_SHORT_REASONS = {"chunk_seam_fragment", "short_fragment"}
+DEFAULT_MAX_WORD_COUNT_ENGLISH = 21
+DEFAULT_MAX_DISPLAY_CHARS_ENGLISH = 79
+APPROVABLE_SHORT_REASONS = {
+    "ambiguous_short_dependent_fragment",
+    "chunk_seam_fragment",
+    "short_fragment",
+}
 HANGING_ENDINGS = {
     "a",
     "an",
@@ -51,6 +61,212 @@ ALWAYS_HANGING_ENDINGS = {
     "its",
     "your",
 }
+HANGING_AUXILIARY_CONTRACTIONS = {
+    "he'd",
+    "he'll",
+    "he's",
+    "i'd",
+    "i'll",
+    "i'm",
+    "i've",
+    "it'd",
+    "it'll",
+    "it's",
+    "she'd",
+    "she'll",
+    "she's",
+    "they'd",
+    "they'll",
+    "they're",
+    "they've",
+    "we'd",
+    "we'll",
+    "we're",
+    "we've",
+    "you'd",
+    "you'll",
+    "you're",
+    "you've",
+}
+RELATIVE_CLAUSE_ENDINGS = {
+    "that",
+    "when",
+    "where",
+    "which",
+    "who",
+    "whom",
+    "whose",
+}
+INDEPENDENT_TO_OPENINGS = {
+    ("to", "be", "clear"),
+    ("to", "be", "fair"),
+    ("to", "be", "honest"),
+    ("to", "be", "sure"),
+}
+INDEPENDENT_TO_DISCOURSE_VERBS = {
+    "begin",
+    "clarify",
+    "conclude",
+    "continue",
+    "explain",
+    "illustrate",
+    "recap",
+    "start",
+    "summarize",
+}
+TO_COMPLEMENT_BASE_VERBS = {
+    "aim",
+    "hope",
+    "intend",
+    "need",
+    "plan",
+    "try",
+    "want",
+}
+TO_COMPLEMENT_FINITE_OR_PAST_VERBS = {
+    "aimed",
+    "aims",
+    "hoped",
+    "hopes",
+    "intended",
+    "intends",
+    "needed",
+    "needs",
+    "planned",
+    "plans",
+    "tried",
+    "tries",
+    "wanted",
+    "wants",
+}
+TO_COMPLEMENT_GERUNDS = {
+    "aiming",
+    "hoping",
+    "intending",
+    "needing",
+    "planning",
+    "trying",
+    "wanting",
+}
+NOMINAL_PREDECESSORS = {
+    "a",
+    "an",
+    "any",
+    "her",
+    "his",
+    "its",
+    "my",
+    "no",
+    "our",
+    "some",
+    "that",
+    "the",
+    "their",
+    "this",
+    "your",
+}
+COPULAR_WORDS = {"am", "are", "is", "was", "were"}
+TO_COMPLEMENT_AUXILIARIES = {
+    "am",
+    "are",
+    "is",
+    "i'm",
+    "it's",
+    "they're",
+    "was",
+    "been",
+    "had",
+    "has",
+    "have",
+    "we're",
+    "were",
+    "you're",
+}
+GERUND_CONTROL_VERBS = {
+    "began",
+    "begin",
+    "begins",
+    "continue",
+    "continued",
+    "continues",
+    "keep",
+    "keeps",
+    "kept",
+    "resume",
+    "resumed",
+    "resumes",
+    "start",
+    "started",
+    "starts",
+    "stop",
+    "stopped",
+    "stops",
+}
+SUBJECT_PRONOUNS = {"he", "i", "it", "she", "they", "we", "you"}
+SUBJECT_AUX_CONTRACTIONS = {"i'm", "it's", "they're", "we're", "you're"}
+CLAUSE_CLOSERS = {"all", "anything", "everything", "nothing", "something", "what"}
+LEADING_ADJUNCTS = {
+    "again",
+    "currently",
+    "eventually",
+    "finally",
+    "first",
+    "fortunately",
+    "generally",
+    "here",
+    "now",
+    "often",
+    "perhaps",
+    "sometimes",
+    "then",
+    "today",
+    "tomorrow",
+    "ultimately",
+    "usually",
+    "yesterday",
+}
+NOUN_SUBJECT_BREAKERS = CLAUSE_CLOSERS | {
+    "although",
+    "as",
+    "because",
+    "if",
+    "that",
+    "there",
+    "though",
+    "unless",
+    "when",
+    "where",
+    "which",
+    "while",
+    "who",
+    "whom",
+    "whose",
+}
+TRAILING_FILLER_SEQUENCES = (
+    ("you", "know"),
+    ("i", "mean"),
+    ("you", "see"),
+    ("right",),
+    ("actually",),
+    ("uh",),
+    ("um",),
+)
+HANGING_MODIFIER_PREDECESSORS = {
+    "a",
+    "an",
+    "any",
+    "for",
+    "many",
+    "of",
+    "other",
+    "several",
+    "some",
+    "such",
+    "the",
+    "various",
+    "with",
+}
+COMPLETE_OTHER_PREDECESSORS = {"any", "each", "no", "one", "some", "the"}
 OK_SHORT_UTTERANCES = {
     "ah",
     "alright",
@@ -164,6 +380,8 @@ def inspect_subtitle_path(
     english_line: str = "last",
     seam_times_ms: Optional[Sequence[int]] = None,
     approved_cues: Optional[Dict[int, Dict[str, Any]]] = None,
+    max_word_count_english: int = DEFAULT_MAX_WORD_COUNT_ENGLISH,
+    max_display_chars_english: int = DEFAULT_MAX_DISPLAY_CHARS_ENGLISH,
 ) -> Dict[str, Any]:
     asr_data = parse_srt_strict(Path(path).read_text(encoding="utf-8-sig"))
     return inspect_asr_data(
@@ -173,6 +391,8 @@ def inspect_subtitle_path(
         seam_times_ms=seam_times_ms,
         approved_cues=approved_cues,
         source_path=str(Path(path).resolve()),
+        max_word_count_english=max_word_count_english,
+        max_display_chars_english=max_display_chars_english,
     )
 
 
@@ -184,6 +404,8 @@ def inspect_asr_data(
     seam_times_ms: Optional[Sequence[int]] = None,
     approved_cues: Optional[Dict[int, Dict[str, Any]]] = None,
     source_path: Optional[str] = None,
+    max_word_count_english: int = DEFAULT_MAX_WORD_COUNT_ENGLISH,
+    max_display_chars_english: int = DEFAULT_MAX_DISPLAY_CHARS_ENGLISH,
 ) -> Dict[str, Any]:
     findings: List[Dict[str, Any]] = []
     seams = list(seam_times_ms or [])
@@ -198,13 +420,32 @@ def inspect_asr_data(
         last_token = last_word_token(text)
         last = last_token.lower()
         previous_segment = asr_data.segments[index - 1] if index > 0 else None
-        next_text = ""
-        if index + 1 < len(asr_data.segments):
-            next_text = english_text(
-                asr_data.segments[index + 1],
+        previous_text = ""
+        if previous_segment is not None:
+            previous_text = english_text(
+                previous_segment,
                 bilingual=bilingual,
                 english_line=english_line,
             )
+        next_segment = None
+        next_text = ""
+        if index + 1 < len(asr_data.segments):
+            next_segment = asr_data.segments[index + 1]
+            next_text = english_text(
+                next_segment,
+                bilingual=bilingual,
+                english_line=english_line,
+            )
+        gap_before_ms = (
+            segment.start_time - previous_segment.end_time
+            if previous_segment is not None
+            else None
+        )
+        gap_after_ms = (
+            next_segment.start_time - segment.end_time
+            if next_segment is not None
+            else None
+        )
 
         lowercase_continuation = next_starts_lower(next_text)
         hanging = (
@@ -218,8 +459,17 @@ def inspect_asr_data(
         )
         if hanging:
             reasons.append("hanging_function_word")
-        if lowercase_continuation:
+        if last in HANGING_AUXILIARY_CONTRACTIONS:
+            reasons.append("hanging_auxiliary_contraction")
+        length_wrap = is_english_length_wrap(
+            text,
+            max_word_count_english=max_word_count_english,
+            max_display_chars_english=max_display_chars_english,
+        )
+        if lowercase_continuation and (has_terminal_punctuation(text) or not length_wrap):
             reasons.append("lowercase_continuation")
+        if display_line_length(text) > max_display_chars_english:
+            reasons.append("overlong_display_line")
 
         short = word_count < SHORT_WORD_LIMIT and duration_ms < SHORT_DURATION_MS
         few_words = word_count < SHORT_WORD_LIMIT
@@ -235,6 +485,20 @@ def inspect_asr_data(
             reasons.append("chunk_seam_fragment")
         if short and not allowed_short:
             reasons.append("short_fragment")
+        dependent_reason = classify_short_dependent_fragment(
+            text,
+            previous_text=previous_text,
+            duration_ms=duration_ms,
+        )
+        if dependent_reason:
+            reasons.append(dependent_reason)
+        if (
+            duration_ms <= DUPLICATE_SUFFIX_MAX_DURATION_MS
+            and is_adjacent_duplicate_suffix(previous_text, text)
+        ):
+            reasons.append("adjacent_duplicate_suffix")
+        if is_incomplete_before_long_gap(text, gap_after_ms=gap_after_ms):
+            reasons.append("incomplete_before_long_gap")
 
         approval = approvals.get(index + 1)
         if (
@@ -251,6 +515,10 @@ def inspect_asr_data(
                 word_count=word_count,
                 severity="ok_short",
                 reasons=["human_approved_complete_utterance"],
+                previous_text=previous_text,
+                next_text=next_text,
+                gap_before_ms=gap_before_ms,
+                gap_after_ms=gap_after_ms,
             )
             approved["approval_reason"] = approval.get("reason")
             findings.append(approved)
@@ -268,6 +536,10 @@ def inspect_asr_data(
                         word_count=word_count,
                         severity="ok_short",
                         reasons=["allowed_short_utterance"],
+                        previous_text=previous_text,
+                        next_text=next_text,
+                        gap_before_ms=gap_before_ms,
+                        gap_after_ms=gap_after_ms,
                     )
                 )
             continue
@@ -282,6 +554,10 @@ def inspect_asr_data(
                 word_count=word_count,
                 severity="high_risk",
                 reasons=unique_reasons,
+                previous_text=previous_text,
+                next_text=next_text,
+                gap_before_ms=gap_before_ms,
+                gap_after_ms=gap_after_ms,
             )
         )
 
@@ -314,8 +590,10 @@ def inspect_asr_data(
         "approved_short_count": len(approved_short),
         "seam_times_ms": seams,
         "policy": (
-            "Flag semantic orphans for review. Do not auto-merge short cues; "
-            "Yes./Great. and similar utterances may be complete."
+            "Flag semantic or viewer-facing orphans for review. Do not auto-merge "
+            "short cues or delete repeated text without source evidence; Yes./Great. "
+            "and similar utterances may be complete. "
+            "Do not merge full-length lowercase wraps to pass QC; recut overlong English instead."
         ),
         "findings": findings,
         "review_items": high_risk,
@@ -355,6 +633,25 @@ def contiguous_english_lines(lines: Sequence[str]) -> List[str]:
     return selected
 
 
+def display_line_length(text: str) -> int:
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+    if not lines:
+        return 0
+    return max(len(line) for line in lines)
+
+
+def is_english_length_wrap(
+    text: str,
+    *,
+    max_word_count_english: int = DEFAULT_MAX_WORD_COUNT_ENGLISH,
+    max_display_chars_english: int = DEFAULT_MAX_DISPLAY_CHARS_ENGLISH,
+) -> bool:
+    return (
+        semantic_word_count(text) >= max_word_count_english
+        or display_line_length(text) >= max_display_chars_english
+    )
+
+
 def last_word_token(text: str) -> str:
     tokens = WORD_RE.findall(text or "")
     return tokens[-1] if tokens else ""
@@ -382,6 +679,317 @@ def is_allowed_short(text: str) -> bool:
         return False
     cjk_text = "".join(CJK_RE.findall(text or ""))
     return cjk_text in OK_SHORT_CJK_UTTERANCES
+
+
+def normalized_word_tokens(text: str) -> List[str]:
+    return [token.lower().replace("’", "'") for token in WORD_RE.findall(text or "")]
+
+
+def is_short_dependent_fragment(
+    text: str,
+    *,
+    previous_text: str,
+    duration_ms: int,
+) -> bool:
+    return bool(
+        classify_short_dependent_fragment(
+            text,
+            previous_text=previous_text,
+            duration_ms=duration_ms,
+        )
+    )
+
+
+def classify_short_dependent_fragment(
+    text: str,
+    *,
+    previous_text: str,
+    duration_ms: int,
+) -> Optional[str]:
+    if duration_ms > VIEWER_SHORT_DURATION_MS or is_allowed_short(text):
+        return None
+    tokens = normalized_word_tokens(text)
+    if not tokens:
+        return None
+    if tokens[0] == "to":
+        if has_terminal_punctuation(previous_text) and is_independent_to_opening(
+            text, tokens
+        ):
+            return None
+        previous_stripped = (previous_text or "").rstrip()
+        if is_independent_to_opening(text, tokens):
+            if previous_stripped.endswith((";", ":")):
+                return None
+            if previous_stripped.endswith(("—", "–")):
+                return "ambiguous_short_dependent_fragment"
+        previous_for_evidence = re.sub(
+            r"\s*(?:\([^()]{1,80}\)|\[[^\[\]]{1,80}\])\s*[.!?]?\s*$",
+            "",
+            previous_text or "",
+        ).rstrip(", ")
+        previous_tokens = strip_trailing_fillers(
+            normalized_word_tokens(previous_for_evidence)
+        )
+        if not previous_tokens:
+            return None
+        evidence = previous_to_complement_evidence(previous_tokens)
+        if evidence is None:
+            trailing_parenthetical = split_trailing_parenthetical(previous_text)
+            prefix, suffix_tokens = trailing_parenthetical or ("", [])
+            if is_short_parenthetical_suffix(suffix_tokens):
+                prefix_tokens = normalized_word_tokens(prefix)
+                prefix_evidence = previous_to_complement_evidence(prefix_tokens)
+                if prefix_evidence is not None:
+                    previous_tokens = prefix_tokens
+                    evidence = prefix_evidence
+        if evidence is not None and is_independent_to_opening(text, tokens):
+            if "how" in previous_tokens:
+                return None
+            if has_pronominal_subject(previous_tokens):
+                return (
+                    "short_dependent_fragment"
+                    if evidence == "hard"
+                    else "ambiguous_short_dependent_fragment"
+                )
+            return "ambiguous_short_dependent_fragment"
+        if evidence == "hard":
+            return "short_dependent_fragment"
+        if is_independent_to_opening(text, tokens):
+            return None
+        if evidence == "ambiguous":
+            return "ambiguous_short_dependent_fragment"
+        if len(tokens) >= 3 and tokens[:2] == ["to", "the"] and has_terminal_punctuation(text):
+            return None
+        return None
+    if next_starts_lower(text):
+        return "short_dependent_fragment"
+    if (
+        last_word(previous_text) in RELATIVE_CLAUSE_ENDINGS
+        and not has_terminal_punctuation(previous_text)
+    ):
+        return "short_dependent_fragment"
+    return None
+
+
+def is_adjacent_duplicate_suffix(previous_text: str, text: str) -> bool:
+    previous_tokens = normalized_word_tokens(previous_text)
+    tokens = normalized_word_tokens(text)
+    if not 2 <= len(tokens) <= DUPLICATE_SUFFIX_MAX_WORDS:
+        return False
+    if len(previous_tokens) < len(tokens):
+        return False
+    return previous_tokens[-len(tokens) :] == tokens
+
+
+def is_independent_to_opening(text: str, tokens: Sequence[str]) -> bool:
+    if any(
+        list(tokens[: len(opening)]) == list(opening)
+        for opening in INDEPENDENT_TO_OPENINGS
+    ):
+        return True
+    prefix = (text or "").split(",", 1)[0]
+    prefix_tokens = normalized_word_tokens(prefix)
+    return (
+        "," in (text or "")
+        and len(prefix_tokens) == 2
+        and prefix_tokens[0] == "to"
+        and prefix_tokens[1] in INDEPENDENT_TO_DISCOURSE_VERBS
+    )
+
+
+def is_short_parenthetical_suffix(tokens: Sequence[str]) -> bool:
+    if not tokens or len(tokens) > 6:
+        return False
+    first = tokens[0]
+    return bool(
+        first in SUBJECT_PRONOUNS
+        or first in {"as", "in", "of", "or", "perhaps", "possibly", "probably"}
+        or first.endswith("ly")
+    )
+
+
+def split_trailing_parenthetical(text: str) -> Optional[tuple[str, List[str]]]:
+    separators = list(re.finditer(r"\s*(?:,|;|:|—|–)\s*", text or ""))
+    if not separators:
+        return None
+    separator = separators[-1]
+    prefix = (text or "")[: separator.start()].rstrip()
+    suffix_tokens = normalized_word_tokens((text or "")[separator.end() :])
+    return prefix, suffix_tokens
+
+
+def has_pronominal_subject(tokens: Sequence[str]) -> bool:
+    if not tokens:
+        return False
+    last = tokens[-1]
+    if last in TO_COMPLEMENT_BASE_VERBS | TO_COMPLEMENT_FINITE_OR_PAST_VERBS:
+        return bool(
+            tokens[0] in SUBJECT_PRONOUNS
+            or (len(tokens) >= 2 and tokens[-2] in SUBJECT_PRONOUNS)
+        )
+    return any(token in SUBJECT_PRONOUNS for token in tokens[-5:-1])
+
+
+def strip_trailing_fillers(tokens: Sequence[str]) -> List[str]:
+    stripped = list(tokens)
+    changed = True
+    while stripped and changed:
+        changed = False
+        for filler in TRAILING_FILLER_SEQUENCES:
+            if len(stripped) >= len(filler) and tuple(stripped[-len(filler) :]) == filler:
+                stripped = stripped[: -len(filler)]
+                changed = True
+                break
+    return stripped
+
+
+def previous_expects_to_complement(tokens: Sequence[str]) -> bool:
+    return previous_to_complement_evidence(tokens) == "hard"
+
+
+def previous_to_complement_evidence(tokens: Sequence[str]) -> Optional[str]:
+    if not tokens:
+        return None
+    tokens = strip_trailing_fillers(tokens)
+    if not tokens:
+        return None
+    last = tokens[-1]
+    previous = tokens[-2] if len(tokens) >= 2 else ""
+    if last == "plan" and len(tokens) >= 2 and tokens[0] in NOMINAL_PREDECESSORS:
+        noun_head = tokens[-2]
+        if len(tokens) != 3 or not noun_head.endswith("s"):
+            return None
+    if previous in NOMINAL_PREDECESSORS:
+        return None
+    if (
+        last in TO_COMPLEMENT_BASE_VERBS
+        and len(tokens) >= 3
+        and "there" in tokens[-4:-1]
+        and any(token in COPULAR_WORDS for token in tokens[-4:-1])
+    ):
+        return None
+    if (
+        last in TO_COMPLEMENT_FINITE_OR_PAST_VERBS
+        and len(tokens) >= 3
+        and tokens[0] == "there"
+        and tokens[1] in COPULAR_WORDS
+    ):
+        return None
+    if (
+        len(tokens) >= 3
+        and tokens[-2] in SUBJECT_PRONOUNS
+        and tokens[-3] in CLAUSE_CLOSERS
+    ):
+        return None
+    if last in TO_COMPLEMENT_BASE_VERBS | TO_COMPLEMENT_FINITE_OR_PAST_VERBS:
+        if len(tokens) == 2:
+            return "hard"
+        if tokens[0] in SUBJECT_PRONOUNS:
+            return "hard"
+        if len(tokens) >= 2 and tokens[-2] in SUBJECT_PRONOUNS:
+            leading = tokens[:-2]
+            if leading and (
+                all(token in LEADING_ADJUNCTS for token in leading)
+                or all(token.endswith("ly") for token in leading)
+                or tuple(leading)
+                in {("in", "fact"), ("as", "a", "result"), ("of", "course")}
+            ):
+                return "hard"
+            return "ambiguous"
+        subject_tokens = tokens[:-1]
+        subject_breakers = [
+            token
+            for index, token in enumerate(subject_tokens)
+            if token in NOUN_SUBJECT_BREAKERS
+            and token != "all"
+        ]
+        if (
+            len(subject_tokens) >= 2
+            and not subject_breakers
+        ):
+            return "hard"
+        return None
+    if last in ({"going"} | TO_COMPLEMENT_GERUNDS):
+        if "how" in tokens[-5:-1] and any(
+            token in TO_COMPLEMENT_AUXILIARIES for token in tokens[-4:-1]
+        ):
+            return "ambiguous"
+        if last == "going" and previous in TO_COMPLEMENT_AUXILIARIES:
+            return "hard"
+        if (
+            last in TO_COMPLEMENT_GERUNDS
+            and previous in {"am", "are", "is", "was", "were"}
+            and len(tokens) >= 4
+            and not any(token in NOUN_SUBJECT_BREAKERS for token in tokens[:-2])
+        ):
+            return "hard"
+        if previous in SUBJECT_AUX_CONTRACTIONS:
+            return "hard"
+        if previous in GERUND_CONTROL_VERBS:
+            control_subject = tokens[:-2]
+            if any(token in SUBJECT_PRONOUNS for token in control_subject):
+                return "hard"
+            if (
+                len(control_subject) >= 2
+                and not any(
+                    token in NOUN_SUBJECT_BREAKERS and token != "all"
+                    for token in control_subject
+                )
+            ):
+                return "hard"
+            return None
+        auxiliary_window = tokens[-5:-1]
+        if (
+            (
+                any(token in SUBJECT_PRONOUNS for token in auxiliary_window)
+                or len(tokens[:-1]) >= 2
+            )
+            and any(token in TO_COMPLEMENT_AUXILIARIES for token in auxiliary_window)
+            and not any(
+                token in NOUN_SUBJECT_BREAKERS and token != "all"
+                for token in tokens[:-1]
+            )
+        ):
+            return "hard"
+        return None
+    return None
+
+
+def is_incomplete_before_long_gap(text: str, *, gap_after_ms: Optional[int]) -> bool:
+    if gap_after_ms is None or gap_after_ms < LONG_PAUSE_GAP_MS:
+        return False
+    tokens = strip_trailing_fillers(normalized_word_tokens(text))
+    if not tokens:
+        return False
+    trailing_parenthetical = split_trailing_parenthetical(text)
+    if trailing_parenthetical is not None:
+        prefix, suffix_tokens = trailing_parenthetical
+        prefix_tokens = normalized_word_tokens(prefix)
+        if (
+            is_short_parenthetical_suffix(suffix_tokens)
+            and prefix_tokens
+            and prefix_tokens[-1] == "other"
+        ):
+            tokens = prefix_tokens
+    last = tokens[-1]
+    unfinished_different = (
+        last == "different"
+        and len(tokens) >= 2
+        and tokens[-2] in HANGING_MODIFIER_PREDECESSORS
+    )
+    unfinished_other = (
+        last == "other"
+        and len(tokens) >= 2
+        and tokens[-2] not in COMPLETE_OTHER_PREDECESSORS
+    )
+    if unfinished_different or unfinished_other:
+        return True
+    if has_terminal_punctuation(text):
+        return False
+    return (
+        last in HANGING_ENDINGS
+        or last in HANGING_AUXILIARY_CONTRACTIONS
+    )
 
 
 def is_cjk_hanging_short(text: str) -> bool:
@@ -491,14 +1099,33 @@ def make_finding(
     word_count: int,
     severity: str,
     reasons: Sequence[str],
+    previous_text: str = "",
+    next_text: str = "",
+    gap_before_ms: Optional[int] = None,
+    gap_after_ms: Optional[int] = None,
 ) -> Dict[str, Any]:
     return {
         "cue": cue,
         "start_ms": segment.start_time,
         "end_ms": segment.end_time,
+        "start_timestamp": ms_to_srt_timestamp(segment.start_time),
+        "end_timestamp": ms_to_srt_timestamp(segment.end_time),
         "duration_ms": duration_ms,
         "text": text,
         "word_count": word_count,
+        "previous_cue": cue - 1 if previous_text else None,
+        "previous_text": previous_text or None,
+        "next_cue": cue + 1 if next_text else None,
+        "next_text": next_text or None,
+        "gap_before_ms": gap_before_ms,
+        "gap_after_ms": gap_after_ms,
         "severity": severity,
         "reasons": list(reasons),
     }
+
+
+def ms_to_srt_timestamp(value: int) -> str:
+    hours, remainder = divmod(value, 3_600_000)
+    minutes, remainder = divmod(remainder, 60_000)
+    seconds, milliseconds = divmod(remainder, 1000)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"

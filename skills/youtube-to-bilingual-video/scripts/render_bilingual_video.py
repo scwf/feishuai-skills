@@ -21,7 +21,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from path_safety import file_identity
+from path_safety import UnsafeLockPathError, file_identity, open_safe_lock_file
 
 
 def run(
@@ -153,6 +153,83 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def restore_archived_output(archive: Path, output: Path, expected_digest: str) -> None:
+    if not archive.exists():
+        raise FileNotFoundError(f"expected archive is missing: {archive}")
+    temporary = output.parent / f".restore-{output.name}-{uuid.uuid4().hex}.tmp"
+    try:
+        shutil.copy2(archive, temporary)
+        candidate_digest = sha256(temporary)
+        if candidate_digest != expected_digest:
+            raise OSError(
+                f"archive digest mismatch before restore: expected {expected_digest}, "
+                f"got {candidate_digest}"
+            )
+        temporary.replace(output)
+        if not output.is_file():
+            raise OSError(f"restored canonical output is missing: {output}")
+        restored_digest = sha256(output)
+        if restored_digest != expected_digest:
+            raise OSError(
+                f"restored output digest mismatch: expected {expected_digest}, "
+                f"got {restored_digest}"
+            )
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def publish_verified_render(
+    partial: Path, output: Path, work_dir: Path, run_id: str
+) -> str | None:
+    archive: Path | None = None
+    archive_digest: str | None = None
+    archive_moved = False
+    try:
+        if output.exists():
+            archive_dir = work_dir / "archive"
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            output_digest = hashlib.sha256(str(output).encode("utf-8")).hexdigest()[:12]
+            archive = archive_dir / f"previous-{output_digest}-{run_id}{output.suffix}"
+            archive_digest = sha256(output)
+            output.replace(archive)
+            archive_moved = True
+        partial.replace(output)
+        return str(archive.resolve()) if archive_moved and archive is not None else None
+    except Exception as publish_error:
+        rollback_error: Exception | None = None
+        if archive_moved and archive is not None:
+            try:
+                if archive_digest is None:
+                    raise OSError("archived output digest was not recorded")
+                restore_archived_output(archive, output, archive_digest)
+            except Exception as exc:
+                rollback_error = exc
+        archive_evidence = (
+            str(archive.resolve())
+            if archive is not None and archive.exists()
+            else None
+        )
+        if rollback_error is not None:
+            raise RenderError(
+                "verified render publication failed and the previous output could not be restored; "
+                f"archive evidence: {archive_evidence or 'unavailable'}; {rollback_error}",
+                reason="rollback_failure",
+                suggested_fix="Recover the reported archive evidence before retrying the render.",
+                details={"archived_previous_output": archive_evidence},
+            ) from publish_error
+        recovery_note = (
+            "the previous output was restored"
+            if archive_moved
+            else "the previous output was not moved"
+        )
+        raise RenderError(
+            f"verified render publication failed: {publish_error}",
+            reason="publish_failure",
+            suggested_fix=f"Resolve the filesystem error and retry; {recovery_note}.",
+            details={"archived_previous_output": archive_evidence},
+        ) from publish_error
+
+
 def qa_times(duration: float, requested: list[float]) -> list[float]:
     candidates = requested or [min(5.0, duration / 4), duration / 2, max(0.0, duration - 5)]
     valid = {round(value, 3) for value in candidates if 0 <= value < duration}
@@ -249,10 +326,18 @@ def report_write_failure(report_path: Path, exc: Exception) -> dict[str, object]
 
 
 class RenderError(RuntimeError):
-    def __init__(self, message: str, *, reason: str, suggested_fix: str | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        reason: str,
+        suggested_fix: str | None = None,
+        details: dict[str, object] | None = None,
+    ) -> None:
         super().__init__(message)
         self.reason = reason
         self.suggested_fix = suggested_fix
+        self.details = details or {}
 
 
 def _lock_handle(handle: BinaryIO) -> None:
@@ -289,7 +374,14 @@ def output_lock(output: Path) -> Iterator[Path]:
     lock_key = file_identity(output)
     digest = hashlib.sha256(lock_key.encode("utf-8")).hexdigest()[:16]
     lock_path = output.parent / f".render-{digest}.lock"
-    handle = lock_path.open("a+b")
+    try:
+        handle = open_safe_lock_file(lock_path)
+    except (OSError, UnsafeLockPathError) as exc:
+        raise RenderError(
+            f"render lock path is not a safe single-link regular file: {lock_path}",
+            reason="unsafe_lock_path",
+            suggested_fix="Remove or quarantine the unsafe lock path, then retry.",
+        ) from exc
     try:
         try:
             _lock_handle(handle)
@@ -304,12 +396,12 @@ def output_lock(output: Path) -> Iterator[Path]:
         finally:
             try:
                 _unlock_handle(handle)
-            except OSError:
+            except Exception:
                 pass
     finally:
         try:
             handle.close()
-        except OSError:
+        except Exception:
             pass
 
 
@@ -444,15 +536,7 @@ def render_locked(
     frame_paths = extract_frames(
         partial, work_dir / "qa", qa_times(output_duration, args.qa_time)
     )
-    archived: str | None = None
-    if output.exists():
-        archive_dir = work_dir / "archive"
-        archive_dir.mkdir(parents=True, exist_ok=True)
-        output_digest = hashlib.sha256(str(output).encode("utf-8")).hexdigest()[:12]
-        archive = archive_dir / f"previous-{output_digest}-{run_id}{output.suffix}"
-        output.replace(archive)
-        archived = str(archive.resolve())
-    partial.replace(output)
+    archived = publish_verified_render(partial, output, work_dir, run_id)
     return {
         "status": "ok",
         "input_video": str(source),
@@ -545,6 +629,8 @@ def main() -> int:
         }
         if exc.suggested_fix:
             report["suggested_fix"] = exc.suggested_fix
+        if exc.details:
+            report["details"] = exc.details
         exit_code = 1
     except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
         report = {

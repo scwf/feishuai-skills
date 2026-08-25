@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import difflib
 import re
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from .data import ASRData, ASRDataSeg, ASRWord, join_word_texts
@@ -17,6 +18,7 @@ from .qc import (
     validate_asr_timeline,
 )
 from .utils import count_words, is_mainly_cjk, setup_logger
+from .split_checkpoint import load_split_checkpoint, write_split_checkpoint
 
 
 logger = setup_logger("subtitle_splitter")
@@ -60,9 +62,12 @@ def split_subtitle(
     max_display_chars_english: int = DEFAULT_MAX_DISPLAY_CHARS_ENGLISH,
     chunk_word_limit: int = DEFAULT_CHUNK_WORD_LIMIT,
     max_retries: int = MAX_STEPS,
+    llm_timeout_seconds: int = 180,
     split_fn: Optional[SplitFn] = None,
     seam_times_out: Optional[List[int]] = None,
     seam_failures_out: Optional[List[Dict[str, Any]]] = None,
+    checkpoint_dir: Optional[str | Path] = None,
+    progress_state_out: Optional[Dict[str, Any]] = None,
 ) -> ASRData:
     splitter = SubtitleSplitter(
         model=model,
@@ -73,13 +78,17 @@ def split_subtitle(
         max_display_chars_english=max_display_chars_english,
         chunk_word_limit=chunk_word_limit,
         max_retries=max_retries,
+        llm_timeout_seconds=llm_timeout_seconds,
         split_fn=split_fn,
+        checkpoint_dir=checkpoint_dir,
     )
     result = splitter.split_subtitle(subtitle_data)
     if seam_times_out is not None:
         seam_times_out.extend(normalize_seam_times(splitter.seam_times_ms))
     if seam_failures_out is not None:
         seam_failures_out.extend(splitter.seam_repair_failures)
+    if progress_state_out is not None:
+        progress_state_out.update(splitter.progress_state)
     return result
 
 
@@ -125,7 +134,9 @@ class SubtitleSplitter:
         max_display_chars_english: int = DEFAULT_MAX_DISPLAY_CHARS_ENGLISH,
         chunk_word_limit: int = DEFAULT_CHUNK_WORD_LIMIT,
         max_retries: int = MAX_STEPS,
+        llm_timeout_seconds: int = 180,
         split_fn: Optional[SplitFn] = None,
+        checkpoint_dir: Optional[str | Path] = None,
     ) -> None:
         self.model = model
         self.api_key = api_key
@@ -135,22 +146,64 @@ class SubtitleSplitter:
         self.max_display_chars_english = max_display_chars_english
         self.chunk_word_limit = chunk_word_limit
         self.max_retries = max_retries
+        self.llm_timeout_seconds = llm_timeout_seconds
         self.split_fn = split_fn or split_by_llm
+        self.checkpoint_dir = Path(checkpoint_dir).resolve() if checkpoint_dir else None
         self.seam_times_ms: List[int] = []
         self.seam_repair_failures: List[Dict[str, Any]] = []
+        self.progress_state: Dict[str, Any] = {}
 
     def split_subtitle(self, subtitle_data: ASRData) -> ASRData:
         if not subtitle_data.has_word_timestamps():
             raise RuntimeError("Subtitle splitting requires word-level timestamps.")
 
         words = subtitle_data.words
-        chunks = self._chunk_words(words, original_segment_end_indices(subtitle_data))
+        segment_ends = original_segment_end_indices(subtitle_data)
+        chunks = self._chunk_words(words, segment_ends)
         self.seam_times_ms = [chunk[-1].end_time for chunk in chunks[:-1] if chunk]
         self.seam_repair_failures = []
         result_segments: List[ASRDataSeg] = []
         chunk_ranges: List[Tuple[int, int]] = []
-        for chunk_words in chunks:
-            mapped = self._split_chunk(chunk_words)
+        checkpoint_path, completed_chunks = load_split_checkpoint(
+            self.checkpoint_dir,
+            chunks,
+            segment_ends,
+            self._checkpoint_settings(),
+            logger,
+        )
+        resumed_chunks = len(completed_chunks)
+        if resumed_chunks:
+            logger.info(
+                "Semantic split resumed %s/%s completed chunks from %s",
+                resumed_chunks,
+                len(chunks),
+                checkpoint_path,
+            )
+        for chunk_index, chunk_words in enumerate(chunks):
+            if chunk_index < resumed_chunks:
+                mapped = completed_chunks[chunk_index]
+            else:
+                logger.info(
+                    "Semantic split chunk %s/%s: requesting segmentation for %s words",
+                    chunk_index + 1,
+                    len(chunks),
+                    len(chunk_words),
+                )
+                mapped = self._split_chunk(chunk_words)
+                completed_chunks.append(mapped)
+                write_split_checkpoint(
+                    checkpoint_path,
+                    chunks,
+                    segment_ends,
+                    self._checkpoint_settings(),
+                    completed_chunks,
+                )
+                logger.info(
+                    "Semantic split chunk %s/%s completed; checkpoint=%s",
+                    chunk_index + 1,
+                    len(chunks),
+                    checkpoint_path,
+                )
             start = len(result_segments)
             result_segments.extend(mapped)
             chunk_ranges.append((start, len(result_segments)))
@@ -159,6 +212,12 @@ class SubtitleSplitter:
             validate_asr_timeline(repaired)
         except ValueError as exc:
             raise SubtitleSplitValidationError(str(exc)) from exc
+        self.progress_state = {
+            "checkpoint_path": str(checkpoint_path) if checkpoint_path else None,
+            "chunk_count": len(chunks),
+            "resumed_chunk_count": resumed_chunks,
+            "completed_chunk_count": len(completed_chunks),
+        }
         return ASRData(repaired)
 
     def _split_chunk(self, chunk_words: Sequence[ASRWord]) -> List[ASRDataSeg]:
@@ -173,8 +232,21 @@ class SubtitleSplitter:
             max_word_count_english=self.max_word_count_english,
             max_display_chars_english=self.max_display_chars_english,
             max_retries=self.max_retries,
+            llm_timeout_seconds=self.llm_timeout_seconds,
         )
         return map_sentences_to_words(chunk_words, sentences)
+
+    def _checkpoint_settings(self) -> Dict[str, Any]:
+        return {
+            "model": self.model,
+            "base_url": self.base_url,
+            "max_word_count_cjk": self.max_word_count_cjk,
+            "max_word_count_english": self.max_word_count_english,
+            "max_display_chars_english": self.max_display_chars_english,
+            "chunk_word_limit": self.chunk_word_limit,
+            "max_retries": self.max_retries,
+            "llm_timeout_seconds": self.llm_timeout_seconds,
+        }
 
     def _chunk_words(
         self,
@@ -270,6 +342,12 @@ class SubtitleSplitter:
                 previous_singleton_consumed = False
                 continue
 
+            logger.info(
+                "Semantic split seam repair %s/%s: requesting segmentation for %s words",
+                chunk_index,
+                len(chunk_ranges) - 1,
+                len(window_words),
+            )
             try:
                 window_segments = self._split_chunk(window_words)
             except Exception as exc:
@@ -300,6 +378,11 @@ class SubtitleSplitter:
 
             repaired[-1:] = window_segments
             repaired.extend(chunk_segments[1:])
+            logger.info(
+                "Semantic split seam repair %s/%s completed",
+                chunk_index,
+                len(chunk_ranges) - 1,
+            )
             previous_singleton_consumed = len(chunk_segments) == 1
         return repaired
 
@@ -380,6 +463,7 @@ def split_by_llm(
     max_word_count_english: int = DEFAULT_MAX_WORD_COUNT_ENGLISH,
     max_display_chars_english: int = DEFAULT_MAX_DISPLAY_CHARS_ENGLISH,
     max_retries: int = MAX_STEPS,
+    llm_timeout_seconds: int = 180,
 ) -> List[str]:
     system_prompt = get_prompt(
         "split/sentence",
@@ -409,6 +493,7 @@ def split_by_llm(
             temperature=0.1,
             api_key=api_key,
             base_url=base_url,
+            timeout_seconds=llm_timeout_seconds,
         )
         result_text = response.choices[0].message.content or ""
         split_result = [segment.strip() for segment in re.sub(r"\n+", "", result_text).split("<br>") if segment.strip()]

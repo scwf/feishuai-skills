@@ -12,6 +12,10 @@ from unittest.mock import patch
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 CLI_PATH = SKILL_ROOT / "scripts" / "generate_and_process_subtitles.py"
+DEEPSEEK_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "deepseek_boundaries.json"
+AGENT_MEMORY_FIXTURE = (
+    Path(__file__).resolve().parent / "fixtures" / "agent_memory_viewer_clusters.json"
+)
 if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
@@ -21,6 +25,7 @@ CLI = importlib.util.module_from_spec(CLI_SPEC)
 CLI_SPEC.loader.exec_module(CLI)
 
 from subtitle_tools.data import ASRData, ASRDataSeg
+from subtitle_tools import qc_command as QC_COMMAND
 from subtitle_tools.qc import ApprovalValidationError, inspect_asr_data, inspect_subtitle_path
 
 
@@ -29,6 +34,81 @@ def write_srt(path: Path, text: str) -> None:
 
 
 class SemanticOrphanQcTests(unittest.TestCase):
+    def test_agent_memory_five_original_clusters_fail_and_reviewed_clusters_pass(self) -> None:
+        fixture = json.loads(AGENT_MEMORY_FIXTURE.read_text(encoding="utf-8"))
+
+        for group in fixture["groups"]:
+            with self.subTest(group=group["name"]):
+                before = inspect_asr_data(
+                    ASRData(
+                        [
+                            ASRDataSeg(item["text"], item["start_ms"], item["end_ms"])
+                            for item in group["before"]
+                        ]
+                    )
+                )
+                after = inspect_asr_data(
+                    ASRData(
+                        [
+                            ASRDataSeg(item["text"], item["start_ms"], item["end_ms"])
+                            for item in group["after"]
+                        ]
+                    )
+                )
+                self.assertEqual(before["status"], "review_required")
+                self.assertEqual(after["status"], "ok")
+
+    def test_deepseek_problem_boundaries_are_detected_without_false_positive_controls(self) -> None:
+        fixture = json.loads(DEEPSEEK_FIXTURE.read_text(encoding="utf-8"))
+
+        for item in fixture["problem_boundaries"]:
+            with self.subTest(problem=item["problem"], cue=item["cue"]):
+                current = item["current"]
+                following = item["next"]
+                report = inspect_asr_data(
+                    ASRData(
+                        [
+                            ASRDataSeg(
+                                current["text"], current["start_ms"], current["end_ms"]
+                            ),
+                            ASRDataSeg(
+                                following["text"],
+                                following["start_ms"],
+                                following["end_ms"],
+                            ),
+                        ]
+                    )
+                )
+                first = next(
+                    finding for finding in report["review_items"] if finding["cue"] == 1
+                )
+                self.assertIn("unpunctuated_continuation", first["reasons"])
+
+        for item in fixture["healthy_boundaries"]:
+            with self.subTest(healthy_cue=item["cue"]):
+                current = item["current"]
+                following = item["next"]
+                report = inspect_asr_data(
+                    ASRData(
+                        [
+                            ASRDataSeg(
+                                current["text"], current["start_ms"], current["end_ms"]
+                            ),
+                            ASRDataSeg(
+                                following["text"],
+                                following["start_ms"],
+                                following["end_ms"],
+                            ),
+                        ]
+                    )
+                )
+                first = next(
+                    (finding for finding in report["findings"] if finding["cue"] == 1),
+                    None,
+                )
+                if first is not None:
+                    self.assertNotIn("unpunctuated_continuation", first["reasons"])
+
     def test_customers_fragment_is_high_risk(self) -> None:
         asr_data = ASRData(
             [
@@ -916,7 +996,7 @@ I agree.
             )
 
             with patch.object(
-                CLI,
+                QC_COMMAND,
                 "default_qc_output_path",
                 return_value=noncanonical_output,
             ):

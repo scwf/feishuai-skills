@@ -14,6 +14,59 @@ from .base import BaseASR
 
 logger = setup_logger("faster_whisper")
 _DLL_DIR_HANDLES: list[Any] = []
+_MIN_WORD_DURATION_SECONDS = 0.001
+
+
+def _repair_zero_duration_words(segments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Give rare zero-duration Whisper words a minimal, non-overlapping 1 ms span."""
+    repairs: List[Dict[str, Any]] = []
+    for segment_index, segment in enumerate(segments):
+        words = segment.get("words") or []
+        for word_index, word in enumerate(words):
+            start = float(word["start"])
+            end = float(word["end"])
+            if end != start:
+                continue
+
+            previous_end = (
+                float(words[word_index - 1]["end"])
+                if word_index > 0
+                else float(segment["start"])
+            )
+            next_start = (
+                float(words[word_index + 1]["start"])
+                if word_index + 1 < len(words)
+                else float(segment["end"])
+            )
+            repaired_start = start
+            repaired_end = end
+            method = ""
+            if start - previous_end >= _MIN_WORD_DURATION_SECONDS:
+                repaired_start = start - _MIN_WORD_DURATION_SECONDS
+                repaired_end = start
+                method = "bounded_1ms_before_reported_time"
+            elif next_start - end >= _MIN_WORD_DURATION_SECONDS:
+                repaired_start = end
+                repaired_end = end + _MIN_WORD_DURATION_SECONDS
+                method = "bounded_1ms_after_reported_time"
+            else:
+                continue
+
+            word["start"] = repaired_start
+            word["end"] = repaired_end
+            repairs.append(
+                {
+                    "segment_index": segment_index,
+                    "word_index": word_index,
+                    "word": word.get("word"),
+                    "original_start": start,
+                    "original_end": end,
+                    "repaired_start": repaired_start,
+                    "repaired_end": repaired_end,
+                    "method": method,
+                }
+            )
+    return repairs
 
 
 def _configure_windows_cuda_dll_paths() -> None:
@@ -96,6 +149,13 @@ class FasterWhisperASR(BaseASR):
                 progress = int(min(100, max(0, (float(segment.end) / float(info.duration)) * 100)))
                 callback(progress, f"{progress}%")
 
+        timestamp_repairs = _repair_zero_duration_words(segments)
+        if timestamp_repairs:
+            logger.warning(
+                "Repaired %s zero-duration ASR words with bounded 1 ms intervals; evidence is recorded in raw ASR JSON.",
+                len(timestamp_repairs),
+            )
+
         raw_payload = {
             "language": getattr(info, "language", None),
             "language_probability": getattr(info, "language_probability", None),
@@ -106,6 +166,7 @@ class FasterWhisperASR(BaseASR):
             "vad_filter": self.config.vad_filter,
             "clip_timestamps": self.config.clip_timestamps,
             "segments": segments,
+            "timestamp_repairs": timestamp_repairs,
         }
         self.result_metadata = {
             "language": raw_payload["language"],

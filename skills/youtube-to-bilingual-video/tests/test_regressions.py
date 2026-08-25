@@ -10,6 +10,8 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -1405,13 +1407,16 @@ class WorkflowContractRegressionTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        audit_position = skill_text.index("**Audit optimization changes.**")
-        final_qc_position = skill_text.index("**Re-run final English QC.**")
-        translate_position = skill_text.index("**Translate.**")
+        audit_position = skill_text.index("| Audit |")
+        final_qc_position = skill_text.index("| Final English QC |")
+        translate_position = skill_text.index("| Translate |")
         self.assertLess(audit_position, final_qc_position)
         self.assertLess(final_qc_position, translate_position)
         self.assertIn("exact downstream English SRT returns QC exit code `0`", workflow_text)
-        self.assertIn("punctuation or case changes can create a new orphan", workflow_text)
+        self.assertIn(
+            "punctuation or case changes can create a new orphan",
+            workflow_text.lower(),
+        )
 
     def test_default_job_root_and_english_language_handoff_are_explicit(self) -> None:
         skill_text = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
@@ -1421,7 +1426,7 @@ class WorkflowContractRegressionTests(unittest.TestCase):
         contracts = (SKILL_ROOT / "references" / "atomic-skill-contracts.md").read_text(
             encoding="utf-8"
         )
-        self.assertIn("<cwd>/<safe-title>-<video-id>-<id-digest>/", skill_text)
+        self.assertIn("Use one stable job directory", skill_text)
         self.assertIn("<cwd>/<safe-title>-<video-id>-<id-digest>/", workflow_text)
         self.assertIn("--require-language en", contracts)
         self.assertIn("--source-metadata", workflow_text)
@@ -1747,6 +1752,236 @@ class RenderStyleRegressionTests(unittest.TestCase):
                     with module.output_lock(output):
                         self.fail("second lock unexpectedly succeeded")
             self.assertEqual(raised.exception.reason, "output_locked")
+
+    def test_output_lock_rejects_hardlink_without_modifying_target(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "render_bilingual_video_hardlink_tests", RENDER_SCRIPT
+        )
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            output = root / "final.mp4"
+            lock_key = module.file_identity(output)
+            digest = hashlib.sha256(lock_key.encode("utf-8")).hexdigest()[:16]
+            lock_path = root / f".render-{digest}.lock"
+            victim = root / "important.txt"
+            victim.write_bytes(b"preserve-me")
+            try:
+                os.link(victim, lock_path)
+            except OSError as exc:
+                self.skipTest(f"hardlinks unavailable: {exc}")
+
+            with self.assertRaises(module.RenderError) as raised:
+                with module.output_lock(output):
+                    self.fail("unsafe hardlinked lock unexpectedly opened")
+
+            self.assertEqual(raised.exception.reason, "unsafe_lock_path")
+            self.assertEqual(victim.read_bytes(), b"preserve-me")
+
+    def test_failed_verified_promotion_restores_previous_output(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "render_bilingual_video_rollback_tests", RENDER_SCRIPT
+        )
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source.mp4"
+            subtitle = root / "subtitles.srt"
+            output = root / "final.mp4"
+            work_dir = root / "work"
+            work_dir.mkdir()
+            source.write_bytes(b"source")
+            subtitle.write_text(
+                "1\n00:00:00,000 --> 00:00:01,000\nHello.\n",
+                encoding="utf-8",
+            )
+            output.write_bytes(b"previous-output")
+            args = SimpleNamespace(
+                replace_existing=True,
+                encoder="libx264",
+                allow_silent=False,
+                font_name="Arial",
+                font_size=16.0,
+                margin_v=8,
+                outline=1.2,
+                qa_time=[],
+            )
+            probe_payload = {
+                "format": {"duration": "1.0"},
+                "streams": [{"codec_type": "video"}, {"codec_type": "audio"}],
+            }
+            original_replace = Path.replace
+
+            def fake_run(command: list[str], **_kwargs: object) -> SimpleNamespace:
+                candidate = Path(command[-1])
+                if candidate.suffix == ".mp4":
+                    candidate.write_bytes(b"verified-output")
+                return SimpleNamespace(returncode=0, stderr="", stdout="")
+
+            def fail_partial_promotion(path: Path, target: Path) -> Path:
+                if path.name.endswith(".partial.mp4") and target == output:
+                    raise OSError("injected promotion failure")
+                return original_replace(path, target)
+
+            with (
+                patch.object(module, "run", side_effect=fake_run),
+                patch.object(module, "probe", return_value=probe_payload),
+                patch.object(module, "choose_encoder", return_value="libx264"),
+                patch.object(module, "extract_frames", return_value=[]),
+                patch.object(Path, "replace", new=fail_partial_promotion),
+            ):
+                with self.assertRaises(module.RenderError) as raised:
+                    module.render_locked(args, source, subtitle, output, work_dir)
+
+            self.assertEqual(raised.exception.reason, "publish_failure")
+            self.assertEqual(output.read_bytes(), b"previous-output")
+            archive_evidence = raised.exception.details["archived_previous_output"]
+            self.assertTrue(Path(archive_evidence).is_file())
+
+    def test_missing_render_archive_is_reported_as_rollback_failure(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "render_bilingual_video_missing_archive_tests", RENDER_SCRIPT
+        )
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source.mp4"
+            subtitle = root / "subtitles.srt"
+            output = root / "final.mp4"
+            work_dir = root / "work"
+            work_dir.mkdir()
+            source.write_bytes(b"source")
+            subtitle.write_text(
+                "1\n00:00:00,000 --> 00:00:01,000\nHello.\n", encoding="utf-8"
+            )
+            output.write_bytes(b"previous-output")
+            args = SimpleNamespace(
+                replace_existing=True,
+                encoder="libx264",
+                allow_silent=False,
+                font_name="Arial",
+                font_size=16.0,
+                margin_v=8,
+                outline=1.2,
+                qa_time=[],
+            )
+            probe_payload = {
+                "format": {"duration": "1.0"},
+                "streams": [{"codec_type": "video"}, {"codec_type": "audio"}],
+            }
+            original_replace = Path.replace
+
+            def fake_run(command: list[str], **_kwargs: object) -> SimpleNamespace:
+                candidate = Path(command[-1])
+                if candidate.suffix == ".mp4":
+                    candidate.write_bytes(b"verified-output")
+                return SimpleNamespace(returncode=0, stderr="", stdout="")
+
+            def lose_archive_then_fail(path: Path, target: Path) -> Path:
+                if path.name.endswith(".partial.mp4") and target == output:
+                    next((work_dir / "archive").glob("*.mp4")).unlink()
+                    raise OSError("injected promotion failure")
+                return original_replace(path, target)
+
+            with (
+                patch.object(module, "run", side_effect=fake_run),
+                patch.object(module, "probe", return_value=probe_payload),
+                patch.object(module, "choose_encoder", return_value="libx264"),
+                patch.object(module, "extract_frames", return_value=[]),
+                patch.object(Path, "replace", new=lose_archive_then_fail),
+            ):
+                with self.assertRaises(module.RenderError) as raised:
+                    module.render_locked(args, source, subtitle, output, work_dir)
+
+            self.assertEqual(raised.exception.reason, "rollback_failure")
+            self.assertIn("expected archive is missing", str(raised.exception))
+            self.assertIsNone(raised.exception.details["archived_previous_output"])
+            self.assertFalse(output.exists())
+
+    def test_render_archive_restore_error_preserves_archive(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "render_bilingual_video_restore_helper_tests", RENDER_SCRIPT
+        )
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            archive = root / "previous.mp4"
+            output = root / "final.mp4"
+            archive.write_bytes(b"previous-output")
+            digest = module.sha256(archive)
+            with patch.object(
+                Path, "replace", side_effect=OSError("simulated restore failure")
+            ):
+                with self.assertRaises(OSError):
+                    module.restore_archived_output(archive, output, digest)
+            self.assertTrue(archive.is_file())
+            self.assertFalse(output.exists())
+
+    def test_render_digest_capture_failure_keeps_previous_output(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "render_bilingual_video_digest_capture_tests", RENDER_SCRIPT
+        )
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            output = root / "final.mp4"
+            partial = root / "verified.partial.mp4"
+            work_dir = root / "work"
+            work_dir.mkdir()
+            output.write_bytes(b"previous-output")
+            partial.write_bytes(b"verified-output")
+            with patch.object(
+                module, "sha256", side_effect=OSError("simulated digest read failure")
+            ):
+                with self.assertRaises(module.RenderError) as raised:
+                    module.publish_verified_render(partial, output, work_dir, "run")
+            self.assertEqual(raised.exception.reason, "publish_failure")
+            self.assertEqual(output.read_bytes(), b"previous-output")
+            self.assertEqual(list((work_dir / "archive").glob("*.mp4")), [])
+
+    def test_render_tampered_archive_remains_available(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "render_bilingual_video_digest_mismatch_tests", RENDER_SCRIPT
+        )
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            output = root / "final.mp4"
+            partial = root / "verified.partial.mp4"
+            work_dir = root / "work"
+            work_dir.mkdir()
+            output.write_bytes(b"previous-output")
+            partial.write_bytes(b"verified-output")
+            original_replace = Path.replace
+
+            def tamper_archive_then_fail(path: Path, target: Path) -> Path:
+                if path == partial and target == output:
+                    next((work_dir / "archive").glob("*.mp4")).write_bytes(b"tampered")
+                    raise OSError("simulated promotion failure")
+                return original_replace(path, target)
+
+            with patch.object(Path, "replace", new=tamper_archive_then_fail):
+                with self.assertRaises(module.RenderError) as raised:
+                    module.publish_verified_render(partial, output, work_dir, "run")
+            self.assertEqual(raised.exception.reason, "rollback_failure")
+            archive_evidence = Path(
+                raised.exception.details["archived_previous_output"]
+            )
+            self.assertTrue(archive_evidence.is_file())
+            self.assertEqual(archive_evidence.read_bytes(), b"tampered")
+            self.assertFalse(output.exists())
 
     @unittest.skipUnless(os.name == "nt", "Windows paths are case-insensitive")
     def test_output_lock_normalizes_windows_path_case(self) -> None:

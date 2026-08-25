@@ -1,0 +1,160 @@
+{
+  "source": "Agent Memory viewer-readability issue five clusters",
+  "groups": [
+    {
+      "name": "short_tail_040",
+      "before": [
+        {
+          "text": "And this one is going to be the main place where all the memories are going",
+          "start_ms": 283260,
+          "end_ms": 287580
+        },
+        {
+          "text": "To be stored.",
+          "start_ms": 287580,
+          "end_ms": 287980
+        }
+      ],
+      "after": [
+        {
+          "text": "And this one is going to be the main place",
+          "start_ms": 283260,
+          "end_ms": 286220
+        },
+        {
+          "text": "Where all the memories are going to be stored.",
+          "start_ms": 286220,
+          "end_ms": 287980
+        }
+      ]
+    },
+    {
+      "name": "short_tail_070",
+      "before": [
+        {
+          "text": "And these ones right here are going to come from the SQLite database that",
+          "start_ms": 756360,
+          "end_ms": 759520
+        },
+        {
+          "text": "We mentioned before.",
+          "start_ms": 759520,
+          "end_ms": 760220
+        }
+      ],
+      "after": [
+        {
+          "text": "These messages come from the SQLite database.",
+          "start_ms": 756360,
+          "end_ms": 758400
+        },
+        {
+          "text": "It's the database we mentioned before.",
+          "start_ms": 758400,
+          "end_ms": 760220
+        }
+      ]
+    },
+    {
+      "name": "duplicate_tail_072",
+      "before": [
+        {
+          "text": "Between your query and the memories within that were returned from here.",
+          "start_ms": 1256960,
+          "end_ms": 1262760
+        },
+        {
+          "text": "Returned from here.",
+          "start_ms": 1262760,
+          "end_ms": 1263480
+        }
+      ],
+      "after": [
+        {
+          "text": "Between your query and the memories within the database",
+          "start_ms": 1256960,
+          "end_ms": 1261120
+        },
+        {
+          "text": "That were returned from here.",
+          "start_ms": 1261120,
+          "end_ms": 1263480
+        }
+      ]
+    },
+    {
+      "name": "short_tail_064",
+      "before": [
+        {
+          "text": "I would not go beyond 1 billion unless you fine-tune the model in order to make",
+          "start_ms": 1581700,
+          "end_ms": 1587480
+        },
+        {
+          "text": "it more accurate.",
+          "start_ms": 1587480,
+          "end_ms": 1588120
+        }
+      ],
+      "after": [
+        {
+          "text": "I would not go beyond 1 billion",
+          "start_ms": 1581700,
+          "end_ms": 1585000
+        },
+        {
+          "text": "Unless you fine-tune the model in order to make it more accurate.",
+          "start_ms": 1585000,
+          "end_ms": 1588120
+        }
+      ]
+    },
+    {
+      "name": "long_gap_and_tail_062",
+      "before": [
+        {
+          "text": "MTEB, which is one of the most reputable benchmarks for a bunch of different",
+          "start_ms": 1639200,
+          "end_ms": 1643280
+        },
+        {
+          "text": "Embedding models for multilingual, for English, for different languages, etc.",
+          "start_ms": 1645100,
+          "end_ms": 1649580
+        },
+        {
+          "text": "And here you have the benchmarks exactly, depending on which one you're trying",
+          "start_ms": 1649740,
+          "end_ms": 1653340
+        },
+        {
+          "text": "To figure out.",
+          "start_ms": 1653340,
+          "end_ms": 1653960
+        }
+      ],
+      "after": [
+        {
+          "text": "MTEB is one of the most reputable benchmarks.",
+          "start_ms": 1639200,
+          "end_ms": 1643280
+        },
+        {
+          "text": "It covers many embedding models: multilingual, English, and other languages.",
+          "start_ms": 1645100,
+          "end_ms": 1649580
+        },
+        {
+          "text": "And here you have the benchmarks exactly,",
+          "start_ms": 1649740,
+          "end_ms": 1651820
+        },
+        {
+          "text": "Depending on which one you're trying to figure out.",
+          "start_ms": 1651820,
+          "end_ms": 1653960
+        }
+      ]
+    }
+  ]
+}

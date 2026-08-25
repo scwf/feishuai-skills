@@ -31,11 +31,14 @@ def process_media(
     split_max_chars_en: int = 79,
     split_chunk_word_limit: int = 350,
     split_max_retries: int = 2,
+    llm_timeout_seconds: int = 180,
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
     seam_times_out: Optional[list[int]] = None,
     seam_failures_out: Optional[list[dict]] = None,
     asr_metadata_out: Optional[dict] = None,
+    split_checkpoint_dir: Optional[str] = None,
+    split_progress_out: Optional[dict] = None,
 ) -> ASRData:
     if os.path.exists(media_url_or_path):
         audio_path = media_url_or_path
@@ -79,8 +82,11 @@ def process_media(
             max_display_chars_english=split_max_chars_en,
             chunk_word_limit=split_chunk_word_limit,
             max_retries=split_max_retries,
+            llm_timeout_seconds=llm_timeout_seconds,
             seam_times_out=seam_times_out,
             seam_failures_out=seam_failures_out,
+            checkpoint_dir=split_checkpoint_dir,
+            progress_state_out=split_progress_out,
         )
 
     return asr_data

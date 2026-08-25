@@ -1,76 +1,35 @@
 # Transcribe
 
-Use `transcribe` for local audio/video files and video URLs.
-Resolve `{SKILL_ROOT}` to this skill folder before running commands.
+Use `transcribe` for local audio/video and supported media URLs:
 
 ```bash
-python {SKILL_ROOT}/scripts/generate_and_process_subtitles.py transcribe "<input>" --output-dir "<target-dir>"
+{PYTHON} {SKILL_ROOT}/scripts/generate_and_process_subtitles.py transcribe "<input>" --output-dir "<target-dir>"
 ```
 
-Behavior:
+The default final outputs are `<base>.srt` and `<base>.txt`. Read [output-contract.md](output-contract.md) for publication and evidence placement.
 
-- Final outputs are `<target-dir>/<base>.srt` and `<target-dir>/<base>.txt`.
-- Process files go to `<target-dir>/_subtitle_work/`.
-- YouTube human subtitles are reused by default when available, except when `--semantic-split` is requested. Semantic splitting uses ASR because seam repair requires word-level timestamps.
-- YouTube video descriptions are saved in metadata and mirrored to `<target-dir>/_subtitle_work/context.txt` when available.
-- The context file contains the video title, channel, and raw description. It does not include the source URL.
-- The context file is not used by `transcribe`; it exists for optional follow-up optimization.
-- Pass `--force-asr` when the user explicitly wants ASR instead of reusable YouTube subtitles.
-- First ASR use may download the selected `faster-whisper` model into the system Hugging Face cache.
-- Repeated ASR runs reuse the cached model.
-- Semantic splitting is off by default. Use `--semantic-split` only when requested.
+## Source Selection
 
-## YouTube Confirmation Gate
+YouTube human subtitles are reused when available. Pass `--force-asr` only when the user explicitly wants ASR. A confirmed `--semantic-split` also uses ASR because seam repair requires word timestamps; read [split.md](split.md).
 
-For YouTube URL requests, confirm the desired workflow before running any command unless the user already explicitly chose both the transcription shape and post-transcription correction path. Treat generic wording like "提取字幕", "把字幕提取出来", "extract subtitles", "生成字幕", or "transcribe this video" as ambiguous because the skill supports plain transcription, semantic splitting during transcription, and description-reference-assisted correction.
+Use `--require-language <code>` when a downstream workflow requires a verified source language. A reusable track must match that language, and ASR detection must match with sufficient confidence. Mismatch is a hard stop. The returned metadata binds language evidence to the exact emitted SRT.
 
-Ask two short questions in order:
+For YouTube, metadata includes title, channel, and description. When description text exists, the command writes an immutable `_subtitle_work/context-<video-id>-<digest>.txt` and records its SHA-256 for an optional, separately confirmed optimize step. Transcribe never applies that context automatically.
 
-1. "转录时要不要启用 semantic split，让字幕断句更自然？"
-2. "转录完成后，要不要用视频简介作为参考做一次保守纠错 optimize？"
+Useful ASR controls include `--model`, `--device`, `--compute-type`, and `--language`. Defaults and optional Windows GPU setup are in [setup.md](setup.md).
 
-After asking, stop and wait for the user's answer. If the user answers only the first question, ask the second question before running commands.
-
-Skip a question only when the user has already answered that part, such as "不要语义切分 / no semantic split", "加 semantic split / natural subtitle breaking", "transcription only / 不要优化", or "use the description as reference evidence to correct subtitles".
-
-Available workflows:
-
-- Transcription only: run `transcribe` and stop after the final `.srt` and `.txt`.
-- Transcription plus semantic split: run `transcribe --semantic-split`. Keep the `.srt` and `.txt`, then stop if nested QC reports `review_required` (exit code `2`). That is a quality gate, not a transcription failure. Do not continue to optimize, translate, or treat the run as complete.
-- Transcription plus description-reference-assisted correction: run `transcribe`, then run `optimize` on the generated SRT with `--reference-file "<target-dir>/_subtitle_work/context.txt"`.
-- Transcription plus semantic split and correction: run `transcribe --semantic-split`, stop on `review_required`, and only then run `optimize` with `--reference-file "<target-dir>/_subtitle_work/context.txt"`.
-
-Before description-reference-assisted correction, verify the `transcribe` JSON includes `context_file` and that the file exists. If no context file was generated, tell the user the video has no available description context and stop after transcription unless they provide another reference file.
-
-Example follow-up optimization:
-
-```bash
-python {SKILL_ROOT}/scripts/generate_and_process_subtitles.py optimize "<target-dir>/<base>.srt" --reference-file "<target-dir>/_subtitle_work/context.txt" --output-dir "<target-dir>"
-```
-
-Useful options:
-
-```bash
---model large-v2
---device auto
---compute-type auto
---language en
---force-asr
---semantic-split
-```
+Faster-whisper can rarely emit a word whose start and end timestamps are identical. When there is a proven non-overlapping gap immediately beside that word, the adapter assigns only a 1 ms bounded interval and records the original timestamps, repaired timestamps, token, indices, and method in raw ASR JSON under `timestamp_repairs`. If no safe adjacent interval exists, strict timeline validation still stops the run; the program never shifts neighboring words or silently drops the token.
 
 ## Targeted Missing-Speech Recovery
 
-When audible speech is missing from an existing SRT, run ASR only around the confirmed gap and disable VAD:
+Audible speech with no source cue is a transcription coverage failure. Preserve the current SRT, confirm the affected interval against the media, and rerun only that interval:
 
 ```bash
-python {SKILL_ROOT}/scripts/generate_and_process_subtitles.py transcribe "<local-media>" \
+{PYTHON} {SKILL_ROOT}/scripts/generate_and_process_subtitles.py transcribe "<local-media>" \
   --output-dir "<repair-dir>" --language en \
   --start-seconds 120.0 --end-seconds 128.0 --no-vad
 ```
 
-Pass both interval bounds, a fixed `--language`, and `--no-vad` together. The CLI rejects global `--no-vad`. Bounds are seconds on the original media timeline, so returned cue and word timestamps stay aligned with the source. Outputs use `<media-stem>.repair-<start-ms>-<end-ms>.srt/.txt`; existing repair files are never overwritten. For a YouTube URL, also pass `--force-asr`, or preferably run against the already downloaded local source. Merge only verified missing speech into a copy of the baseline SRT.
+Both bounds, a fixed language, and `--no-vad` are required together; global no-VAD transcription is rejected. Prefer the already downloaded local source. Returned word/cue timestamps remain on the original media timeline.
 
-For GPU use, keep `--device auto` unless the user asks for a specific device. The script falls back to `cpu/int8` if automatic or GPU loading fails.
-
-On Windows, if GPU transcription fails with a missing CUDA 12 DLL such as `cublas64_12.dll`, install the optional Windows GPU requirements from `references/setup.md`, then retry with `--device cuda --compute-type float16`.
+Review the interval output against adjacent cues. Reject boundary duplication, filler-only fragments, hallucination, and garbling. Merge only verified missing speech into a copy of the baseline, then renumber and rerun structural and viewer-facing QC. If bilingual subtitles exist, repair the source-language cue first and translate the verified addition.

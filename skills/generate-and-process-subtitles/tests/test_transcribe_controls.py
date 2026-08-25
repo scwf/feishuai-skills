@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -28,7 +29,9 @@ assert CLI_SPEC and CLI_SPEC.loader
 CLI = importlib.util.module_from_spec(CLI_SPEC)
 CLI_SPEC.loader.exec_module(CLI)
 
-from subtitle_tools import ASRData, ASRDataSeg, core  # noqa: E402
+from subtitle_tools import ASRData, ASRDataSeg, ASRWord, core  # noqa: E402
+from subtitle_tools import publishing as PUBLISHING  # noqa: E402
+from subtitle_tools import transcribe_command as TRANSCRIBE  # noqa: E402
 from subtitle_tools.asr.faster_whisper import FasterWhisperASR  # noqa: E402
 from subtitle_tools.config import TranscribeConfig  # noqa: E402
 
@@ -149,7 +152,7 @@ class TranscribeControlTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir)
             base_name = CLI.targeted_repair_base_name("source", [12.5, 18.0])
-            original_unlink = CLI.unlink_with_retries
+            original_unlink = PUBLISHING.unlink_with_retries
 
             def keep_locked_repair_temps(
                 path: Path, *, suppress_errors: bool = False
@@ -159,7 +162,7 @@ class TranscribeControlTests(unittest.TestCase):
                 original_unlink(path, suppress_errors=suppress_errors)
 
             with patch.object(
-                CLI, "unlink_with_retries", side_effect=keep_locked_repair_temps
+                PUBLISHING, "unlink_with_retries", side_effect=keep_locked_repair_temps
             ):
                 outputs = CLI.save_repair_outputs(FakeASRData(), output_dir, base_name)
 
@@ -245,7 +248,7 @@ class TranscribeControlTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir)
             paths = CLI.output_paths(output_dir, "baseline")
-            original_promote = CLI.promote_temp_file
+            original_promote = PUBLISHING.promote_temp_file
             calls = 0
 
             def fail_second(source: Path, target: Path) -> None:
@@ -255,7 +258,7 @@ class TranscribeControlTests(unittest.TestCase):
                     raise OSError("simulated TXT publish failure")
                 original_promote(source, target)
 
-            with patch.object(CLI, "promote_temp_file", side_effect=fail_second):
+            with patch.object(PUBLISHING, "promote_temp_file", side_effect=fail_second):
                 with self.assertRaises(CLI.SubtitleSkillError) as raised:
                     CLI.save_main_outputs(
                         data,
@@ -279,7 +282,7 @@ class TranscribeControlTests(unittest.TestCase):
                 action="normalize",
             )
             original = {key: path.read_bytes() for key, path in paths.items()}
-            original_promote = CLI.promote_temp_file
+            original_promote = PUBLISHING.promote_temp_file
             calls = 0
 
             def fail_second(source: Path, target: Path) -> None:
@@ -289,7 +292,7 @@ class TranscribeControlTests(unittest.TestCase):
                     raise OSError("simulated replacement failure")
                 original_promote(source, target)
 
-            with patch.object(CLI, "promote_temp_file", side_effect=fail_second):
+            with patch.object(PUBLISHING, "promote_temp_file", side_effect=fail_second):
                 with self.assertRaises(CLI.SubtitleSkillError) as raised:
                     CLI.save_main_outputs(
                         replacement,
@@ -300,6 +303,226 @@ class TranscribeControlTests(unittest.TestCase):
                     )
             self.assertEqual(raised.exception.error_type, "publish_failure")
             self.assertEqual({key: path.read_bytes() for key, path in paths.items()}, original)
+
+    def test_main_output_missing_archive_is_reported_as_rollback_failure(self) -> None:
+        original_data = ASRData([ASRDataSeg("Original.", 0, 1000)])
+        replacement = ASRData([ASRDataSeg("Replacement.", 0, 1000)])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir)
+            paths = CLI.save_main_outputs(
+                original_data, output_dir, "baseline", action="normalize"
+            )
+            original_promote = PUBLISHING.promote_temp_file
+            calls = 0
+
+            def lose_archive_then_fail(source: Path, target: Path) -> None:
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    archive_dir = output_dir / "_subtitle_work" / "archive"
+                    next(archive_dir.glob("*.srt")).unlink()
+                    raise OSError("simulated replacement failure")
+                original_promote(source, target)
+
+            with patch.object(
+                PUBLISHING, "promote_temp_file", side_effect=lose_archive_then_fail
+            ):
+                with self.assertRaises(CLI.SubtitleSkillError) as raised:
+                    CLI.save_main_outputs(
+                        replacement,
+                        output_dir,
+                        "baseline",
+                        action="normalize",
+                        replace_existing=True,
+                    )
+            self.assertEqual(raised.exception.error_type, "rollback_failure")
+            self.assertIn("expected archive is missing", str(raised.exception))
+            archive_evidence = raised.exception.details["archived_outputs"]
+            self.assertIsNone(archive_evidence["srt"])
+            self.assertTrue(Path(archive_evidence["txt"]).is_file())
+            self.assertEqual(raised.exception.details["unavailable_archives"], ["srt"])
+            self.assertFalse(paths["srt"].exists())
+
+    def test_main_output_restore_error_is_reported_as_rollback_failure(self) -> None:
+        original_data = ASRData([ASRDataSeg("Original.", 0, 1000)])
+        replacement = ASRData([ASRDataSeg("Replacement.", 0, 1000)])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir)
+            CLI.save_main_outputs(
+                original_data, output_dir, "baseline", action="normalize"
+            )
+            original_promote = PUBLISHING.promote_temp_file
+            calls = 0
+
+            def fail_second(source: Path, target: Path) -> None:
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise OSError("simulated replacement failure")
+                original_promote(source, target)
+
+            with (
+                patch.object(PUBLISHING, "promote_temp_file", side_effect=fail_second),
+                patch.object(
+                    PUBLISHING,
+                    "restore_archived_pair_member",
+                    side_effect=OSError("simulated restore failure"),
+                ),
+            ):
+                with self.assertRaises(CLI.SubtitleSkillError) as raised:
+                    CLI.save_main_outputs(
+                        replacement,
+                        output_dir,
+                        "baseline",
+                        action="normalize",
+                        replace_existing=True,
+                    )
+            self.assertEqual(raised.exception.error_type, "rollback_failure")
+            self.assertIn("simulated restore failure", str(raised.exception))
+            archived = raised.exception.details["archived_outputs"]
+            self.assertTrue(all(Path(path).exists() for path in archived.values()))
+
+    def test_archive_digest_capture_failure_preserves_canonical_pair(self) -> None:
+        original_data = ASRData([ASRDataSeg("Original.", 0, 1000)])
+        replacement = ASRData([ASRDataSeg("Replacement.", 0, 1000)])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir)
+            paths = CLI.save_main_outputs(
+                original_data, output_dir, "baseline", action="normalize"
+            )
+            original = {key: path.read_bytes() for key, path in paths.items()}
+            original_read_bytes = Path.read_bytes
+
+            def fail_canonical_srt_read(path: Path) -> bytes:
+                if path == paths["srt"]:
+                    raise OSError("simulated archive digest read failure")
+                return original_read_bytes(path)
+
+            with patch.object(Path, "read_bytes", new=fail_canonical_srt_read):
+                with self.assertRaises(CLI.SubtitleSkillError) as raised:
+                    CLI.save_main_outputs(
+                        replacement,
+                        output_dir,
+                        "baseline",
+                        action="normalize",
+                        replace_existing=True,
+                    )
+            self.assertEqual(raised.exception.error_type, "publish_failure")
+            self.assertEqual(
+                {key: original_read_bytes(path) for key, path in paths.items()}, original
+            )
+
+    def test_tampered_archive_is_preserved_and_reported(self) -> None:
+        original_data = ASRData([ASRDataSeg("Original.", 0, 1000)])
+        replacement = ASRData([ASRDataSeg("Replacement.", 0, 1000)])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir)
+            CLI.save_main_outputs(
+                original_data, output_dir, "baseline", action="normalize"
+            )
+            original_promote = PUBLISHING.promote_temp_file
+            calls = 0
+
+            def tamper_archive_then_fail(source: Path, target: Path) -> None:
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    next((output_dir / "_subtitle_work" / "archive").glob("*.srt")).write_bytes(
+                        b"tampered"
+                    )
+                    raise OSError("simulated replacement failure")
+                original_promote(source, target)
+
+            with patch.object(
+                PUBLISHING, "promote_temp_file", side_effect=tamper_archive_then_fail
+            ):
+                with self.assertRaises(CLI.SubtitleSkillError) as raised:
+                    CLI.save_main_outputs(
+                        replacement,
+                        output_dir,
+                        "baseline",
+                        action="normalize",
+                        replace_existing=True,
+                    )
+            self.assertEqual(raised.exception.error_type, "rollback_failure")
+            archive_path = Path(raised.exception.details["archived_outputs"]["srt"])
+            self.assertTrue(archive_path.is_file())
+            self.assertEqual(archive_path.read_bytes(), b"tampered")
+
+    def test_youtube_context_is_content_addressed_and_metadata_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            work_dir = Path(temp_dir) / "_subtitle_work"
+            work_dir.mkdir()
+            first_source = {
+                "id": "video-1",
+                "title": "Same title",
+                "channel": "Channel",
+                "description": "First description.",
+            }
+            second_source = {
+                "id": "video-2",
+                "title": "Same title",
+                "channel": "Channel",
+                "description": "Second description.",
+            }
+            args = SimpleNamespace(
+                input="https://youtu.be/example",
+                model="large-v2",
+                device="auto",
+                compute_type="auto",
+                no_vad=False,
+                semantic_split=False,
+            )
+
+            first_context = TRANSCRIBE.write_youtube_context(work_dir, first_source)
+            assert first_context is not None
+            first_bytes = first_context.read_bytes()
+            first_metadata = TRANSCRIBE.initial_transcribe_metadata(
+                args,
+                effective_vad_filter=True,
+                clip_timestamps=None,
+                video_metadata=first_source,
+                context_path=first_context,
+            )
+            source_srt_hash = "a" * 64
+            first_metadata_path = PUBLISHING.metadata_output_path(
+                work_dir,
+                "Same title",
+                source_srt_hash,
+                PUBLISHING.sha256_bytes(PUBLISHING.json_payload_bytes(first_metadata)),
+            )
+            PUBLISHING.write_immutable_json_atomic(
+                first_metadata_path, first_metadata, action="transcribe"
+            )
+
+            second_context = TRANSCRIBE.write_youtube_context(work_dir, second_source)
+            assert second_context is not None
+            second_metadata = TRANSCRIBE.initial_transcribe_metadata(
+                args,
+                effective_vad_filter=True,
+                clip_timestamps=None,
+                video_metadata=second_source,
+                context_path=second_context,
+            )
+            second_metadata_path = PUBLISHING.metadata_output_path(
+                work_dir,
+                "Same title",
+                source_srt_hash,
+                PUBLISHING.sha256_bytes(PUBLISHING.json_payload_bytes(second_metadata)),
+            )
+            PUBLISHING.write_immutable_json_atomic(
+                second_metadata_path, second_metadata, action="transcribe"
+            )
+
+            persisted_first = json.loads(first_metadata_path.read_text(encoding="utf-8"))
+            self.assertNotEqual(first_context, second_context)
+            self.assertNotEqual(first_metadata_path, second_metadata_path)
+            self.assertEqual(Path(persisted_first["context_file"]).read_bytes(), first_bytes)
+            self.assertEqual(
+                persisted_first["context_sha256"],
+                PUBLISHING.sha256_bytes(first_bytes),
+            )
+            self.assertEqual(len(list(work_dir.glob("context-*.txt"))), 2)
 
     def test_pair_validation_rejects_srt_txt_from_different_serializations(self) -> None:
         class MismatchedData:
@@ -338,7 +561,7 @@ class TranscribeControlTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             paths = CLI.output_paths(root, "repair")
-            original_promote = CLI.promote_temp_file
+            original_promote = PUBLISHING.promote_temp_file
             calls = 0
 
             def fail_second(source: Path, target: Path) -> None:
@@ -354,8 +577,8 @@ class TranscribeControlTests(unittest.TestCase):
                 path.unlink(missing_ok=True)
 
             with (
-                patch.object(CLI, "promote_temp_file", side_effect=fail_second),
-                patch.object(CLI, "unlink_with_retries", side_effect=locked_unlink),
+                patch.object(PUBLISHING, "promote_temp_file", side_effect=fail_second),
+                patch.object(PUBLISHING, "unlink_with_retries", side_effect=locked_unlink),
             ):
                 with self.assertRaises(CLI.SubtitleSkillError) as raised:
                     CLI.save_repair_outputs(data, root, "repair")
@@ -489,7 +712,7 @@ class TranscribeControlTests(unittest.TestCase):
                 )
                 return ASRData([ASRDataSeg("Hola.", 0, 1000)])
 
-            with patch.object(CLI, "process_media", side_effect=fake_process):
+            with patch.object(TRANSCRIBE, "process_media", side_effect=fake_process):
                 with self.assertRaises(CLI.SubtitleSkillError) as raised:
                     CLI.run_transcribe(args)
             self.assertEqual(raised.exception.error_type, "source_language_mismatch")
@@ -509,7 +732,7 @@ class TranscribeControlTests(unittest.TestCase):
                     "en",
                 ]
             )
-            with patch.object(CLI, "process_media") as process_media:
+            with patch.object(TRANSCRIBE, "process_media") as process_media:
                 with self.assertRaises(CLI.SubtitleSkillError) as raised:
                     CLI.run_transcribe(args)
             process_media.assert_not_called()
@@ -544,9 +767,9 @@ class TranscribeControlTests(unittest.TestCase):
                 ]
             )
             with (
-                patch.object(CLI, "fetch_video_metadata", return_value=video_metadata),
+                patch.object(TRANSCRIBE, "fetch_video_metadata", return_value=video_metadata),
                 patch.object(
-                    CLI,
+                    TRANSCRIBE,
                     "download_manual_subtitles",
                     return_value=(manual, video_metadata, "en"),
                 ),
@@ -557,6 +780,80 @@ class TranscribeControlTests(unittest.TestCase):
             self.assertEqual(metadata["required_source_language"], "en")
             self.assertEqual(metadata["source_language_origin"], "manual_subtitle_track")
             self.assertTrue(metadata["used_manual_subtitles"])
+
+    def test_two_same_title_videos_preserve_distinct_metadata_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            output_dir = root / "out"
+            manual = root / "manual.en.srt"
+            manual.write_text(
+                "1\n00:00:00,000 --> 00:00:01,000\nHello.\n",
+                encoding="utf-8",
+            )
+            first_video = {
+                "id": "video-1",
+                "title": "Same title",
+                "channel": "Channel",
+                "description": "First description.",
+                "subtitles": {"en": [{"ext": "srt"}]},
+            }
+            second_video = {
+                "id": "video-2",
+                "title": "Same title",
+                "channel": "Channel",
+                "description": "Second description.",
+                "subtitles": {"en": [{"ext": "srt"}]},
+            }
+
+            def run_video(url: str, metadata: dict[str, object], *, replace: bool):
+                command = [
+                    "transcribe",
+                    url,
+                    "--require-language",
+                    "en",
+                    "--output-dir",
+                    str(output_dir),
+                ]
+                if replace:
+                    command.append("--replace-existing")
+                args = CLI.build_parser().parse_args(command)
+                with (
+                    patch.object(
+                        TRANSCRIBE, "fetch_video_metadata", return_value=metadata
+                    ),
+                    patch.object(
+                        TRANSCRIBE,
+                        "download_manual_subtitles",
+                        return_value=(manual, metadata, "en"),
+                    ),
+                ):
+                    return CLI.run_transcribe(args)
+
+            first_result = run_video(
+                "https://www.youtube.com/watch?v=video-1", first_video, replace=False
+            )
+            first_metadata_path = Path(first_result["metadata"])
+            first_metadata_bytes = first_metadata_path.read_bytes()
+            first_payload = json.loads(first_metadata_bytes)
+
+            second_result = run_video(
+                "https://www.youtube.com/watch?v=video-2", second_video, replace=True
+            )
+            second_metadata_path = Path(second_result["metadata"])
+
+            self.assertNotEqual(first_metadata_path, second_metadata_path)
+            self.assertEqual(first_metadata_path.read_bytes(), first_metadata_bytes)
+            self.assertEqual(first_payload["video_metadata"]["id"], "video-1")
+            self.assertEqual(
+                Path(first_payload["context_file"]).read_text(encoding="utf-8"),
+                "Title: Same title\nChannel: Channel\nDescription:\nFirst description.\n",
+            )
+            self.assertEqual(
+                json.loads(second_metadata_path.read_text(encoding="utf-8"))[
+                    "video_metadata"
+                ]["id"],
+                "video-2",
+            )
 
     def test_manual_metadata_failure_does_not_publish_final_pair(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -584,21 +881,18 @@ class TranscribeControlTests(unittest.TestCase):
                     str(output_dir),
                 ]
             )
-            original_write_json = CLI.write_json_atomic
-
-            def fail_metadata(path: Path, payload: dict[str, object]) -> None:
-                if path.name.endswith(".metadata.json"):
-                    raise OSError("simulated metadata write failure")
-                original_write_json(path, payload)
-
             with (
-                patch.object(CLI, "fetch_video_metadata", return_value=video_metadata),
+                patch.object(TRANSCRIBE, "fetch_video_metadata", return_value=video_metadata),
                 patch.object(
-                    CLI,
+                    TRANSCRIBE,
                     "download_manual_subtitles",
                     return_value=(manual, video_metadata, "en"),
                 ),
-                patch.object(CLI, "write_json_atomic", side_effect=fail_metadata),
+                patch.object(
+                    TRANSCRIBE,
+                    "write_immutable_json_atomic",
+                    side_effect=OSError("simulated metadata write failure"),
+                ),
             ):
                 with self.assertRaises(OSError):
                     CLI.run_transcribe(args)
@@ -750,9 +1044,9 @@ class TranscribeControlTests(unittest.TestCase):
             }
 
             with (
-                patch.object(CLI, "fetch_video_metadata", return_value=metadata),
-                patch.object(CLI, "download_manual_subtitles") as download_manual,
-                patch.object(CLI, "process_media", return_value=split_result) as process_media,
+                patch.object(TRANSCRIBE, "fetch_video_metadata", return_value=metadata),
+                patch.object(TRANSCRIBE, "download_manual_subtitles") as download_manual,
+                patch.object(TRANSCRIBE, "process_media", return_value=split_result) as process_media,
             ):
                 result = CLI.run_transcribe(args)
 
@@ -793,7 +1087,7 @@ class TranscribeControlTests(unittest.TestCase):
                             str(root / "out"),
                         ]
                     )
-                    with patch.object(CLI, "process_media", return_value=split_result):
+                    with patch.object(TRANSCRIBE, "process_media", return_value=split_result):
                         with self.assertRaises(CLI.SubtitleSkillError) as raised:
                             CLI.run_transcribe(args)
                     self.assertEqual(raised.exception.error_type, "invalid_srt")
@@ -825,7 +1119,7 @@ class TranscribeControlTests(unittest.TestCase):
                 ]
             )
             split_result = ASRData([ASRDataSeg("Hello\n\nWorld", 0, 1000)])
-            with patch.object(CLI, "process_media", return_value=split_result):
+            with patch.object(TRANSCRIBE, "process_media", return_value=split_result):
                 with self.assertRaises(CLI.SubtitleSkillError) as raised:
                     CLI.run_transcribe(args)
             self.assertEqual(raised.exception.error_type, "invalid_srt")
@@ -885,6 +1179,29 @@ class TranscribeControlTests(unittest.TestCase):
                         pass
             self.assertEqual(raised.exception.error_type, "output_locked")
 
+    def test_pair_lock_rejects_hardlink_without_modifying_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            paths = CLI.output_paths(root, "same")
+            lock_key = "|".join(
+                sorted(CLI.file_identity(path) for path in paths.values())
+            )
+            digest = CLI.hashlib.sha256(lock_key.encode("utf-8")).hexdigest()[:16]
+            lock_path = root / f".subtitle-pair-{digest}.lock"
+            victim = root / "important.txt"
+            victim.write_bytes(b"preserve-me")
+            try:
+                os.link(victim, lock_path)
+            except OSError as exc:
+                self.skipTest(f"hardlinks unavailable: {exc}")
+
+            with self.assertRaises(CLI.SubtitleSkillError) as raised:
+                with CLI.output_pair_lock(paths, "normalize"):
+                    self.fail("unsafe hardlinked lock unexpectedly opened")
+
+            self.assertEqual(raised.exception.error_type, "unsafe_lock_path")
+            self.assertEqual(victim.read_bytes(), b"preserve-me")
+
     def test_losing_normalize_publisher_leaves_no_work_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -920,7 +1237,7 @@ class TranscribeControlTests(unittest.TestCase):
             args = CLI.build_parser().parse_args(
                 ["normalize", str(source), "--output-dir", str(output_dir)]
             )
-            original_validate = CLI.validate_main_outputs
+            original_validate = PUBLISHING.validate_main_outputs
             calls = 0
 
             def fail_second_validation(*call_args: object, **call_kwargs: object) -> None:
@@ -931,7 +1248,7 @@ class TranscribeControlTests(unittest.TestCase):
                 original_validate(*call_args, **call_kwargs)
 
             with patch.object(
-                CLI, "validate_main_outputs", side_effect=fail_second_validation
+                PUBLISHING, "validate_main_outputs", side_effect=fail_second_validation
             ):
                 result = CLI.run_normalize(args)
             self.assertTrue(result["ok"])
@@ -957,7 +1274,7 @@ class TranscribeControlTests(unittest.TestCase):
             args = CLI.build_parser().parse_args(
                 ["normalize", str(source), "--output-dir", str(output_dir)]
             )
-            original_promote = CLI.promote_temp_file
+            original_promote = PUBLISHING.promote_temp_file
             calls = 0
 
             def fail_srt_promotion(source_path: Path, target_path: Path) -> None:
@@ -968,7 +1285,7 @@ class TranscribeControlTests(unittest.TestCase):
                 original_promote(source_path, target_path)
 
             with patch.object(
-                CLI, "promote_temp_file", side_effect=fail_srt_promotion
+                PUBLISHING, "promote_temp_file", side_effect=fail_srt_promotion
             ):
                 with self.assertRaises(CLI.SubtitleSkillError) as raised:
                     CLI.run_normalize(args)
@@ -1000,7 +1317,7 @@ class TranscribeControlTests(unittest.TestCase):
                 )
                 return ASRData([ASRDataSeg("Hello.", 0, 1000)])
 
-            with patch.object(CLI, "process_media", side_effect=fake_process):
+            with patch.object(TRANSCRIBE, "process_media", side_effect=fake_process):
                 with self.assertRaises(CLI.SubtitleSkillError) as raised:
                     CLI.run_transcribe(args)
             self.assertEqual(raised.exception.error_type, "source_language_unreliable")
@@ -1028,7 +1345,7 @@ class TranscribeControlTests(unittest.TestCase):
                 )
                 return ASRData([ASRDataSeg("Hello.", 0, 1000)])
 
-            with patch.object(CLI, "process_media", side_effect=fake_process):
+            with patch.object(TRANSCRIBE, "process_media", side_effect=fake_process):
                 result = CLI.run_transcribe(args)
             source = Path(result["outputs"]["srt"])
             metadata = Path(result["metadata"])
@@ -1063,6 +1380,53 @@ class TranscribeControlTests(unittest.TestCase):
                 encoding="utf-8",
             )
             self.assertEqual(validated.returncode, 0, validated.stderr or validated.stdout)
+
+    def test_semantic_transcribe_reports_and_binds_checkpoint_progress(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "source.wav"
+            media.touch()
+            args = CLI.build_parser().parse_args(
+                [
+                    "transcribe",
+                    str(media),
+                    "--semantic-split",
+                    "--api-key",
+                    "test",
+                    "--output-dir",
+                    str(root / "out"),
+                ]
+            )
+            data = ASRData(
+                [
+                    ASRDataSeg(
+                        "Hello.",
+                        0,
+                        1000,
+                        words=[ASRWord("Hello.", 0, 1000)],
+                    )
+                ]
+            )
+            expected_progress = {
+                "checkpoint_path": str(root / "checkpoint.json"),
+                "chunk_count": 1,
+                "resumed_chunk_count": 0,
+                "completed_chunk_count": 1,
+            }
+
+            def fake_process(*_args: object, **kwargs: object) -> ASRData:
+                kwargs["asr_metadata_out"].update(
+                    {"language": "en", "language_probability": 1.0}
+                )
+                kwargs["split_progress_out"].update(expected_progress)
+                return data
+
+            with patch.object(TRANSCRIBE, "process_media", side_effect=fake_process):
+                result = CLI.run_transcribe(args)
+
+            self.assertEqual(result["semantic_split_progress"], expected_progress)
+            metadata = json.loads(Path(result["metadata"]).read_text(encoding="utf-8"))
+            self.assertEqual(metadata["semantic_split_progress"], expected_progress)
 
     def test_faster_whisper_receives_clip_and_no_vad(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1108,6 +1472,140 @@ class TranscribeControlTests(unittest.TestCase):
             kwargs = model.transcribe.call_args.kwargs
             self.assertFalse(kwargs["vad_filter"])
             self.assertEqual(kwargs["clip_timestamps"], [12.5, 18.0])
+
+    def test_faster_whisper_repairs_zero_duration_word_with_auditable_interval(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "source.wav"
+            media.touch()
+            model = Mock()
+            words = [
+                SimpleNamespace(word=" hello", start=0.0, end=0.5),
+                SimpleNamespace(word=" And", start=1.0, end=1.0),
+                SimpleNamespace(word=" so", start=1.0, end=1.2),
+            ]
+            segment = SimpleNamespace(
+                id=0,
+                start=0.0,
+                end=1.2,
+                text="hello And so",
+                words=words,
+            )
+            info = SimpleNamespace(
+                language="en",
+                language_probability=1.0,
+                duration=1.2,
+            )
+            model.transcribe.return_value = (iter([segment]), info)
+            config = TranscribeConfig(output_dir=str(root / "work"), language="en")
+            asr = FasterWhisperASR(str(media), config)
+            fake_module = types.ModuleType("faster_whisper")
+            fake_module.WhisperModel = object
+
+            with (
+                patch.dict(sys.modules, {"faster_whisper": fake_module}),
+                patch.object(
+                    asr,
+                    "_load_model_with_fallback",
+                    return_value=(model, "cpu", "int8"),
+                ),
+            ):
+                result = asr.run()
+
+            repaired_word = result.words[1]
+            self.assertEqual((repaired_word.start_time, repaired_word.end_time), (999, 1000))
+            raw_path = root / "work" / "source.asr.json"
+            raw_payload = json.loads(raw_path.read_text(encoding="utf-8"))
+            self.assertEqual(len(raw_payload["timestamp_repairs"]), 1)
+            repair = raw_payload["timestamp_repairs"][0]
+            self.assertEqual(repair["word"], " And")
+            self.assertEqual(repair["method"], "bounded_1ms_before_reported_time")
+            self.assertEqual(repair["original_start"], repair["original_end"])
+
+    def test_faster_whisper_repairs_zero_duration_word_forward_when_needed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "source.wav"
+            media.touch()
+            model = Mock()
+            segment = SimpleNamespace(
+                id=0,
+                start=0.0,
+                end=1.0,
+                text="And then",
+                words=[
+                    SimpleNamespace(word=" And", start=0.0, end=0.0),
+                    SimpleNamespace(word=" then", start=0.5, end=1.0),
+                ],
+            )
+            info = SimpleNamespace(language="en", language_probability=1.0, duration=1.0)
+            model.transcribe.return_value = (iter([segment]), info)
+            asr = FasterWhisperASR(
+                str(media),
+                TranscribeConfig(output_dir=str(root / "work"), language="en"),
+            )
+            fake_module = types.ModuleType("faster_whisper")
+            fake_module.WhisperModel = object
+
+            with (
+                patch.dict(sys.modules, {"faster_whisper": fake_module}),
+                patch.object(asr, "_load_model_with_fallback", return_value=(model, "cpu", "int8")),
+            ):
+                result = asr.run()
+
+            self.assertEqual((result.words[0].start_time, result.words[0].end_time), (0, 1))
+
+    def test_faster_whisper_does_not_repair_reverse_or_unbounded_timestamps(self) -> None:
+        cases = [
+            (
+                "reverse",
+                [SimpleNamespace(word=" bad", start=2.0, end=1.0)],
+                0.0,
+                3.0,
+            ),
+            (
+                "no-gap",
+                [
+                    SimpleNamespace(word=" before", start=0.0, end=1.0),
+                    SimpleNamespace(word=" zero", start=1.0, end=1.0),
+                    SimpleNamespace(word=" after", start=1.0, end=2.0),
+                ],
+                0.0,
+                2.0,
+            ),
+        ]
+        for name, words, segment_start, segment_end in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                media = root / "source.wav"
+                media.touch()
+                model = Mock()
+                segment = SimpleNamespace(
+                    id=0,
+                    start=segment_start,
+                    end=segment_end,
+                    text="bad timestamps",
+                    words=words,
+                )
+                info = SimpleNamespace(
+                    language="en",
+                    language_probability=1.0,
+                    duration=segment_end,
+                )
+                model.transcribe.return_value = (iter([segment]), info)
+                asr = FasterWhisperASR(
+                    str(media),
+                    TranscribeConfig(output_dir=str(root / "work"), language="en"),
+                )
+                fake_module = types.ModuleType("faster_whisper")
+                fake_module.WhisperModel = object
+
+                with (
+                    patch.dict(sys.modules, {"faster_whisper": fake_module}),
+                    patch.object(asr, "_load_model_with_fallback", return_value=(model, "cpu", "int8")),
+                ):
+                    with self.assertRaisesRegex(ValueError, "non-positive duration"):
+                        asr.run()
 
 
 if __name__ == "__main__":

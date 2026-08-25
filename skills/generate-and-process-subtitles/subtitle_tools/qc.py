@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
@@ -13,6 +14,7 @@ SHORT_WORD_LIMIT = 3
 SHORT_DURATION_MS = 800
 VIEWER_SHORT_DURATION_MS = 1000
 LONG_PAUSE_GAP_MS = 1500
+CONTINUATION_MAX_GAP_MS = 500
 DUPLICATE_SUFFIX_MAX_WORDS = 6
 DUPLICATE_SUFFIX_MAX_DURATION_MS = 1500
 SEAM_TOLERANCE_MS = 20
@@ -96,6 +98,17 @@ RELATIVE_CLAUSE_ENDINGS = {
     "who",
     "whom",
     "whose",
+}
+READABLE_CLAUSE_OPENERS = {
+    "although",
+    "because",
+    "between",
+    "that",
+    "unless",
+    "when",
+    "where",
+    "which",
+    "while",
 }
 INDEPENDENT_TO_OPENINGS = {
     ("to", "be", "clear"),
@@ -304,6 +317,7 @@ OK_SHORT_UTTERANCES = {
 }
 WORD_RE = re.compile(r"[A-Za-z0-9]+(?:['’][A-Za-z0-9]+)?", re.UNICODE)
 TERMINAL_PUNCT_RE = re.compile(r"""[.!?…。！？]["')\]”’）》】」』〕〉》]*$""")
+BOUNDARY_PUNCT_RE = re.compile(r"""[.!?,;:…。！？，；：]["')\]”’）》】」』〕〉》]*$""")
 CJK_RE = re.compile(r"[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]")
 CJK_HANGING_SHORTS = {
     "与",
@@ -396,6 +410,159 @@ def inspect_subtitle_path(
     )
 
 
+@dataclass(frozen=True)
+class CueContext:
+    cue: int
+    segment: ASRDataSeg
+    text: str
+    duration_ms: int
+    word_count: int
+    previous_segment: Optional[ASRDataSeg]
+    previous_text: str
+    next_text: str
+    gap_before_ms: Optional[int]
+    gap_after_ms: Optional[int]
+
+
+def build_cue_context(
+    asr_data: ASRData,
+    index: int,
+    *,
+    bilingual: bool,
+    english_line: str,
+) -> CueContext:
+    segment = asr_data.segments[index]
+    previous_segment = asr_data.segments[index - 1] if index > 0 else None
+    next_segment = asr_data.segments[index + 1] if index + 1 < len(asr_data.segments) else None
+    previous_text = (
+        english_text(previous_segment, bilingual=bilingual, english_line=english_line)
+        if previous_segment is not None
+        else ""
+    )
+    next_text = (
+        english_text(next_segment, bilingual=bilingual, english_line=english_line)
+        if next_segment is not None
+        else ""
+    )
+    text = english_text(segment, bilingual=bilingual, english_line=english_line)
+    return CueContext(
+        cue=index + 1,
+        segment=segment,
+        text=text,
+        duration_ms=max(0, segment.end_time - segment.start_time),
+        word_count=semantic_word_count(text),
+        previous_segment=previous_segment,
+        previous_text=previous_text,
+        next_text=next_text,
+        gap_before_ms=(
+            segment.start_time - previous_segment.end_time
+            if previous_segment is not None
+            else None
+        ),
+        gap_after_ms=(
+            next_segment.start_time - segment.end_time
+            if next_segment is not None
+            else None
+        ),
+    )
+
+
+def classify_cue_context(
+    cue: CueContext,
+    *,
+    seams: Sequence[int],
+    max_word_count_english: int,
+    max_display_chars_english: int,
+) -> tuple[List[str], bool, bool]:
+    reasons: List[str] = []
+    last_token = last_word_token(cue.text)
+    last = last_token.lower()
+    lowercase_continuation = next_starts_lower(cue.next_text)
+    uppercase_or_numeric_continuation = next_starts_upper_or_number(cue.next_text)
+    next_tokens = normalized_word_tokens(cue.next_text)
+    hanging = (
+        last in HANGING_ENDINGS
+        and not is_uppercase_label(last_token)
+        and (
+            last in ALWAYS_HANGING_ENDINGS
+            or not has_terminal_punctuation(cue.text)
+            or lowercase_continuation
+        )
+    )
+    if hanging:
+        reasons.append("hanging_function_word")
+    if last in HANGING_AUXILIARY_CONTRACTIONS:
+        reasons.append("hanging_auxiliary_contraction")
+    length_wrap = is_english_length_wrap(
+        cue.text,
+        max_word_count_english=max_word_count_english,
+        max_display_chars_english=max_display_chars_english,
+    )
+    if lowercase_continuation and (has_terminal_punctuation(cue.text) or not length_wrap):
+        reasons.append("lowercase_continuation")
+    if (
+        uppercase_or_numeric_continuation
+        and cue.gap_after_ms is not None
+        and 0 <= cue.gap_after_ms <= CONTINUATION_MAX_GAP_MS
+        and not has_boundary_punctuation(cue.text)
+        and (not next_tokens or next_tokens[0] != "to")
+        and (not next_tokens or next_tokens[0] not in READABLE_CLAUSE_OPENERS)
+    ):
+        reasons.append("unpunctuated_continuation")
+    if display_line_length(cue.text) > max_display_chars_english:
+        reasons.append("overlong_display_line")
+
+    short = cue.word_count < SHORT_WORD_LIMIT and cue.duration_ms < SHORT_DURATION_MS
+    few_words = cue.word_count < SHORT_WORD_LIMIT
+    allowed_short = is_allowed_short(cue.text)
+    if is_cjk_hanging_short(cue.text):
+        reasons.append("hanging_cjk_function_word")
+    if (
+        is_at_chunk_seam(cue.segment, seams, previous_segment=cue.previous_segment)
+        and few_words
+        and not allowed_short
+    ):
+        reasons.append("chunk_seam_fragment")
+    if short and not allowed_short:
+        reasons.append("short_fragment")
+    dependent_reason = classify_short_dependent_fragment(
+        cue.text,
+        previous_text=cue.previous_text,
+        duration_ms=cue.duration_ms,
+    )
+    if dependent_reason:
+        reasons.append(dependent_reason)
+    if (
+        cue.duration_ms <= DUPLICATE_SUFFIX_MAX_DURATION_MS
+        and is_adjacent_duplicate_suffix(cue.previous_text, cue.text)
+    ):
+        reasons.append("adjacent_duplicate_suffix")
+    if is_incomplete_before_long_gap(cue.text, gap_after_ms=cue.gap_after_ms):
+        reasons.append("incomplete_before_long_gap")
+    return list(dict.fromkeys(reasons)), short, allowed_short
+
+
+def make_context_finding(
+    cue: CueContext,
+    *,
+    severity: str,
+    reasons: List[str],
+) -> Dict[str, Any]:
+    return make_finding(
+        cue=cue.cue,
+        segment=cue.segment,
+        text=cue.text,
+        duration_ms=cue.duration_ms,
+        word_count=cue.word_count,
+        severity=severity,
+        reasons=reasons,
+        previous_text=cue.previous_text,
+        next_text=cue.next_text,
+        gap_before_ms=cue.gap_before_ms,
+        gap_after_ms=cue.gap_after_ms,
+    )
+
+
 def inspect_asr_data(
     asr_data: ASRData,
     *,
@@ -412,152 +579,49 @@ def inspect_asr_data(
     approvals = approved_cues or {}
     consumed_approvals: set[int] = set()
 
-    for index, segment in enumerate(asr_data.segments):
-        text = english_text(segment, bilingual=bilingual, english_line=english_line)
-        duration_ms = max(0, segment.end_time - segment.start_time)
-        word_count = semantic_word_count(text)
-        reasons: List[str] = []
-        last_token = last_word_token(text)
-        last = last_token.lower()
-        previous_segment = asr_data.segments[index - 1] if index > 0 else None
-        previous_text = ""
-        if previous_segment is not None:
-            previous_text = english_text(
-                previous_segment,
-                bilingual=bilingual,
-                english_line=english_line,
-            )
-        next_segment = None
-        next_text = ""
-        if index + 1 < len(asr_data.segments):
-            next_segment = asr_data.segments[index + 1]
-            next_text = english_text(
-                next_segment,
-                bilingual=bilingual,
-                english_line=english_line,
-            )
-        gap_before_ms = (
-            segment.start_time - previous_segment.end_time
-            if previous_segment is not None
-            else None
+    for index, _segment in enumerate(asr_data.segments):
+        cue = build_cue_context(
+            asr_data, index, bilingual=bilingual, english_line=english_line
         )
-        gap_after_ms = (
-            next_segment.start_time - segment.end_time
-            if next_segment is not None
-            else None
-        )
-
-        lowercase_continuation = next_starts_lower(next_text)
-        hanging = (
-            last in HANGING_ENDINGS
-            and not is_uppercase_label(last_token)
-            and (
-                last in ALWAYS_HANGING_ENDINGS
-                or not has_terminal_punctuation(text)
-                or lowercase_continuation
-            )
-        )
-        if hanging:
-            reasons.append("hanging_function_word")
-        if last in HANGING_AUXILIARY_CONTRACTIONS:
-            reasons.append("hanging_auxiliary_contraction")
-        length_wrap = is_english_length_wrap(
-            text,
+        reasons, short, allowed_short = classify_cue_context(
+            cue,
+            seams=seams,
             max_word_count_english=max_word_count_english,
             max_display_chars_english=max_display_chars_english,
         )
-        if lowercase_continuation and (has_terminal_punctuation(text) or not length_wrap):
-            reasons.append("lowercase_continuation")
-        if display_line_length(text) > max_display_chars_english:
-            reasons.append("overlong_display_line")
-
-        short = word_count < SHORT_WORD_LIMIT and duration_ms < SHORT_DURATION_MS
-        few_words = word_count < SHORT_WORD_LIMIT
-        allowed_short = is_allowed_short(text)
-        if is_cjk_hanging_short(text):
-            reasons.append("hanging_cjk_function_word")
-        at_seam = is_at_chunk_seam(
-            segment,
-            seams,
-            previous_segment=previous_segment,
-        )
-        if at_seam and few_words and not allowed_short:
-            reasons.append("chunk_seam_fragment")
-        if short and not allowed_short:
-            reasons.append("short_fragment")
-        dependent_reason = classify_short_dependent_fragment(
-            text,
-            previous_text=previous_text,
-            duration_ms=duration_ms,
-        )
-        if dependent_reason:
-            reasons.append(dependent_reason)
-        if (
-            duration_ms <= DUPLICATE_SUFFIX_MAX_DURATION_MS
-            and is_adjacent_duplicate_suffix(previous_text, text)
-        ):
-            reasons.append("adjacent_duplicate_suffix")
-        if is_incomplete_before_long_gap(text, gap_after_ms=gap_after_ms):
-            reasons.append("incomplete_before_long_gap")
-
-        approval = approvals.get(index + 1)
+        approval = approvals.get(cue.cue)
         if (
             reasons
             and approval is not None
-            and approval.get("text") == text
+            and approval.get("text") == cue.text
             and set(reasons).issubset(APPROVABLE_SHORT_REASONS)
         ):
-            approved = make_finding(
-                cue=index + 1,
-                segment=segment,
-                text=text,
-                duration_ms=duration_ms,
-                word_count=word_count,
+            approved = make_context_finding(
+                cue,
                 severity="ok_short",
                 reasons=["human_approved_complete_utterance"],
-                previous_text=previous_text,
-                next_text=next_text,
-                gap_before_ms=gap_before_ms,
-                gap_after_ms=gap_after_ms,
             )
             approved["approval_reason"] = approval.get("reason")
             findings.append(approved)
-            consumed_approvals.add(index + 1)
+            consumed_approvals.add(cue.cue)
             continue
 
         if not reasons:
             if short and allowed_short:
                 findings.append(
-                    make_finding(
-                        cue=index + 1,
-                        segment=segment,
-                        text=text,
-                        duration_ms=duration_ms,
-                        word_count=word_count,
+                    make_context_finding(
+                        cue,
                         severity="ok_short",
                         reasons=["allowed_short_utterance"],
-                        previous_text=previous_text,
-                        next_text=next_text,
-                        gap_before_ms=gap_before_ms,
-                        gap_after_ms=gap_after_ms,
                     )
                 )
             continue
 
-        unique_reasons = list(dict.fromkeys(reasons))
         findings.append(
-            make_finding(
-                cue=index + 1,
-                segment=segment,
-                text=text,
-                duration_ms=duration_ms,
-                word_count=word_count,
+            make_context_finding(
+                cue,
                 severity="high_risk",
-                reasons=unique_reasons,
-                previous_text=previous_text,
-                next_text=next_text,
-                gap_before_ms=gap_before_ms,
-                gap_after_ms=gap_after_ms,
+                reasons=reasons,
             )
         )
 
@@ -1001,9 +1065,21 @@ def has_terminal_punctuation(text: str) -> bool:
     return bool(TERMINAL_PUNCT_RE.search((text or "").strip()))
 
 
+def has_boundary_punctuation(text: str) -> bool:
+    return bool(BOUNDARY_PUNCT_RE.search((text or "").strip()))
+
+
 def next_starts_lower(text: str) -> bool:
     stripped = (text or "").lstrip("\"'“‘([{（［【《「『〈 ")
     return bool(stripped) and stripped[0].isalpha() and stripped[0].islower()
+
+
+def next_starts_upper_or_number(text: str) -> bool:
+    stripped = (text or "").lstrip("\"'“‘([{（［【《「『〈 ")
+    return bool(
+        stripped
+        and (stripped[0].isdigit() or (stripped[0].isalpha() and stripped[0].isupper()))
+    )
 
 
 def is_at_chunk_seam(

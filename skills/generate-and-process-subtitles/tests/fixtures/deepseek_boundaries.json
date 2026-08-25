@@ -1,0 +1,844 @@
+{
+  "source": "DeepSeek viewer-readability issue P01-P31",
+  "problem_boundaries": [
+    {
+      "problem": "P01",
+      "cue": 1,
+      "current": {
+        "text": "It feels like it's been a long time since we've gotten a new coding agent",
+        "start_ms": 0,
+        "end_ms": 3340
+      },
+      "next": {
+        "text": "Harness, but there's a new kid on the block.",
+        "start_ms": 3340,
+        "end_ms": 5740
+      }
+    },
+    {
+      "problem": "P02",
+      "cue": 3,
+      "current": {
+        "text": "DeepSeek has built and open sourced their own harness, and it already has",
+        "start_ms": 5860,
+        "end_ms": 9260
+      },
+      "next": {
+        "text": "165,000 stars in just a week.",
+        "start_ms": 9260,
+        "end_ms": 12960
+      }
+    },
+    {
+      "problem": "P03",
+      "cue": 5,
+      "current": {
+        "text": "Now, it is a bit rough around the edges, and we'll talk about that as well, but",
+        "start_ms": 13320,
+        "end_ms": 16460
+      },
+      "next": {
+        "text": "What I appreciate about it is it's the complete opposite of other coding agents",
+        "start_ms": 16460,
+        "end_ms": 20320
+      }
+    },
+    {
+      "problem": "P04",
+      "cue": 11,
+      "current": {
+        "text": "Goes to harnesses that are as easy as possible for us to build on top",
+        "start_ms": 33480,
+        "end_ms": 37620
+      },
+      "next": {
+        "text": "Of and customize. And what DeepSeek has created here is the ultimate version",
+        "start_ms": 37620,
+        "end_ms": 42300
+      }
+    },
+    {
+      "problem": "P05",
+      "cue": 14,
+      "current": {
+        "text": "It's a coding agent I've covered a lot on my channel before, still a fantastic",
+        "start_ms": 45180,
+        "end_ms": 48960
+      },
+      "next": {
+        "text": "Tool. Their original motto was, there are many coding agents out there, but",
+        "start_ms": 48960,
+        "end_ms": 53420
+      }
+    },
+    {
+      "problem": "P06",
+      "cue": 17,
+      "current": {
+        "text": "The idea being, let's create something very minimalistic and make it easy",
+        "start_ms": 55300,
+        "end_ms": 58880
+      },
+      "next": {
+        "text": "For people to build on top of with the idea of extensions.",
+        "start_ms": 58880,
+        "end_ms": 62600
+      }
+    },
+    {
+      "problem": "P07",
+      "cue": 22,
+      "current": {
+        "text": "Literally everything that makes up this interface for the harness",
+        "start_ms": 71100,
+        "end_ms": 74940
+      },
+      "next": {
+        "text": "And the underlying harness itself is made up of plugins.",
+        "start_ms": 74940,
+        "end_ms": 78480
+      }
+    },
+    {
+      "problem": "P08",
+      "cue": 33,
+      "current": {
+        "text": "As coding agents get more capable and it's easier for us to build our own",
+        "start_ms": 107400,
+        "end_ms": 111640
+      },
+      "next": {
+        "text": "Solutions, we don't want to just rely on something that works out of the box",
+        "start_ms": 111640,
+        "end_ms": 115620
+      }
+    },
+    {
+      "problem": "P09",
+      "cue": 43,
+      "current": {
+        "text": "I'm not telling you to just jump from Claude or Codex or Pi right",
+        "start_ms": 139260,
+        "end_ms": 142860
+      },
+      "next": {
+        "text": "Into DeepSeek's harness, but this is worth our attention because mark my words,",
+        "start_ms": 142860,
+        "end_ms": 147160
+      }
+    },
+    {
+      "problem": "P10",
+      "cue": 48,
+      "current": {
+        "text": "We're already at the point where self-evolving software is quite realistic",
+        "start_ms": 154220,
+        "end_ms": 157980
+      },
+      "next": {
+        "text": "In many ways. And so if we have coding agents building software very",
+        "start_ms": 157980,
+        "end_ms": 161920
+      }
+    },
+    {
+      "problem": "P11",
+      "cue": 61,
+      "current": {
+        "text": "Their plugin system is as granular as it possibly can be for having these",
+        "start_ms": 199460,
+        "end_ms": 204820
+      },
+      "next": {
+        "text": "Different components of functionality that guide the new tools we build on top",
+        "start_ms": 204820,
+        "end_ms": 209100
+      }
+    },
+    {
+      "problem": "P12",
+      "cue": 72,
+      "current": {
+        "text": "And then as we do that, I want to talk about, is it really worth going this",
+        "start_ms": 236800,
+        "end_ms": 240500
+      },
+      "next": {
+        "text": "Minimalistic or should we go a step up to Pi or just something totally out",
+        "start_ms": 240500,
+        "end_ms": 244900
+      }
+    },
+    {
+      "problem": "P13",
+      "cue": 76,
+      "current": {
+        "text": "But anyway, to get the harness up and running, you just have to either install",
+        "start_ms": 249560,
+        "end_ms": 253120
+      },
+      "next": {
+        "text": "From NPM or run from source.",
+        "start_ms": 253120,
+        "end_ms": 254940
+      }
+    },
+    {
+      "problem": "P14",
+      "cue": 88,
+      "current": {
+        "text": "So you have access to the default model for the platform, which is DeepSeek V",
+        "start_ms": 283900,
+        "end_ms": 287800
+      },
+      "next": {
+        "text": "3.1. And of course, you can add any provider that you want.",
+        "start_ms": 287800,
+        "end_ms": 292080
+      }
+    },
+    {
+      "problem": "P15",
+      "cue": 90,
+      "current": {
+        "text": "And so if you want to use different models and providers, it's you're totally",
+        "start_ms": 292420,
+        "end_ms": 295200
+      },
+      "next": {
+        "text": "Open source, so you're not locked into any specific model, like you are",
+        "start_ms": 295200,
+        "end_ms": 298620
+      }
+    },
+    {
+      "problem": "P16",
+      "cue": 96,
+      "current": {
+        "text": "The underlying composable system is very unique, but the way you interact",
+        "start_ms": 308320,
+        "end_ms": 312040
+      },
+      "next": {
+        "text": "With it is quite similar.",
+        "start_ms": 312040,
+        "end_ms": 313320
+      }
+    },
+    {
+      "problem": "P17",
+      "cue": 107,
+      "current": {
+        "text": "The sponsor of today's video is QVAC, Tether's free and open source local AI",
+        "start_ms": 337520,
+        "end_ms": 342020
+      },
+      "next": {
+        "text": "Platform. It gives you your entire local AI ecosystem in a single NPM install.",
+        "start_ms": 342020,
+        "end_ms": 347340
+      }
+    },
+    {
+      "problem": "P18",
+      "cue": 110,
+      "current": {
+        "text": "So what I have here is a desktop app I built with QVAC for querying a banking",
+        "start_ms": 349740,
+        "end_ms": 353780
+      },
+      "next": {
+        "text": "Database with plain English, definitely the kind of thing you want running 100%",
+        "start_ms": 353780,
+        "end_ms": 358200
+      }
+    },
+    {
+      "problem": "P19",
+      "cue": 115,
+      "current": {
+        "text": "Send in the question, Qwen3 is going to generate the query and I can even",
+        "start_ms": 367160,
+        "end_ms": 370800
+      },
+      "next": {
+        "text": "Approve it before it runs and then get the final answer.",
+        "start_ms": 370800,
+        "end_ms": 373840
+      }
+    },
+    {
+      "problem": "P20",
+      "cue": 125,
+      "current": {
+        "text": "They have their own models as well and LoRa fine tuning that you can run",
+        "start_ms": 404120,
+        "end_ms": 407500
+      },
+      "next": {
+        "text": "On your phone. So all this is for anyone building a desktop or mobile app",
+        "start_ms": 407500,
+        "end_ms": 411260
+      }
+    },
+    {
+      "problem": "P21",
+      "cue": 140,
+      "current": {
+        "text": "Everything you see on my screen here and in your harness UI is a plugin, even",
+        "start_ms": 450840,
+        "end_ms": 456020
+      },
+      "next": {
+        "text": "This button, even attaching files.",
+        "start_ms": 456020,
+        "end_ms": 457820
+      }
+    },
+    {
+      "problem": "P22",
+      "cue": 149,
+      "current": {
+        "text": "It looks like the kind of thing you'd have in an AI observability platform like",
+        "start_ms": 480120,
+        "end_ms": 484020
+      },
+      "next": {
+        "text": "LangFuse or LangSmith. So every single part of the agent loop, which you can",
+        "start_ms": 484020,
+        "end_ms": 488880
+      }
+    },
+    {
+      "problem": "P23",
+      "cue": 163,
+      "current": {
+        "text": "Now let's go back to the conversation here, because I want to show you",
+        "start_ms": 527780,
+        "end_ms": 530140
+      },
+      "next": {
+        "text": "The sub-agent delegation now.",
+        "start_ms": 530140,
+        "end_ms": 531680
+      }
+    },
+    {
+      "problem": "P24",
+      "cue": 187,
+      "current": {
+        "text": "So if we want to work with a PNG or something like a JPEG in a conversation, we",
+        "start_ms": 592460,
+        "end_ms": 596740
+      },
+      "next": {
+        "text": "Need a tool call to reach out to another model that can process that and then",
+        "start_ms": 596740,
+        "end_ms": 600560
+      }
+    },
+    {
+      "problem": "P25",
+      "cue": 199,
+      "current": {
+        "text": "And I know this path is really, really tiny on my screen right now, but this is",
+        "start_ms": 628880,
+        "end_ms": 632480
+      },
+      "next": {
+        "text": "A local path because RepoStats is actually a plugin I built myself.",
+        "start_ms": 632480,
+        "end_ms": 636980
+      }
+    },
+    {
+      "problem": "P26",
+      "cue": 209,
+      "current": {
+        "text": "I mean, this isn't super useful, but I'm sure your imagination can run wild",
+        "start_ms": 662720,
+        "end_ms": 666820
+      },
+      "next": {
+        "text": "At this point for the ways that you can extend this harness.",
+        "start_ms": 666820,
+        "end_ms": 669240
+      }
+    },
+    {
+      "problem": "P27",
+      "cue": 211,
+      "current": {
+        "text": "I know that you're like me, where you're probably using coding agents like",
+        "start_ms": 669620,
+        "end_ms": 672660
+      },
+      "next": {
+        "text": "Claude Code or Codex, and they work well most of the time, but I feel like",
+        "start_ms": 672660,
+        "end_ms": 676840
+      }
+    },
+    {
+      "problem": "P28",
+      "cue": 220,
+      "current": {
+        "text": "You can modify or create plugins to even change the inner agent loop",
+        "start_ms": 701460,
+        "end_ms": 705560
+      },
+      "next": {
+        "text": "Of the harness itself.",
+        "start_ms": 705560,
+        "end_ms": 706820
+      }
+    },
+    {
+      "problem": "P29",
+      "cue": 229,
+      "current": {
+        "text": "Starting this minimalistic, and then anything we need, we have to build",
+        "start_ms": 729180,
+        "end_ms": 732300
+      },
+      "next": {
+        "text": "On as plugins or components.",
+        "start_ms": 732300,
+        "end_ms": 733960
+      }
+    },
+    {
+      "problem": "P30",
+      "cue": 243,
+      "current": {
+        "text": "And of course, I want to repeat as well that DeepSeek's harness is definitely",
+        "start_ms": 775900,
+        "end_ms": 779220
+      },
+      "next": {
+        "text": "Unrefined. I mean, just going through some of the conversations here,",
+        "start_ms": 779220,
+        "end_ms": 782140
+      }
+    },
+    {
+      "problem": "P31",
+      "cue": 251,
+      "current": {
+        "text": "If you appreciated this video, you're looking forward to more things",
+        "start_ms": 801560,
+        "end_ms": 803960
+      },
+      "next": {
+        "text": "On self-extensible agents and using AI to code in general, I would appreciate",
+        "start_ms": 803960,
+        "end_ms": 808180
+      }
+    }
+  ],
+  "healthy_boundaries": [
+    {
+      "cue": 19,
+      "current": {
+        "text": "It's a self-extensible coding agent.",
+        "start_ms": 62800,
+        "end_ms": 65320
+      },
+      "next": {
+        "text": "And so with DeepSeek's harness, they have a very similar philosophy, but",
+        "start_ms": 65840,
+        "end_ms": 69240
+      }
+    },
+    {
+      "cue": 24,
+      "current": {
+        "text": "That's the idea that drives everything is plugins.",
+        "start_ms": 78840,
+        "end_ms": 81040
+      },
+      "next": {
+        "text": "It's the composable units under the hood that stitch together, create",
+        "start_ms": 81180,
+        "end_ms": 84720
+      }
+    },
+    {
+      "cue": 27,
+      "current": {
+        "text": "And so we can toggle these on and off.",
+        "start_ms": 87100,
+        "end_ms": 88820
+      },
+      "next": {
+        "text": "We can go to their plugin marketplace to install third-party tools to build",
+        "start_ms": 88980,
+        "end_ms": 92220
+      }
+    },
+    {
+      "cue": 42,
+      "current": {
+        "text": "Now, here's the thing.",
+        "start_ms": 138200,
+        "end_ms": 138960
+      },
+      "next": {
+        "text": "I'm not telling you to just jump from Claude or Codex or Pi right",
+        "start_ms": 139260,
+        "end_ms": 142860
+      }
+    },
+    {
+      "cue": 45,
+      "current": {
+        "text": "This kind of harness is going to be optimal for you very soon.",
+        "start_ms": 147580,
+        "end_ms": 150860
+      },
+      "next": {
+        "text": "Just hear me out on this for a bit.",
+        "start_ms": 151060,
+        "end_ms": 152220
+      }
+    },
+    {
+      "cue": 46,
+      "current": {
+        "text": "Just hear me out on this for a bit.",
+        "start_ms": 151060,
+        "end_ms": 152220
+      },
+      "next": {
+        "text": "I think it's going to click for you very quickly.",
+        "start_ms": 152260,
+        "end_ms": 153920
+      }
+    },
+    {
+      "cue": 47,
+      "current": {
+        "text": "I think it's going to click for you very quickly.",
+        "start_ms": 152260,
+        "end_ms": 153920
+      },
+      "next": {
+        "text": "We're already at the point where self-evolving software is quite realistic",
+        "start_ms": 154220,
+        "end_ms": 157980
+      }
+    },
+    {
+      "cue": 52,
+      "current": {
+        "text": "That's the whole idea of a self-extensible coding agent.",
+        "start_ms": 169460,
+        "end_ms": 172320
+      },
+      "next": {
+        "text": "That's what made Pi so incredibly popular earlier this year.",
+        "start_ms": 172460,
+        "end_ms": 175480
+      }
+    },
+    {
+      "cue": 53,
+      "current": {
+        "text": "That's what made Pi so incredibly popular earlier this year.",
+        "start_ms": 172460,
+        "end_ms": 175480
+      },
+      "next": {
+        "text": "But in order to make it as viable as possible for a coding agent to work",
+        "start_ms": 175780,
+        "end_ms": 179840
+      }
+    },
+    {
+      "cue": 60,
+      "current": {
+        "text": "And that's exactly what DeepSeek is building here.",
+        "start_ms": 197180,
+        "end_ms": 199380
+      },
+      "next": {
+        "text": "Their plugin system is as granular as it possibly can be for having these",
+        "start_ms": 199460,
+        "end_ms": 204820
+      }
+    },
+    {
+      "cue": 64,
+      "current": {
+        "text": "That's what I love most about this.",
+        "start_ms": 212100,
+        "end_ms": 213620
+      },
+      "next": {
+        "text": "And the cool part is you don't have to build these plugins yourself.",
+        "start_ms": 213680,
+        "end_ms": 216820
+      }
+    },
+    {
+      "cue": 65,
+      "current": {
+        "text": "And the cool part is you don't have to build these plugins yourself.",
+        "start_ms": 213680,
+        "end_ms": 216820
+      },
+      "next": {
+        "text": "They literally have a mode built into this called creator mode that guides you",
+        "start_ms": 216920,
+        "end_ms": 221740
+      }
+    },
+    {
+      "cue": 70,
+      "current": {
+        "text": "Cool. So with that, I want to show you how to get the harness up and running,",
+        "start_ms": 231260,
+        "end_ms": 234200
+      },
+      "next": {
+        "text": "And we'll go through some of the features together as well.",
+        "start_ms": 234220,
+        "end_ms": 236520
+      }
+    },
+    {
+      "cue": 75,
+      "current": {
+        "text": "Definitely some pros and cons there.",
+        "start_ms": 247560,
+        "end_ms": 249200
+      },
+      "next": {
+        "text": "But anyway, to get the harness up and running, you just have to either install",
+        "start_ms": 249560,
+        "end_ms": 253120
+      }
+    },
+    {
+      "cue": 78,
+      "current": {
+        "text": "So of course, I'll link to this GitHub repo in the description.",
+        "start_ms": 255120,
+        "end_ms": 257420
+      },
+      "next": {
+        "text": "So you can go to this readme here.",
+        "start_ms": 257680,
+        "end_ms": 259340
+      }
+    },
+    {
+      "cue": 79,
+      "current": {
+        "text": "So you can go to this readme here.",
+        "start_ms": 257680,
+        "end_ms": 259340
+      },
+      "next": {
+        "text": "The even easier way to get this up and running, and this is what I did, is I",
+        "start_ms": 259400,
+        "end_ms": 262820
+      }
+    },
+    {
+      "cue": 85,
+      "current": {
+        "text": "So I'm working with all my coding agents locally.",
+        "start_ms": 273740,
+        "end_ms": 275860
+      },
+      "next": {
+        "text": "And for getting the models set up, going to the models tab right here, you can",
+        "start_ms": 276560,
+        "end_ms": 280700
+      }
+    },
+    {
+      "cue": 93,
+      "current": {
+        "text": "That's one of the big benefits that I was talking about earlier.",
+        "start_ms": 299660,
+        "end_ms": 302160
+      },
+      "next": {
+        "text": "So once you have your LLM configured, you just start a new session.",
+        "start_ms": 302360,
+        "end_ms": 305200
+      }
+    },
+    {
+      "cue": 94,
+      "current": {
+        "text": "So once you have your LLM configured, you just start a new session.",
+        "start_ms": 302360,
+        "end_ms": 305200
+      },
+      "next": {
+        "text": "And then working with the harness is very similar to other coding agents.",
+        "start_ms": 305340,
+        "end_ms": 308140
+      }
+    },
+    {
+      "cue": 98,
+      "current": {
+        "text": "I mean, this just looks like a good old Claude.ai or ChatGPT.",
+        "start_ms": 313420,
+        "end_ms": 316880
+      },
+      "next": {
+        "text": "There are a couple of different modes, though.",
+        "start_ms": 317200,
+        "end_ms": 318700
+      }
+    },
+    {
+      "cue": 103,
+      "current": {
+        "text": "The harness can improve itself.",
+        "start_ms": 328420,
+        "end_ms": 329840
+      },
+      "next": {
+        "text": "We even have Orchestrator Modes, we can call other coding agents like Claude",
+        "start_ms": 329840,
+        "end_ms": 333700
+      }
+    },
+    {
+      "cue": 106,
+      "current": {
+        "text": "We'll cover all this in a little bit.",
+        "start_ms": 335820,
+        "end_ms": 337240
+      },
+      "next": {
+        "text": "The sponsor of today's video is QVAC, Tether's free and open source local AI",
+        "start_ms": 337520,
+        "end_ms": 342020
+      }
+    },
+    {
+      "cue": 109,
+      "current": {
+        "text": "Let me show you the kinds of things you can build with it.",
+        "start_ms": 347560,
+        "end_ms": 349640
+      },
+      "next": {
+        "text": "So what I have here is a desktop app I built with QVAC for querying a banking",
+        "start_ms": 349740,
+        "end_ms": 353780
+      }
+    },
+    {
+      "cue": 119,
+      "current": {
+        "text": "In fact, I'm in airplane mode right now and everything still works here.",
+        "start_ms": 380820,
+        "end_ms": 383900
+      },
+      "next": {
+        "text": "And QVAC isn't just another way to run local models like Ollama or LM Studio.",
+        "start_ms": 384240,
+        "end_ms": 388560
+      }
+    },
+    {
+      "cue": 123,
+      "current": {
+        "text": "They have it all.",
+        "start_ms": 398160,
+        "end_ms": 398920
+      },
+      "next": {
+        "text": "And you can bring in any open models like DeepSeek or Qwen, any GGUF file.",
+        "start_ms": 399060,
+        "end_ms": 403960
+      }
+    },
+    {
+      "cue": 130,
+      "current": {
+        "text": "It's Apache 2.0 and there are no API keys in any of this.",
+        "start_ms": 417940,
+        "end_ms": 421180
+      },
+      "next": {
+        "text": "All of the models are just stored on my drive.",
+        "start_ms": 421260,
+        "end_ms": 423600
+      }
+    },
+    {
+      "cue": 131,
+      "current": {
+        "text": "All of the models are just stored on my drive.",
+        "start_ms": 421260,
+        "end_ms": 423600
+      },
+      "next": {
+        "text": "So also nothing here can get rate limited or repriced from under me.",
+        "start_ms": 423720,
+        "end_ms": 426940
+      }
+    },
+    {
+      "cue": 132,
+      "current": {
+        "text": "So also nothing here can get rate limited or repriced from under me.",
+        "start_ms": 423720,
+        "end_ms": 426940
+      },
+      "next": {
+        "text": "I'll have a link in the description.",
+        "start_ms": 427100,
+        "end_ms": 428500
+      }
+    },
+    {
+      "cue": 136,
+      "current": {
+        "text": "So let me just show you some things from my existing conversations.",
+        "start_ms": 435740,
+        "end_ms": 438700
+      },
+      "next": {
+        "text": "So first thing here, every single action that you see, like context injection,",
+        "start_ms": 439300,
+        "end_ms": 443680
+      }
+    },
+    {
+      "cue": 147,
+      "current": {
+        "text": "This trajectory view, which I absolutely love.",
+        "start_ms": 474720,
+        "end_ms": 477380
+      },
+      "next": {
+        "text": "I've never seen this in a coding agent before.",
+        "start_ms": 477440,
+        "end_ms": 479760
+      }
+    },
+    {
+      "cue": 148,
+      "current": {
+        "text": "I've never seen this in a coding agent before.",
+        "start_ms": 477440,
+        "end_ms": 479760
+      },
+      "next": {
+        "text": "It looks like the kind of thing you'd have in an AI observability platform like",
+        "start_ms": 480120,
+        "end_ms": 484020
+      }
+    }
+  ]
+}

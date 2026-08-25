@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
+import tempfile
 import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(SKILL_ROOT) not in sys.path:
@@ -20,6 +22,7 @@ from subtitle_tools.split import (
     split_by_llm,
     validate_split_result,
 )
+from subtitle_tools.llm import call_llm
 
 
 def make_words(*tokens: str, start: int = 0, duration: int = 200, gap: int = 0) -> list[ASRWord]:
@@ -45,6 +48,109 @@ def asr_from_words(words: list[ASRWord]) -> ASRData:
 
 
 class SplitSeamTests(unittest.TestCase):
+    def test_completed_chunks_are_checkpointed_and_resumed(self) -> None:
+        words = make_words("One", "done.", "Next", "ends.")
+        source = asr_from_words(words)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            first_calls: list[str] = []
+
+            def interrupted_split(text: str, **_kwargs: object) -> list[str]:
+                first_calls.append(text)
+                if text == "Next ends.":
+                    raise RuntimeError("simulated interruption")
+                return [text]
+
+            with self.assertRaisesRegex(RuntimeError, "simulated interruption"):
+                split_subtitle(
+                    source,
+                    model="test",
+                    chunk_word_limit=2,
+                    split_fn=interrupted_split,
+                    checkpoint_dir=temp_dir,
+                )
+
+            checkpoint = next(Path(temp_dir).glob("semantic-split-*.checkpoint.json"))
+            self.assertTrue(checkpoint.is_file())
+            checkpoint_payload = json.loads(checkpoint.read_text(encoding="utf-8"))
+            cached_segment = checkpoint_payload["completed_chunks"][0][0]
+            cached_segment["text"] = "INJECTED TEXT"
+            cached_segment["start_time"] = 100
+            cached_segment["end_time"] = 200
+            checkpoint.write_text(
+                json.dumps(checkpoint_payload),
+                encoding="utf-8",
+            )
+            second_calls: list[str] = []
+            progress: dict[str, object] = {}
+
+            def resumed_split(text: str, **_kwargs: object) -> list[str]:
+                second_calls.append(text)
+                return [text]
+
+            result = split_subtitle(
+                source,
+                model="test",
+                chunk_word_limit=2,
+                split_fn=resumed_split,
+                checkpoint_dir=temp_dir,
+                progress_state_out=progress,
+            )
+
+            self.assertEqual(first_calls, ["One done.", "Next ends."])
+            self.assertEqual(second_calls, ["Next ends."])
+            self.assertEqual(progress["resumed_chunk_count"], 1)
+            self.assertEqual(progress["completed_chunk_count"], 2)
+            self.assertEqual(result.segments[0].text, "One done.")
+            self.assertEqual(
+                (result.segments[0].start_time, result.segments[0].end_time),
+                (words[0].start_time, words[1].end_time),
+            )
+            self.assertEqual(join_word_texts(result.words), join_word_texts(words))
+
+    def test_malformed_checkpoint_word_is_ignored_and_recomputed(self) -> None:
+        words = make_words("One", "done.")
+        source = asr_from_words(words)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            split_subtitle(
+                source,
+                model="test",
+                split_fn=lambda text, **_kwargs: [text],
+                checkpoint_dir=temp_dir,
+            )
+            checkpoint = next(Path(temp_dir).glob("semantic-split-*.checkpoint.json"))
+            payload = json.loads(checkpoint.read_text(encoding="utf-8"))
+            del payload["completed_chunks"][0][0]["words"][0]["text"]
+            checkpoint.write_text(json.dumps(payload), encoding="utf-8")
+            calls: list[str] = []
+
+            result = split_subtitle(
+                source,
+                model="test",
+                split_fn=lambda text, **_kwargs: (calls.append(text) or [text]),
+                checkpoint_dir=temp_dir,
+            )
+
+            self.assertEqual(calls, ["One done."])
+            self.assertEqual(join_word_texts(result.words), "One done.")
+
+    def test_explicit_llm_timeout_disables_nested_client_retries(self) -> None:
+        client = Mock()
+        request_client = Mock()
+        client.with_options.return_value = request_client
+        request_client.chat.completions.create.side_effect = TimeoutError("timed out")
+
+        with patch("subtitle_tools.llm.get_llm_client", return_value=client):
+            with self.assertRaisesRegex(TimeoutError, "timed out"):
+                call_llm(
+                    messages=[{"role": "user", "content": "hello"}],
+                    model="test",
+                    timeout_seconds=7,
+                )
+
+        client.with_options.assert_called_once_with(timeout=7, max_retries=0)
+        request_client.chat.completions.create.assert_called_once()
+
     def test_chunking_prefers_punctuation_near_the_limit(self) -> None:
         words = make_words(*[f"w{i}" for i in range(1, 8)], "done.", "keep", "going", "now")
         splitter = SubtitleSplitter(model="test", chunk_word_limit=10)
@@ -450,7 +556,7 @@ class SplitSeamTests(unittest.TestCase):
             choices=[SimpleNamespace(message=SimpleNamespace(content=text))]
         )
 
-        with patch("subtitle_tools.split.call_llm", return_value=response):
+        with patch("subtitle_tools.split.call_llm", return_value=response) as mocked_call:
             with self.assertRaisesRegex(
                 SubtitleSplitValidationError, "exceeds length limit"
             ):
@@ -462,6 +568,7 @@ class SplitSeamTests(unittest.TestCase):
                     max_word_count_english=21,
                     max_retries=1,
                 )
+        self.assertEqual(mocked_call.call_args.kwargs["timeout_seconds"], 180)
 
 
 if __name__ == "__main__":

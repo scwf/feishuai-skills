@@ -5,8 +5,6 @@ from typing import Any, List, Optional
 from urllib.parse import urlparse, urlunparse
 
 from openai import OpenAI
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_random_exponential
-
 from .local_config import load_local_llm_config
 from .utils import setup_logger
 
@@ -61,24 +59,25 @@ def get_llm_client(api_key: Optional[str] = None, base_url: Optional[str] = None
     return _client
 
 
-@retry(
-    stop=stop_after_attempt(5),
-    wait=wait_random_exponential(multiplier=1, min=2, max=30),
-    retry=retry_if_exception_type(Exception),
-    reraise=True,
-)
 def call_llm(
     messages: List[dict],
     model: str,
     temperature: float = 0.2,
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
+    timeout_seconds: Optional[float] = None,
     **kwargs: Any,
 ) -> Any:
     client = get_llm_client(api_key, base_url)
 
     try:
-        response = client.chat.completions.create(
+        request_client = client
+        if timeout_seconds is not None:
+            request_client = client.with_options(
+                timeout=timeout_seconds,
+                max_retries=0,
+            )
+        response = request_client.chat.completions.create(
             model=model,
             messages=messages,
             temperature=temperature,

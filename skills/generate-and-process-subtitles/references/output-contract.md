@@ -15,3 +15,5 @@ Publication rules:
 Standalone QC writes its full report atomically. Default report names are digest-suffixed and cannot alias inputs. Console JSON is ASCII-safe and bounded so legacy Windows code pages and large reports do not change the exit contract.
 
 With `--require-language`, metadata records the required and detected language, evidence origin/confidence, exact source path, and SHA-256 of canonical emitted SRT bytes. Its content-addressed filename also binds the complete metadata payload, including any immutable context path and context SHA-256, so a different video cannot overwrite earlier evidence. Downstream consumers must validate those exact bindings.
+
+Raw ASR JSON is immutable and content-addressed. ASR transcription results and metadata expose `raw_asr_json`, `raw_asr_hash_algorithm`, `raw_asr_sha256`, and `timestamp_repair_summary`. When bounded word-timestamp repair is blocked, the structured error exposes the same hash-bound evidence instead of publishing final SRT/TXT files.

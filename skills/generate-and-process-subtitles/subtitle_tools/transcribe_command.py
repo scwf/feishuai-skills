@@ -8,6 +8,11 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import parse_qs, urlparse
 
+from .asr.faster_whisper import TimestampRepairLimitError
+from .config import (
+    DEFAULT_MAX_PACKED_CLUSTER_SIZE,
+    DEFAULT_MAX_PACKED_WORD_REPAIRS_PER_10K,
+)
 from .core import process_media
 from .llm_runtime import llm_base_url, require_llm_api_key
 from .publishing import (
@@ -287,6 +292,14 @@ def initial_transcribe_metadata(
         "requested_vad_filter": not args.no_vad,
         "effective_vad_filter": effective_vad_filter,
         "clip_timestamps": clip_timestamps,
+        "max_packed_word_repairs_per_10k": getattr(
+            args,
+            "max_packed_word_repairs_per_10k",
+            DEFAULT_MAX_PACKED_WORD_REPAIRS_PER_10K,
+        ),
+        "max_packed_cluster_size": getattr(
+            args, "max_packed_cluster_size", DEFAULT_MAX_PACKED_CLUSTER_SIZE
+        ),
         "semantic_split": bool(args.semantic_split),
         "used_manual_subtitles": False,
     }
@@ -408,6 +421,14 @@ def run_asr(
             language=args.language,
             vad_filter=effective_vad_filter,
             clip_timestamps=clip_timestamps,
+            max_packed_word_repairs_per_10k=getattr(
+                args,
+                "max_packed_word_repairs_per_10k",
+                DEFAULT_MAX_PACKED_WORD_REPAIRS_PER_10K,
+            ),
+            max_packed_cluster_size=getattr(
+                args, "max_packed_cluster_size", DEFAULT_MAX_PACKED_CLUSTER_SIZE
+            ),
             split_enabled=args.semantic_split,
             split_model=args.split_model,
             split_max_chars_cjk=args.split_max_chars_cjk,
@@ -424,6 +445,23 @@ def run_asr(
             split_checkpoint_dir=str(work_dir) if args.semantic_split else None,
             split_progress_out=split_progress if args.semantic_split else None,
         )
+    except TimestampRepairLimitError as exc:
+        raise SubtitleSkillError(
+            str(exc),
+            action="transcribe",
+            step="repair_word_timestamps",
+            error_type="timestamp_repair_blocked",
+            suggested_fix=(
+                "Inspect the raw ASR JSON and repair summary. Change a safety limit only "
+                "after confirming the timestamp collapse is local rather than a broader alignment failure."
+            ),
+            details={
+                "raw_asr_json": str(exc.raw_asr_path),
+                "raw_asr_hash_algorithm": "sha256",
+                "raw_asr_sha256": exc.raw_asr_sha256,
+                "timestamp_repair_summary": exc.repair_summary,
+            },
+        ) from exc
     except SubtitleSplitValidationError as exc:
         raise wrap_split_validation_error(exc, "transcribe") from exc
     require_valid_asr_timeline(asr_data, "transcribe")
@@ -499,6 +537,16 @@ def publish_asr_transcription(
         semantic_split_progress = asr_metadata.get("semantic_split_progress")
         if semantic_split_progress:
             metadata["semantic_split_progress"] = semantic_split_progress
+        if asr_metadata.get("raw_asr_json"):
+            metadata["raw_asr_json"] = asr_metadata["raw_asr_json"]
+            metadata["raw_asr_hash_algorithm"] = asr_metadata[
+                "raw_asr_hash_algorithm"
+            ]
+            metadata["raw_asr_sha256"] = asr_metadata["raw_asr_sha256"]
+        if asr_metadata.get("timestamp_repair_summary"):
+            metadata["timestamp_repair_summary"] = asr_metadata[
+                "timestamp_repair_summary"
+            ]
         metadata_path = metadata_output_path(
             work_dir,
             base_name,
@@ -549,6 +597,14 @@ def publish_asr_transcription(
         payload.update(qc_fields)
     if asr_metadata.get("semantic_split_progress"):
         payload["semantic_split_progress"] = asr_metadata["semantic_split_progress"]
+    if asr_metadata.get("raw_asr_json"):
+        payload["raw_asr_json"] = asr_metadata["raw_asr_json"]
+        payload["raw_asr_hash_algorithm"] = asr_metadata["raw_asr_hash_algorithm"]
+        payload["raw_asr_sha256"] = asr_metadata["raw_asr_sha256"]
+    if asr_metadata.get("timestamp_repair_summary"):
+        payload["timestamp_repair_summary"] = asr_metadata[
+            "timestamp_repair_summary"
+        ]
     return payload
 
 

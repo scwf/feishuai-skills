@@ -6,6 +6,8 @@ DEFAULT_MODEL_NAME = "large-v2"
 DEFAULT_WORK_DIR_NAME = "_subtitle_work"
 DEFAULT_LLM_BASE_URL = "https://api.deepseek.com/v1"
 DEFAULT_LLM_MODEL = "deepseek-v4-flash"
+DEFAULT_MAX_PACKED_WORD_REPAIRS_PER_10K = 50
+DEFAULT_MAX_PACKED_CLUSTER_SIZE = 4
 
 
 @dataclass
@@ -21,6 +23,8 @@ class TranscribeConfig:
     vad_threshold: float = 0.5
     clip_timestamps: Optional[list[float]] = None
     prompt: Optional[str] = None
+    max_packed_word_repairs_per_10k: int = DEFAULT_MAX_PACKED_WORD_REPAIRS_PER_10K
+    max_packed_cluster_size: int = DEFAULT_MAX_PACKED_CLUSTER_SIZE
     split_enabled: bool = False
     split_model: Optional[str] = None
     split_max_chars_cjk: int = 25

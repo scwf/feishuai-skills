@@ -18,7 +18,16 @@ For YouTube, metadata includes title, channel, and description. When description
 
 Useful ASR controls include `--model`, `--device`, `--compute-type`, and `--language`. Defaults and optional Windows GPU setup are in [setup.md](setup.md).
 
-Faster-whisper can rarely emit a word whose start and end timestamps are identical. When there is a proven non-overlapping gap immediately beside that word, the adapter assigns only a 1 ms bounded interval and records the original timestamps, repaired timestamps, token, indices, and method in raw ASR JSON under `timestamp_repairs`. If no safe adjacent interval exists, strict timeline validation still stops the run; the program never shifts neighboring words or silently drops the token.
+Faster-whisper can emit words that collapse to zero duration after millisecond quantization. These events may accumulate on long media even when they are sparse per word. For an isolated word, the adapter first uses a proven adjacent gap for a 1 ms interval. A multi-word cluster at one timestamp is planned as a unit: it consumes only the required milliseconds from the cluster's outer gaps first, then may borrow any remainder from an adjacent positive-duration word in the same segment while leaving that donor at least 20 ms long. It never crosses segment boundaries or repairs reverse timestamps.
+
+Every changed zero-duration word and donor adjustment is recorded in raw ASR JSON under `timestamp_repairs`. `timestamp_repair_summary` reports gap repairs, packed clusters, repaired words, donor adjustments, borrowed milliseconds, safety limits, and whether a large repaired cluster merits review. The defaults allow at most 50 packed-word repairs per 10,000 ASR words and a maximum contiguous run of 4 zero-duration words, measured by original word order before any gap repair even when their timestamps are staggered; short inputs receive enough allowance for one maximum-size run. Console cluster samples contain only bounded token excerpts, while the complete evidence remains in hash-bound raw ASR JSON. Override limits only after inspecting that raw alignment:
+
+```bash
+--max-packed-word-repairs-per-10k 50
+--max-packed-cluster-size 4
+```
+
+The corresponding environment variables are `SUBTITLE_MAX_PACKED_WORD_REPAIRS_PER_10K` and `SUBTITLE_MAX_PACKED_CLUSTER_SIZE`. Exceeding a limit, lacking a safe donor, or finding a contiguous zero-duration run whose original timestamps move backward remains a hard stop before any timestamp is changed. The structured error includes the raw ASR JSON path, SHA-256, bounded diagnostic samples, and repair summary; the unchanged strict timeline validator still runs after every successful repair.
 
 ## Targeted Missing-Speech Recovery
 

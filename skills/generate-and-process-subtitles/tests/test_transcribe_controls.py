@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import os
 import subprocess
@@ -32,11 +33,119 @@ CLI_SPEC.loader.exec_module(CLI)
 from subtitle_tools import ASRData, ASRDataSeg, ASRWord, core  # noqa: E402
 from subtitle_tools import publishing as PUBLISHING  # noqa: E402
 from subtitle_tools import transcribe_command as TRANSCRIBE  # noqa: E402
-from subtitle_tools.asr.faster_whisper import FasterWhisperASR  # noqa: E402
+from subtitle_tools.asr.faster_whisper import (  # noqa: E402
+    FasterWhisperASR,
+    TimestampRepairLimitError,
+)
 from subtitle_tools.config import TranscribeConfig  # noqa: E402
 
 
 class TranscribeControlTests(unittest.TestCase):
+    def test_parser_exposes_packed_timestamp_repair_limits(self) -> None:
+        args = CLI.build_parser().parse_args(
+            [
+                "transcribe",
+                "input.mp4",
+                "--max-packed-word-repairs-per-10k",
+                "25",
+                "--max-packed-cluster-size",
+                "3",
+            ]
+        )
+
+        self.assertEqual(args.max_packed_word_repairs_per_10k, 25)
+        self.assertEqual(args.max_packed_cluster_size, 3)
+
+    def test_raw_asr_evidence_is_content_addressed_and_hash_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "source.wav"
+            media.touch()
+
+            def run_fixture(text: str) -> tuple[Path, str]:
+                model = Mock()
+                segment = SimpleNamespace(
+                    id=0,
+                    start=0.0,
+                    end=0.5,
+                    text=text,
+                    words=[SimpleNamespace(word=f" {text}", start=0.0, end=0.5)],
+                )
+                info = SimpleNamespace(
+                    language="en", language_probability=1.0, duration=0.5
+                )
+                model.transcribe.return_value = (iter([segment]), info)
+                asr = FasterWhisperASR(
+                    str(media),
+                    TranscribeConfig(output_dir=str(root / "work"), language="en"),
+                )
+                fake_module = types.ModuleType("faster_whisper")
+                fake_module.WhisperModel = object
+                with (
+                    patch.dict(sys.modules, {"faster_whisper": fake_module}),
+                    patch.object(
+                        asr,
+                        "_load_model_with_fallback",
+                        return_value=(model, "cpu", "int8"),
+                    ),
+                ):
+                    asr.run()
+                return (
+                    Path(asr.result_metadata["raw_asr_json"]),
+                    asr.result_metadata["raw_asr_sha256"],
+                )
+
+            first_path, first_hash = run_fixture("hello")
+            first_bytes = first_path.read_bytes()
+            second_path, second_hash = run_fixture("world")
+
+            self.assertNotEqual(first_path, second_path)
+            self.assertEqual(first_path.read_bytes(), first_bytes)
+            self.assertEqual(hashlib.sha256(first_bytes).hexdigest(), first_hash)
+            self.assertEqual(
+                hashlib.sha256(second_path.read_bytes()).hexdigest(), second_hash
+            )
+            self.assertIn(first_hash[:12], first_path.name)
+            self.assertIn(second_hash[:12], second_path.name)
+
+    def test_run_asr_wraps_timestamp_repair_block_with_raw_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "source.wav"
+            media.touch()
+            raw_path = root / "source.asr.json"
+            raw_path.write_text("{}", encoding="utf-8")
+            args = CLI.build_parser().parse_args(["transcribe", str(media)])
+            repair_summary = {
+                "status": "blocked",
+                "blocked_reasons": ["fixture limit"],
+            }
+
+            with patch.object(
+                TRANSCRIBE,
+                "process_media",
+                side_effect=TimestampRepairLimitError(
+                    "packed zero-duration ASR repair was blocked: fixture limit",
+                    raw_asr_path=raw_path,
+                    raw_asr_sha256="0" * 64,
+                    repair_summary=repair_summary,
+                ),
+            ):
+                with self.assertRaises(CLI.SubtitleSkillError) as raised:
+                    TRANSCRIBE.run_asr(
+                        args,
+                        work_dir=root,
+                        effective_vad_filter=True,
+                        clip_timestamps=None,
+                    )
+
+            self.assertEqual(raised.exception.error_type, "timestamp_repair_blocked")
+            self.assertEqual(raised.exception.details["raw_asr_json"], str(raw_path))
+            self.assertEqual(raised.exception.details["raw_asr_sha256"], "0" * 64)
+            self.assertEqual(
+                raised.exception.details["timestamp_repair_summary"], repair_summary
+            )
+
     def test_parser_accepts_targeted_no_vad_controls(self) -> None:
         args = CLI.build_parser().parse_args(
             [
@@ -907,6 +1016,8 @@ class TranscribeControlTests(unittest.TestCase):
             ["transcribe", "input.mp4", "--split-max-chars-en", "0"],
             ["transcribe", "input.mp4", "--split-chunk-word-limit", "0"],
             ["transcribe", "input.mp4", "--split-max-retries", "0"],
+            ["transcribe", "input.mp4", "--max-packed-word-repairs-per-10k", "0"],
+            ["transcribe", "input.mp4", "--max-packed-cluster-size", "-1"],
             ["split", "raw.json", "--split-max-words-en", "-1"],
             ["qc", "input.srt", "--max-words-en", "0"],
             ["qc", "input.srt", "--max-display-chars-en", "0"],
@@ -936,6 +1047,28 @@ class TranscribeControlTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(payload["error_type"], "invalid_arguments")
         self.assertEqual(payload["step"], "parse_arguments")
+
+    def test_invalid_packed_repair_environment_limits_are_structured(self) -> None:
+        cases = [
+            ("SUBTITLE_MAX_PACKED_WORD_REPAIRS_PER_10K", "0"),
+            ("SUBTITLE_MAX_PACKED_CLUSTER_SIZE", "not-an-int"),
+        ]
+        for name, value in cases:
+            with self.subTest(name=name, value=value):
+                environment = os.environ.copy()
+                environment[name] = value
+                result = subprocess.run(
+                    [sys.executable, str(CLI_PATH), "transcribe", "unused.mp4"],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    env=environment,
+                )
+
+                self.assertEqual(result.returncode, 1)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["error_type"], "invalid_arguments")
+                self.assertEqual(payload["step"], "parse_arguments")
 
     def test_reverse_whisper_json_returns_structured_invalid_srt(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1514,7 +1647,7 @@ class TranscribeControlTests(unittest.TestCase):
 
             repaired_word = result.words[1]
             self.assertEqual((repaired_word.start_time, repaired_word.end_time), (999, 1000))
-            raw_path = root / "work" / "source.asr.json"
+            raw_path = next((root / "work").glob("source-*.asr.json"))
             raw_payload = json.loads(raw_path.read_text(encoding="utf-8"))
             self.assertEqual(len(raw_payload["timestamp_repairs"]), 1)
             repair = raw_payload["timestamp_repairs"][0]
@@ -1555,57 +1688,609 @@ class TranscribeControlTests(unittest.TestCase):
 
             self.assertEqual((result.words[0].start_time, result.words[0].end_time), (0, 1))
 
-    def test_faster_whisper_does_not_repair_reverse_or_unbounded_timestamps(self) -> None:
-        cases = [
-            (
-                "reverse",
-                [SimpleNamespace(word=" bad", start=2.0, end=1.0)],
-                0.0,
-                3.0,
-            ),
-            (
-                "no-gap",
-                [
+    def test_faster_whisper_repairs_packed_word_and_audits_donor(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "source.wav"
+            media.touch()
+            model = Mock()
+            segment = SimpleNamespace(
+                id=0,
+                start=0.0,
+                end=2.0,
+                text="before zero after",
+                words=[
                     SimpleNamespace(word=" before", start=0.0, end=1.0),
                     SimpleNamespace(word=" zero", start=1.0, end=1.0),
                     SimpleNamespace(word=" after", start=1.0, end=2.0),
                 ],
-                0.0,
-                2.0,
-            ),
-        ]
-        for name, words, segment_start, segment_end in cases:
-            with self.subTest(name=name), tempfile.TemporaryDirectory() as temp_dir:
-                root = Path(temp_dir)
-                media = root / "source.wav"
-                media.touch()
-                model = Mock()
-                segment = SimpleNamespace(
-                    id=0,
-                    start=segment_start,
-                    end=segment_end,
-                    text="bad timestamps",
-                    words=words,
-                )
-                info = SimpleNamespace(
-                    language="en",
-                    language_probability=1.0,
-                    duration=segment_end,
-                )
-                model.transcribe.return_value = (iter([segment]), info)
-                asr = FasterWhisperASR(
-                    str(media),
-                    TranscribeConfig(output_dir=str(root / "work"), language="en"),
-                )
-                fake_module = types.ModuleType("faster_whisper")
-                fake_module.WhisperModel = object
+            )
+            info = SimpleNamespace(language="en", language_probability=1.0, duration=2.0)
+            model.transcribe.return_value = (iter([segment]), info)
+            asr = FasterWhisperASR(
+                str(media),
+                TranscribeConfig(output_dir=str(root / "work"), language="en"),
+            )
+            fake_module = types.ModuleType("faster_whisper")
+            fake_module.WhisperModel = object
 
-                with (
-                    patch.dict(sys.modules, {"faster_whisper": fake_module}),
-                    patch.object(asr, "_load_model_with_fallback", return_value=(model, "cpu", "int8")),
-                ):
-                    with self.assertRaisesRegex(ValueError, "non-positive duration"):
-                        asr.run()
+            with (
+                patch.dict(sys.modules, {"faster_whisper": fake_module}),
+                patch.object(asr, "_load_model_with_fallback", return_value=(model, "cpu", "int8")),
+            ):
+                result = asr.run()
+
+            self.assertEqual(
+                [(word.start_time, word.end_time) for word in result.words],
+                [(0, 1000), (1000, 1001), (1001, 2000)],
+            )
+            raw_payload = json.loads(
+                next((root / "work").glob("source-*.asr.json")).read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(
+                [repair["method"] for repair in raw_payload["timestamp_repairs"]],
+                [
+                    "packed_cluster_redistribution",
+                    "packed_cluster_right_donor_adjustment",
+                ],
+            )
+            self.assertEqual(
+                raw_payload["timestamp_repair_summary"]["packed_word_repairs"], 1
+            )
+            self.assertEqual(
+                raw_payload["timestamp_repair_summary"]["donor_adjustments"], 1
+            )
+
+    def test_faster_whisper_repairs_segment_boundaries_within_each_segment(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "source.wav"
+            media.touch()
+            model = Mock()
+            segments = [
+                SimpleNamespace(
+                    id=0,
+                    start=0.0,
+                    end=0.08,
+                    text="I do",
+                    words=[
+                        SimpleNamespace(word=" I", start=0.0, end=0.0),
+                        SimpleNamespace(word=" do", start=0.0, end=0.08),
+                    ],
+                ),
+                SimpleNamespace(
+                    id=1,
+                    start=1.0,
+                    end=1.08,
+                    text="before And",
+                    words=[
+                        SimpleNamespace(word=" before", start=1.0, end=1.08),
+                        SimpleNamespace(word=" And", start=1.08, end=1.08),
+                    ],
+                ),
+            ]
+            info = SimpleNamespace(language="en", language_probability=1.0, duration=1.08)
+            model.transcribe.return_value = (iter(segments), info)
+            asr = FasterWhisperASR(
+                str(media),
+                TranscribeConfig(output_dir=str(root / "work"), language="en"),
+            )
+            fake_module = types.ModuleType("faster_whisper")
+            fake_module.WhisperModel = object
+
+            with (
+                patch.dict(sys.modules, {"faster_whisper": fake_module}),
+                patch.object(asr, "_load_model_with_fallback", return_value=(model, "cpu", "int8")),
+            ):
+                result = asr.run()
+
+            self.assertEqual(
+                [(word.start_time, word.end_time) for word in result.words],
+                [(0, 1), (1, 80), (1000, 1079), (1079, 1080)],
+            )
+
+    def test_faster_whisper_repairs_four_word_cluster(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "source.wav"
+            media.touch()
+            model = Mock()
+            segment = SimpleNamespace(
+                id=0,
+                start=1.0,
+                end=1.24,
+                text="before not exercising the code after",
+                words=[
+                    SimpleNamespace(word=" before", start=1.0, end=1.2),
+                    SimpleNamespace(word=" not", start=1.2, end=1.2),
+                    SimpleNamespace(word=" exercising", start=1.2, end=1.2),
+                    SimpleNamespace(word=" the", start=1.2, end=1.2),
+                    SimpleNamespace(word=" code", start=1.2, end=1.2),
+                    SimpleNamespace(word=" after", start=1.2, end=1.24),
+                ],
+            )
+            info = SimpleNamespace(language="en", language_probability=1.0, duration=1.24)
+            model.transcribe.return_value = (iter([segment]), info)
+            asr = FasterWhisperASR(
+                str(media),
+                TranscribeConfig(output_dir=str(root / "work"), language="en"),
+            )
+            fake_module = types.ModuleType("faster_whisper")
+            fake_module.WhisperModel = object
+
+            with (
+                patch.dict(sys.modules, {"faster_whisper": fake_module}),
+                patch.object(asr, "_load_model_with_fallback", return_value=(model, "cpu", "int8")),
+            ):
+                result = asr.run()
+
+            self.assertTrue(result.has_word_timestamps())
+            self.assertTrue(
+                all(word.end_time > word.start_time for word in result.words)
+            )
+            raw_payload = json.loads(
+                next((root / "work").glob("source-*.asr.json")).read_text(
+                    encoding="utf-8"
+                )
+            )
+            summary = raw_payload["timestamp_repair_summary"]
+            self.assertEqual(summary["packed_cluster_count"], 1)
+            self.assertEqual(summary["packed_word_repairs"], 4)
+            self.assertEqual(summary["max_observed_cluster_size"], 4)
+            self.assertEqual(summary["donor_adjustments"], 1)
+            self.assertTrue(summary["review_recommended"])
+
+    def test_faster_whisper_repairs_allowed_cluster_using_outer_gaps_as_one_unit(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "source.wav"
+            media.touch()
+            model = Mock()
+            segment = SimpleNamespace(
+                id=0,
+                start=0.0,
+                end=2.0,
+                text="before one two three four after",
+                words=[
+                    SimpleNamespace(word=" before", start=0.0, end=0.99),
+                    SimpleNamespace(word=" one", start=1.0, end=1.0),
+                    SimpleNamespace(word=" two", start=1.0, end=1.0),
+                    SimpleNamespace(word=" three", start=1.0, end=1.0),
+                    SimpleNamespace(word=" four", start=1.0, end=1.0),
+                    SimpleNamespace(word=" after", start=1.01, end=2.0),
+                ],
+            )
+            info = SimpleNamespace(language="en", language_probability=1.0, duration=2.0)
+            model.transcribe.return_value = (iter([segment]), info)
+            asr = FasterWhisperASR(
+                str(media),
+                TranscribeConfig(output_dir=str(root / "work"), language="en"),
+            )
+            fake_module = types.ModuleType("faster_whisper")
+            fake_module.WhisperModel = object
+
+            with (
+                patch.dict(sys.modules, {"faster_whisper": fake_module}),
+                patch.object(asr, "_load_model_with_fallback", return_value=(model, "cpu", "int8")),
+            ):
+                result = asr.run()
+
+            repaired = result.words[1:5]
+            self.assertTrue(all(word.end_time > word.start_time for word in repaired))
+            self.assertTrue(
+                all(
+                    repaired[index].end_time <= repaired[index + 1].start_time
+                    for index in range(len(repaired) - 1)
+                )
+            )
+            summary = asr.result_metadata["timestamp_repair_summary"]
+            self.assertEqual(summary["gap_repairs"], 0)
+            self.assertEqual(summary["packed_word_repairs"], 4)
+            self.assertEqual(summary["donor_adjustments"], 0)
+            self.assertEqual(summary["borrowed_ms"], 0)
+
+    def test_faster_whisper_preserves_raw_evidence_when_packed_repair_exceeds_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "source.wav"
+            media.touch()
+            model = Mock()
+            segment = SimpleNamespace(
+                id=0,
+                start=0.0,
+                end=1.0,
+                text="one two after",
+                words=[
+                    SimpleNamespace(word=" one", start=0.0, end=0.0),
+                    SimpleNamespace(word=" two", start=0.0, end=0.0),
+                    SimpleNamespace(word=" after", start=0.0, end=1.0),
+                ],
+            )
+            info = SimpleNamespace(language="en", language_probability=1.0, duration=1.0)
+            model.transcribe.return_value = (iter([segment]), info)
+            asr = FasterWhisperASR(
+                str(media),
+                TranscribeConfig(
+                    output_dir=str(root / "work"),
+                    language="en",
+                    max_packed_word_repairs_per_10k=1,
+                    max_packed_cluster_size=1,
+                ),
+            )
+            fake_module = types.ModuleType("faster_whisper")
+            fake_module.WhisperModel = object
+
+            with (
+                patch.dict(sys.modules, {"faster_whisper": fake_module}),
+                patch.object(asr, "_load_model_with_fallback", return_value=(model, "cpu", "int8")),
+            ):
+                with self.assertRaisesRegex(
+                    TimestampRepairLimitError, "packed zero-duration"
+                ) as raised:
+                    asr.run()
+
+            self.assertTrue(raised.exception.raw_asr_path.exists())
+            self.assertEqual(
+                hashlib.sha256(raised.exception.raw_asr_path.read_bytes()).hexdigest(),
+                raised.exception.raw_asr_sha256,
+            )
+            raw_payload = json.loads(
+                raised.exception.raw_asr_path.read_text(encoding="utf-8")
+            )
+            self.assertEqual(raw_payload["timestamp_repair_summary"]["status"], "blocked")
+            self.assertEqual(raw_payload["timestamp_repairs"], [])
+
+    def test_faster_whisper_blocks_original_cluster_before_gap_repair_can_peel_it(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "source.wav"
+            media.touch()
+            model = Mock()
+            words = [SimpleNamespace(word=" before", start=0.0, end=1.0)]
+            words.extend(
+                SimpleNamespace(word=f" zero-{index}", start=1.0, end=1.0)
+                for index in range(5)
+            )
+            words.append(SimpleNamespace(word=" after", start=1.01, end=2.0))
+            segment = SimpleNamespace(
+                id=0,
+                start=0.0,
+                end=2.0,
+                text="original five-word collapse",
+                words=words,
+            )
+            info = SimpleNamespace(language="en", language_probability=1.0, duration=2.0)
+            model.transcribe.return_value = (iter([segment]), info)
+            asr = FasterWhisperASR(
+                str(media),
+                TranscribeConfig(output_dir=str(root / "work"), language="en"),
+            )
+            fake_module = types.ModuleType("faster_whisper")
+            fake_module.WhisperModel = object
+
+            with (
+                patch.dict(sys.modules, {"faster_whisper": fake_module}),
+                patch.object(asr, "_load_model_with_fallback", return_value=(model, "cpu", "int8")),
+            ):
+                with self.assertRaises(TimestampRepairLimitError) as raised:
+                    asr.run()
+
+            summary = raised.exception.repair_summary
+            self.assertEqual(summary["status"], "blocked")
+            self.assertEqual(summary["max_observed_cluster_size"], 5)
+            self.assertEqual(summary["gap_repairs"], 0)
+            self.assertIn("cluster size 5", "; ".join(summary["blocked_reasons"]))
+
+    def test_faster_whisper_blocks_staggered_contiguous_zero_duration_run(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "source.wav"
+            media.touch()
+            model = Mock()
+            words = [SimpleNamespace(word=" before", start=0.0, end=1.0)]
+            words.extend(
+                SimpleNamespace(
+                    word=f" zero-{index}",
+                    start=1.001 + index * 0.001,
+                    end=1.001 + index * 0.001,
+                )
+                for index in range(5)
+            )
+            words.append(SimpleNamespace(word=" after", start=1.01, end=2.0))
+            segment = SimpleNamespace(
+                id=0,
+                start=0.0,
+                end=2.0,
+                text="staggered five-word collapse",
+                words=words,
+            )
+            info = SimpleNamespace(language="en", language_probability=1.0, duration=2.0)
+            model.transcribe.return_value = (iter([segment]), info)
+            asr = FasterWhisperASR(
+                str(media),
+                TranscribeConfig(output_dir=str(root / "work"), language="en"),
+            )
+            fake_module = types.ModuleType("faster_whisper")
+            fake_module.WhisperModel = object
+
+            with (
+                patch.dict(sys.modules, {"faster_whisper": fake_module}),
+                patch.object(asr, "_load_model_with_fallback", return_value=(model, "cpu", "int8")),
+            ):
+                with self.assertRaises(TimestampRepairLimitError) as raised:
+                    asr.run()
+
+            summary = raised.exception.repair_summary
+            self.assertEqual(summary["max_observed_cluster_size"], 5)
+            self.assertEqual(summary["gap_repairs"], 0)
+            self.assertEqual(summary["cluster_samples"][0]["timestamp_ms"], 1001)
+            self.assertEqual(summary["cluster_samples"][0]["end_timestamp_ms"], 1005)
+
+    def test_faster_whisper_blocks_non_monotonic_zero_run_with_raw_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "source.wav"
+            media.touch()
+            model = Mock()
+            segment = SimpleNamespace(
+                id=0,
+                start=0.0,
+                end=2.0,
+                text="left a b right",
+                words=[
+                    SimpleNamespace(word=" left", start=0.0, end=1.0),
+                    SimpleNamespace(word=" a", start=1.002, end=1.002),
+                    SimpleNamespace(word=" b", start=1.001, end=1.001),
+                    SimpleNamespace(word=" right", start=1.002, end=2.0),
+                ],
+            )
+            info = SimpleNamespace(language="en", language_probability=1.0, duration=2.0)
+            model.transcribe.return_value = (iter([segment]), info)
+            asr = FasterWhisperASR(
+                str(media),
+                TranscribeConfig(output_dir=str(root / "work"), language="en"),
+            )
+            fake_module = types.ModuleType("faster_whisper")
+            fake_module.WhisperModel = object
+
+            with (
+                patch.dict(sys.modules, {"faster_whisper": fake_module}),
+                patch.object(asr, "_load_model_with_fallback", return_value=(model, "cpu", "int8")),
+            ):
+                with self.assertRaises(TimestampRepairLimitError) as raised:
+                    asr.run()
+
+            summary = raised.exception.repair_summary
+            self.assertEqual(summary["status"], "blocked")
+            self.assertEqual(summary["gap_repairs"], 0)
+            self.assertEqual(summary["packed_word_repairs"], 0)
+            self.assertIn("non-monotonic", "; ".join(summary["blocked_reasons"]))
+            sample = summary["cluster_samples"][0]
+            self.assertFalse(sample["timestamps_monotonic"])
+            self.assertEqual(sample["timestamp_ms_samples"], [1002, 1001])
+            raw_payload = json.loads(
+                raised.exception.raw_asr_path.read_text(encoding="utf-8")
+            )
+            self.assertEqual(raw_payload["timestamp_repairs"], [])
+            self.assertEqual(
+                hashlib.sha256(raised.exception.raw_asr_path.read_bytes()).hexdigest(),
+                raised.exception.raw_asr_sha256,
+            )
+
+    def test_faster_whisper_blocks_mixed_same_time_and_staggered_reverse_zero_run(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "source.wav"
+            media.touch()
+            model = Mock()
+            segment = SimpleNamespace(
+                id=0,
+                start=0.0,
+                end=2.0,
+                text="left a b c right",
+                words=[
+                    SimpleNamespace(word=" left", start=0.0, end=1.0),
+                    SimpleNamespace(word=" a", start=1.002, end=1.002),
+                    SimpleNamespace(word=" b", start=1.002, end=1.002),
+                    SimpleNamespace(word=" c", start=1.001, end=1.001),
+                    SimpleNamespace(word=" right", start=1.002, end=2.0),
+                ],
+            )
+            info = SimpleNamespace(language="en", language_probability=1.0, duration=2.0)
+            model.transcribe.return_value = (iter([segment]), info)
+            asr = FasterWhisperASR(
+                str(media),
+                TranscribeConfig(output_dir=str(root / "work"), language="en"),
+            )
+            fake_module = types.ModuleType("faster_whisper")
+            fake_module.WhisperModel = object
+
+            with (
+                patch.dict(sys.modules, {"faster_whisper": fake_module}),
+                patch.object(asr, "_load_model_with_fallback", return_value=(model, "cpu", "int8")),
+            ):
+                with self.assertRaises(TimestampRepairLimitError) as raised:
+                    asr.run()
+
+            summary = raised.exception.repair_summary
+            self.assertEqual(summary["status"], "blocked")
+            self.assertEqual(summary["gap_repairs"], 0)
+            self.assertEqual(summary["packed_word_repairs"], 0)
+            self.assertIn("non-monotonic", "; ".join(summary["blocked_reasons"]))
+            self.assertEqual(
+                summary["cluster_samples"][0]["timestamp_ms_samples"],
+                [1002, 1002, 1001],
+            )
+
+    def test_faster_whisper_bounds_blocked_cluster_samples(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "source.wav"
+            media.touch()
+            model = Mock()
+            long_token = " x" * 500
+            segment = SimpleNamespace(
+                id=0,
+                start=0.0,
+                end=2.0,
+                text="large collapsed cluster",
+                words=[
+                    SimpleNamespace(
+                        word=f"{long_token}-{index}", start=1.0, end=1.0
+                    )
+                    for index in range(100)
+                ],
+            )
+            info = SimpleNamespace(language="en", language_probability=1.0, duration=2.0)
+            model.transcribe.return_value = (iter([segment]), info)
+            asr = FasterWhisperASR(
+                str(media),
+                TranscribeConfig(output_dir=str(root / "work"), language="en"),
+            )
+            fake_module = types.ModuleType("faster_whisper")
+            fake_module.WhisperModel = object
+
+            with (
+                patch.dict(sys.modules, {"faster_whisper": fake_module}),
+                patch.object(asr, "_load_model_with_fallback", return_value=(model, "cpu", "int8")),
+            ):
+                with self.assertRaises(TimestampRepairLimitError) as raised:
+                    asr.run()
+
+            summary = raised.exception.repair_summary
+            sample = summary["cluster_samples"][0]
+            self.assertNotIn("words", sample)
+            self.assertLessEqual(len(sample["word_samples"]), 5)
+            self.assertTrue(sample["word_samples_truncated"])
+            self.assertTrue(
+                all(len(item["word"]) <= 40 for item in sample["word_samples"])
+            )
+            self.assertLess(len(json.dumps(summary, ensure_ascii=True)), 5000)
+
+    def test_faster_whisper_blocks_packed_word_without_safe_donor(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "source.wav"
+            media.touch()
+            model = Mock()
+            segment = SimpleNamespace(
+                id=0,
+                start=0.0,
+                end=0.02,
+                text="left zero right",
+                words=[
+                    SimpleNamespace(word=" left", start=0.0, end=0.01),
+                    SimpleNamespace(word=" zero", start=0.01, end=0.01),
+                    SimpleNamespace(word=" right", start=0.01, end=0.02),
+                ],
+            )
+            info = SimpleNamespace(language="en", language_probability=1.0, duration=0.02)
+            model.transcribe.return_value = (iter([segment]), info)
+            asr = FasterWhisperASR(
+                str(media),
+                TranscribeConfig(output_dir=str(root / "work"), language="en"),
+            )
+            fake_module = types.ModuleType("faster_whisper")
+            fake_module.WhisperModel = object
+
+            with (
+                patch.dict(sys.modules, {"faster_whisper": fake_module}),
+                patch.object(asr, "_load_model_with_fallback", return_value=(model, "cpu", "int8")),
+            ):
+                with self.assertRaises(TimestampRepairLimitError) as raised:
+                    asr.run()
+
+            self.assertIn(
+                "safely provide only 0 ms",
+                "; ".join(raised.exception.repair_summary["blocked_reasons"]),
+            )
+
+    def test_faster_whisper_rolls_back_planned_gap_repairs_when_later_cluster_blocks(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "source.wav"
+            media.touch()
+            model = Mock()
+            original_words = [
+                SimpleNamespace(word=" first", start=0.0, end=0.5),
+                SimpleNamespace(word=" isolated", start=0.6, end=0.6),
+                SimpleNamespace(word=" bridge", start=0.6, end=0.61),
+                SimpleNamespace(word=" packed", start=0.61, end=0.61),
+                SimpleNamespace(word=" last", start=0.61, end=0.62),
+            ]
+            segment = SimpleNamespace(
+                id=0,
+                start=0.0,
+                end=0.62,
+                text="first isolated bridge packed last",
+                words=original_words,
+            )
+            info = SimpleNamespace(language="en", language_probability=1.0, duration=0.62)
+            model.transcribe.return_value = (iter([segment]), info)
+            asr = FasterWhisperASR(
+                str(media),
+                TranscribeConfig(output_dir=str(root / "work"), language="en"),
+            )
+            fake_module = types.ModuleType("faster_whisper")
+            fake_module.WhisperModel = object
+
+            with (
+                patch.dict(sys.modules, {"faster_whisper": fake_module}),
+                patch.object(asr, "_load_model_with_fallback", return_value=(model, "cpu", "int8")),
+            ):
+                with self.assertRaises(TimestampRepairLimitError) as raised:
+                    asr.run()
+
+            summary = raised.exception.repair_summary
+            self.assertEqual(summary["status"], "blocked")
+            self.assertEqual(summary["gap_repairs"], 0)
+            self.assertEqual(summary["packed_word_repairs"], 0)
+            self.assertEqual(summary["total_repair_records"], 0)
+            raw_payload = json.loads(
+                raised.exception.raw_asr_path.read_text(encoding="utf-8")
+            )
+            self.assertEqual(raw_payload["timestamp_repairs"], [])
+            self.assertEqual(
+                [
+                    (word["start"], word["end"])
+                    for word in raw_payload["segments"][0]["words"]
+                ],
+                [
+                    (word.start, word.end)
+                    for word in original_words
+                ],
+            )
+
+    def test_faster_whisper_does_not_repair_reverse_timestamp(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            media = root / "source.wav"
+            media.touch()
+            model = Mock()
+            segment = SimpleNamespace(
+                id=0,
+                start=0.0,
+                end=3.0,
+                text="bad timestamps",
+                words=[SimpleNamespace(word=" bad", start=2.0, end=1.0)],
+            )
+            info = SimpleNamespace(language="en", language_probability=1.0, duration=3.0)
+            model.transcribe.return_value = (iter([segment]), info)
+            asr = FasterWhisperASR(
+                str(media),
+                TranscribeConfig(output_dir=str(root / "work"), language="en"),
+            )
+            fake_module = types.ModuleType("faster_whisper")
+            fake_module.WhisperModel = object
+
+            with (
+                patch.dict(sys.modules, {"faster_whisper": fake_module}),
+                patch.object(asr, "_load_model_with_fallback", return_value=(model, "cpu", "int8")),
+            ):
+                with self.assertRaisesRegex(ValueError, "non-positive duration"):
+                    asr.run()
 
 
 if __name__ == "__main__":

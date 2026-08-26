@@ -6,6 +6,10 @@ import argparse
 import os
 from collections.abc import Callable, Mapping
 
+from .config import (
+    DEFAULT_MAX_PACKED_CLUSTER_SIZE,
+    DEFAULT_MAX_PACKED_WORD_REPAIRS_PER_10K,
+)
 from .qc import DEFAULT_MAX_DISPLAY_CHARS_ENGLISH, DEFAULT_MAX_WORD_COUNT_ENGLISH
 from .split import DEFAULT_MAX_WORD_COUNT_CJK
 
@@ -34,6 +38,24 @@ def build_parser(
     transcribe.add_argument("--start-seconds", type=float, help="Start of a targeted ASR interval; requires --end-seconds.")
     transcribe.add_argument("--end-seconds", type=float, help="End of a targeted ASR interval; requires --start-seconds.")
     transcribe.add_argument("--no-vad", action="store_true", help="Disable VAD for a targeted interval; not allowed for full-media transcription.")
+    transcribe.add_argument(
+        "--max-packed-word-repairs-per-10k",
+        type=positive_int,
+        default=os.getenv(
+            "SUBTITLE_MAX_PACKED_WORD_REPAIRS_PER_10K",
+            str(DEFAULT_MAX_PACKED_WORD_REPAIRS_PER_10K),
+        ),
+        help="Safety limit for zero-duration words repaired by borrowing adjacent word time per 10,000 ASR words.",
+    )
+    transcribe.add_argument(
+        "--max-packed-cluster-size",
+        type=positive_int,
+        default=os.getenv(
+            "SUBTITLE_MAX_PACKED_CLUSTER_SIZE",
+            str(DEFAULT_MAX_PACKED_CLUSTER_SIZE),
+        ),
+        help="Largest contiguous zero-duration word cluster eligible for bounded repair.",
+    )
     transcribe.add_argument("--semantic-split", action="store_true", help="Run LLM semantic subtitle segmentation after ASR. Default is off.")
     transcribe.add_argument("--split-model", default=os.getenv("SUBTITLE_LLM_MODEL", default_llm_model), help="LLM model for semantic splitting.")
     transcribe.add_argument("--split-max-chars-cjk", type=positive_int, default=DEFAULT_MAX_WORD_COUNT_CJK)

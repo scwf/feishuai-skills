@@ -4,7 +4,13 @@ import os
 from typing import Optional, Union
 
 from .asr.factory import create_asr
-from .config import DEFAULT_LLM_MODEL, DEFAULT_MODEL_NAME, TranscribeConfig
+from .config import (
+    DEFAULT_LLM_MODEL,
+    DEFAULT_MAX_PACKED_CLUSTER_SIZE,
+    DEFAULT_MAX_PACKED_WORD_REPAIRS_PER_10K,
+    DEFAULT_MODEL_NAME,
+    TranscribeConfig,
+)
 from .data import ASRData
 from .downloader import download_audio
 from .split import split_subtitle
@@ -24,6 +30,8 @@ def process_media(
     language: Optional[str] = None,
     vad_filter: bool = True,
     clip_timestamps: Optional[list[float]] = None,
+    max_packed_word_repairs_per_10k: int = DEFAULT_MAX_PACKED_WORD_REPAIRS_PER_10K,
+    max_packed_cluster_size: int = DEFAULT_MAX_PACKED_CLUSTER_SIZE,
     split_enabled: bool = False,
     split_model: Optional[str] = None,
     split_max_chars_cjk: int = 25,
@@ -55,6 +63,8 @@ def process_media(
         output_dir=output_dir,
         vad_filter=vad_filter,
         clip_timestamps=clip_timestamps,
+        max_packed_word_repairs_per_10k=max_packed_word_repairs_per_10k,
+        max_packed_cluster_size=max_packed_cluster_size,
         split_enabled=split_enabled,
         split_model=split_model,
         split_max_chars_cjk=split_max_chars_cjk,

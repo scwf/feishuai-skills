@@ -39,7 +39,7 @@ Final English and bilingual QC:
 "{SUBTITLE_PYTHON}" "{SUBTITLE_SKILL_ROOT}/scripts/generate_and_process_subtitles.py" qc "<bilingual.srt>" --bilingual --output "<job-dir>/audit/bilingual-qc.json"
 ```
 
-Only exit `0` advances the state machine. Exact approvals or seam resolutions are inputs owned and validated by the atomic Skill.
+Only exit `0` advances the state machine. Exact approvals or seam resolutions are inputs owned and validated by the atomic Skill. Final delivery uses the defaults. Passing wider QC limits requires the atomic Skill's separate `--allow-relaxed-limits` authorization flag; semantic split and optimize choices never imply it. Preserve the report path because validation binds its SHA-256 and effective limits to the exact reviewed source.
 
 Translate:
 

@@ -63,24 +63,24 @@ Repeat `--audit-report` in byte-hash order when there are multiple stages. `--ac
 Validate bilingual structure and media coverage:
 
 ```bash
-python "{COMPOSITE_SKILL_ROOT}/scripts/validate_bilingual_srt.py"   "<bilingual.srt>" --source-srt "<reviewed.en.srt>"   --source-metadata "<exact-source-metadata.json>"   --video "<source-video>"   --output "<job-dir>/audit/bilingual-validation.json"
+python "{COMPOSITE_SKILL_ROOT}/scripts/validate_bilingual_srt.py"   "<bilingual.srt>" --source-srt "<reviewed.en.srt>"   --source-metadata "<exact-source-metadata.json>"   --source-qc-report "<job-dir>/audit/final-english-qc.json"   --video "<source-video>"   --output "<job-dir>/audit/bilingual-validation.json"
 ```
 
-The validator must confirm exact English text/timing parity, sequential cues, Chinese-first ordering, language evidence, metadata hash, non-overlap, and material head/tail coverage. A result with `coverage_checked=false` is not render-ready. Do not widen coverage tolerances until the gap is confirmed silent; repair confirmed missing speech in the English source first.
+The validator must confirm exact English text/timing parity, sequential cues, Chinese-first ordering, language evidence, metadata hash, final-English QC hash and limit evidence, non-overlap, and material head/tail coverage. It records each cue's verified source-English line count so rendering never guesses the language boundary from character types. A result with `coverage_checked=false` is not render-ready. Do not widen coverage tolerances until the gap is confirmed silent; repair confirmed missing speech in the English source first.
 
 Run atomic `qc --bilingual` on the same bilingual file and require exit `0`.
 
 ## Render And Inspect
 
 ```bash
-python "{COMPOSITE_SKILL_ROOT}/scripts/render_bilingual_video.py"   --input-video "<source-video>"   --subtitle "<bilingual.srt>"   --output "<job-dir>/render/final.zh-en.mp4"   --work-dir "<job-dir>/render"   --margin-v 8
+python "{COMPOSITE_SKILL_ROOT}/scripts/render_bilingual_video.py"   --input-video "<source-video>"   --subtitle "<bilingual.srt>"   --validation-report "<job-dir>/audit/bilingual-validation.json"   --output "<job-dir>/render/final.zh-en.mp4"   --work-dir "<job-dir>/render"   --margin-v 8
 ```
 
-Defaults keep Chinese above English, bottom-center, FontSize 16, automatic wrapping, H.264/AAC, and adaptive CJK font selection. Override style only for a user requirement or confirmed QA problem.
+Defaults keep Chinese above English, bottom-center, FontSize 16, width-filling automatic wrapping, explicit horizontal margins, H.264/AAC, and adaptive CJK font selection. The delivered bilingual SRT is immutable: the renderer writes a digest-named layout SRT under `render/layout/`, removes hard breaks within each language, and preserves only the Chinese/English separator. Override style only for a user requirement or confirmed QA problem.
 
-The renderer serializes normalized output aliases, encodes to a unique partial, verifies streams and duration, performs a full decode, extracts QA frames, and only then promotes. `--replace-existing` archives and transactionally replaces an old result. Use `--allow-silent` only after explicit acceptance.
+The renderer rejects a missing, stale, coverage-incomplete, or hash-mismatched validation report; serializes normalized output aliases; encodes to a unique partial; verifies streams and duration; performs a full decode; and only then promotes. QA includes ordinary start/middle/end frames, every user time, and the midpoint of the Top 5 cues by deterministic bilingual display load. The report records cue, selection reason, load and estimated line metrics, layout hash, wrap style, margins, and Unicode-wrap support. `--replace-existing` archives and transactionally replaces an old result. Use `--allow-silent` only after explicit acceptance.
 
-Inspect at least one ordinary frame plus every terminology, coverage, or boundary repair timestamp. Decode success does not prove subtitle readability.
+Inspect every high-load frame plus at least one ordinary frame and every terminology, coverage, or boundary repair timestamp. `qa_review_required=true` means the MP4 is not yet deliverable even though deterministic render verification passed. If estimated Chinese or English lines exceed 2, or the total exceeds 4, the renderer returns `review_required` / exit `2`, records the affected cues, and keeps the verified MP4 under `render/review/` without creating or replacing the requested final output. Decode success does not prove subtitle readability.
 
 ## Manual Revision Loop
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import subprocess
 import sys
@@ -15,6 +16,9 @@ CLI_PATH = SKILL_ROOT / "scripts" / "generate_and_process_subtitles.py"
 DEEPSEEK_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "deepseek_boundaries.json"
 AGENT_MEMORY_FIXTURE = (
     Path(__file__).resolve().parent / "fixtures" / "agent_memory_viewer_clusters.json"
+)
+LONG_BILINGUAL_CUES_FIXTURE = (
+    Path(__file__).resolve().parent / "fixtures" / "long_bilingual_cues.json"
 )
 if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
@@ -821,6 +825,29 @@ I agree.
         first = report["review_items"][0]
         self.assertIn("overlong_display_line", first["reasons"])
 
+    def test_issue_long_cues_are_blocked_by_default_limits(self) -> None:
+        fixture = json.loads(LONG_BILINGUAL_CUES_FIXTURE.read_text(encoding="utf-8"))
+        for item in fixture["cues"]:
+            with self.subTest(cue=item["cue"]):
+                report = inspect_asr_data(
+                    ASRData([ASRDataSeg(item["text"], 0, 8000)])
+                )
+                self.assertEqual(report["status"], "review_required")
+                self.assertTrue(
+                    {
+                        "overlong_word_count",
+                        "overlong_display_line",
+                    }.intersection(report["review_items"][0]["reasons"])
+                )
+
+    def test_overlong_word_count_is_independent_of_display_character_limit(self) -> None:
+        text = " ".join(["a"] * 22)
+        self.assertLess(len(text), 79)
+        report = inspect_asr_data(ASRData([ASRDataSeg(text, 0, 2000)]))
+        first = report["review_items"][0]
+        self.assertIn("overlong_word_count", first["reasons"])
+        self.assertNotIn("overlong_display_line", first["reasons"])
+
     def test_bilingual_overlong_english_line_is_high_risk(self) -> None:
         report = inspect_asr_data(
             ASRData(
@@ -888,6 +915,98 @@ customers.
             self.assertEqual(result["exit_code"], 2)
             saved = json.loads(report_path.read_text(encoding="utf-8"))
             self.assertEqual(saved["high_risk_count"], 2)
+            self.assertEqual(
+                saved["default_limits"],
+                {"max_words_en": 21, "max_display_chars_en": 79},
+            )
+            self.assertEqual(saved["effective_limits"], saved["default_limits"])
+            self.assertFalse(saved["limits_relaxed_from_default"])
+            self.assertFalse(saved["relaxed_limits_authorized"])
+            self.assertEqual(
+                saved["source_sha256"],
+                hashlib.sha256(srt.read_bytes()).hexdigest(),
+            )
+
+    def test_cli_qc_requires_explicit_authorization_for_relaxed_limits(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            srt = root / "long.srt"
+            report_path = root / "qc.json"
+            fixture = json.loads(
+                LONG_BILINGUAL_CUES_FIXTURE.read_text(encoding="utf-8")
+            )
+            write_srt(
+                srt,
+                f"1\n00:00:00,000 --> 00:00:08,000\n{fixture['cues'][0]['text']}",
+            )
+            parser = CLI.build_parser()
+            unauthorized = parser.parse_args(
+                [
+                    "qc",
+                    str(srt),
+                    "--output",
+                    str(report_path),
+                    "--max-words-en",
+                    "40",
+                    "--max-display-chars-en",
+                    "250",
+                ]
+            )
+            with self.assertRaises(CLI.SubtitleSkillError) as raised:
+                CLI.run_qc(unauthorized)
+            self.assertEqual(
+                raised.exception.error_type, "relaxed_limits_not_authorized"
+            )
+            self.assertFalse(report_path.exists())
+
+            authorized = parser.parse_args(
+                [
+                    "qc",
+                    str(srt),
+                    "--output",
+                    str(report_path),
+                    "--max-words-en",
+                    "40",
+                    "--max-display-chars-en",
+                    "250",
+                    "--allow-relaxed-limits",
+                ]
+            )
+            result = CLI.run_qc(authorized)
+            self.assertEqual(result["status"], "ok")
+            saved = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertTrue(saved["limits_relaxed_from_default"])
+            self.assertTrue(saved["relaxed_limits_authorized"])
+            self.assertEqual(
+                saved["effective_limits"],
+                {"max_words_en": 40, "max_display_chars_en": 250},
+            )
+
+    def test_cli_qc_allows_stricter_limits_without_relaxation_authorization(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            srt = root / "short.srt"
+            report_path = root / "qc.json"
+            write_srt(
+                srt,
+                "1\n00:00:00,000 --> 00:00:01,000\nComplete sentence.",
+            )
+            args = CLI.build_parser().parse_args(
+                [
+                    "qc",
+                    str(srt),
+                    "--output",
+                    str(report_path),
+                    "--max-words-en",
+                    "20",
+                    "--max-display-chars-en",
+                    "70",
+                ]
+            )
+            result = CLI.run_qc(args)
+            self.assertEqual(result["status"], "ok")
+            self.assertFalse(result["limits_relaxed_from_default"])
+            self.assertFalse(result["relaxed_limits_authorized"])
 
     def test_cli_qc_without_output_uses_atomic_work_report(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -14,4 +14,4 @@ Chunk seams are repaired locally without growing a repair window across later se
 
 Exit `2` means `review_required`. Preserve the generated pair, inspect the exact findings against word timestamps or audio, and stop downstream work. Failed or overlapping seam repair remains blocking until an exact reviewed resolution is supplied to QC.
 
-Do not auto-merge cues, delete apparent repetition, add punctuation, or expand a core phrase list to fit one video. Prefer general boundary signals plus job-level terminology context.
+Do not auto-merge cues, delete apparent repetition, add punctuation, or expand a core phrase list to fit one video. When repairing a continuation, do not merge past the default 21-word / 79-character English ceilings; use word timestamps to recut at a natural clause boundary. Prefer general boundary signals plus job-level terminology context.

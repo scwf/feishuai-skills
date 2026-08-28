@@ -201,6 +201,14 @@ def build_parser(
         default=DEFAULT_MAX_DISPLAY_CHARS_ENGLISH,
         help="English on-screen character budget at 1080p FontSize 16. Longer lines wrap and cannot pass QC.",
     )
+    qc.add_argument(
+        "--allow-relaxed-limits",
+        action="store_true",
+        help=(
+            "Explicitly authorize English QC limits wider than the 21-word / "
+            "79-character defaults. Stricter limits do not require this flag."
+        ),
+    )
     qc.set_defaults(func=handlers["qc"])
 
     return parser

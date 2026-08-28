@@ -17,6 +17,7 @@ For a generic YouTube extraction request, no command may run until both semantic
 - DeepSeek: `tests/fixtures/deepseek_boundaries.json` contains P01-P31 capitalization-bypassed broken boundaries plus 31 healthy controls. Every problem boundary must be detected and no healthy control may receive the capitalization-independent continuation reason.
 - Semantic split: content/order conservation, cue limits, positive duration, seam isolation, and failed-seam persistence.
 - Healthy short speech: complete utterances remain legal; exact approvals can resolve only currently approvable findings.
+- Long bilingual cues: `tests/fixtures/long_bilingual_cues.json` must block under defaults, and a cue above 21 words but below 79 characters must report `overlong_word_count`.
 
 ## Deterministic Contracts
 
@@ -31,6 +32,7 @@ Verify:
 - bounded ASCII-safe stdout and structured errors under a legacy Windows code page;
 - exact source-language metadata hash and confidence;
 - exit `2` propagation from nested and standalone review gates;
+- wider standalone QC limits require `--allow-relaxed-limits`, while stricter limits do not; reports bind default/effective limits, authorization, and exact source SHA-256;
 - targeted no-VAD repair requires interval bounds plus fixed language and never overwrites the baseline.
 
 ## Commands

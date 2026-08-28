@@ -29,6 +29,10 @@ TIMING_RE = re.compile(
     r"(?P<eh>[0-9]{2}):(?P<em>[0-5][0-9]):(?P<es>[0-5][0-9]),(?P<ems>[0-9]{3})$"
 )
 CJK_RE = re.compile(r"[\u3400-\u9fff]")
+EXPECTED_SOURCE_QC_DEFAULT_LIMITS = {
+    "max_words_en": 21,
+    "max_display_chars_en": 79,
+}
 
 
 class SourceLanguageError(ValueError):
@@ -36,6 +40,10 @@ class SourceLanguageError(ValueError):
 
 
 class SourceMetadataError(ValueError):
+    pass
+
+
+class SourceQcError(ValueError):
     pass
 
 
@@ -407,11 +415,68 @@ def validate_source_metadata(
         )
 
 
+def validate_source_qc_report(
+    report_path: Path, source_srt_path: Path
+) -> dict[str, object]:
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise SourceQcError(f"could not parse source QC report: {report_path}") from exc
+    if not isinstance(report, dict):
+        raise SourceQcError("source QC report must be a JSON object")
+    if (
+        report.get("action") != "qc"
+        or report.get("status") != "ok"
+        or report.get("exit_code") != 0
+    ):
+        raise SourceQcError("source QC report must be a successful standalone qc result")
+    expected_hash = report.get("source_sha256")
+    actual_hash = hashlib.sha256(source_srt_path.read_bytes()).hexdigest()
+    if not isinstance(expected_hash, str) or expected_hash.lower() != actual_hash:
+        raise SourceQcError("source QC SHA-256 does not match the supplied source SRT")
+    default_limits = report.get("default_limits")
+    effective_limits = report.get("effective_limits")
+    if not isinstance(default_limits, dict) or not isinstance(effective_limits, dict):
+        raise SourceQcError("source QC report is missing default/effective limit evidence")
+    if default_limits != EXPECTED_SOURCE_QC_DEFAULT_LIMITS:
+        raise SourceQcError("source QC default limits do not match the 21-word / 79-character contract")
+    for limits_name, limits in (
+        ("default_limits", default_limits),
+        ("effective_limits", effective_limits),
+    ):
+        for field in ("max_words_en", "max_display_chars_en"):
+            value = limits.get(field)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise SourceQcError(
+                    f"source QC {limits_name}.{field} must be a positive integer"
+                )
+    relaxed = report.get("limits_relaxed_from_default")
+    authorized = report.get("relaxed_limits_authorized")
+    if not isinstance(relaxed, bool) or not isinstance(authorized, bool):
+        raise SourceQcError("source QC report is missing relaxation audit flags")
+    calculated_relaxed = (
+        effective_limits["max_words_en"] > default_limits["max_words_en"]
+        or effective_limits["max_display_chars_en"]
+        > default_limits["max_display_chars_en"]
+    )
+    if relaxed != calculated_relaxed:
+        raise SourceQcError("source QC relaxation flag contradicts its recorded limits")
+    if relaxed and not authorized:
+        raise SourceQcError("relaxed source QC limits were not explicitly authorized")
+    return report
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate a Chinese-first bilingual SRT.")
     parser.add_argument("srt", type=Path)
     parser.add_argument("--source-srt", type=Path, required=True)
     parser.add_argument("--source-metadata", type=Path, required=True, help="Transcription metadata proving the source language.")
+    parser.add_argument(
+        "--source-qc-report",
+        type=Path,
+        required=True,
+        help="Successful standalone QC report bound by SHA-256 to --source-srt.",
+    )
     parser.add_argument("--expected-source-language", default="en")
     parser.add_argument("--video", type=Path, help="Optional video for duration validation")
     parser.add_argument("--duration", type=float, help="Video duration in seconds")
@@ -424,9 +489,15 @@ def main() -> int:
     srt_path = args.srt.resolve()
     source_srt_path = args.source_srt.resolve()
     source_metadata_path = args.source_metadata.resolve()
+    source_qc_report_path = args.source_qc_report.resolve()
     video_path = args.video.resolve() if args.video else None
     output_path = args.output.resolve() if args.output else None
-    resolved_paths = [srt_path, source_srt_path, source_metadata_path]
+    resolved_paths = [
+        srt_path,
+        source_srt_path,
+        source_metadata_path,
+        source_qc_report_path,
+    ]
     if video_path:
         resolved_paths.append(video_path)
     if output_path:
@@ -436,7 +507,7 @@ def main() -> int:
             {
                 "status": "error",
                 "reason": "path_collision",
-                "message": "bilingual SRT, source SRT, source metadata, video, and report paths must all differ",
+                "message": "bilingual SRT, source SRT, source metadata, source QC, video, and report paths must all differ",
                 "output_path": None if output_path is None else str(output_path),
             }
         )
@@ -453,6 +524,9 @@ def main() -> int:
             source_metadata,
             source_srt_path,
             args.expected_source_language,
+        )
+        source_qc_report = validate_source_qc_report(
+            source_qc_report_path, source_srt_path
         )
         default_gap_limit = None if duration is None else max(30.0, duration * 0.1)
         max_head_gap = (
@@ -479,8 +553,26 @@ def main() -> int:
         report["srt_path"] = str(srt_path)
         report["source_srt_path"] = str(source_srt_path)
         report["source_metadata_path"] = str(source_metadata_path)
+        report["source_qc_report_path"] = str(source_qc_report_path)
         report["source_language"] = source_language
         report["expected_source_language"] = args.expected_source_language
+        report["srt_sha256"] = hashlib.sha256(srt_path.read_bytes()).hexdigest()
+        report["source_srt_sha256"] = hashlib.sha256(
+            source_srt_path.read_bytes()
+        ).hexdigest()
+        report["source_line_counts"] = [len(cue.lines) for cue in source_cues]
+        report["source_qc_report_sha256"] = hashlib.sha256(
+            source_qc_report_path.read_bytes()
+        ).hexdigest()
+        report["source_qc_effective_limits"] = source_qc_report[
+            "effective_limits"
+        ]
+        report["source_qc_limits_relaxed_from_default"] = source_qc_report[
+            "limits_relaxed_from_default"
+        ]
+        report["source_qc_relaxed_limits_authorized"] = source_qc_report[
+            "relaxed_limits_authorized"
+        ]
         if video_path:
             report["video_path"] = str(video_path)
         exit_code = 0 if report["status"] == "ok" else 1
@@ -501,6 +593,16 @@ def main() -> int:
             "srt_path": str(args.srt),
             "source_srt_path": str(source_srt_path),
             "source_metadata_path": str(source_metadata_path),
+        }
+        exit_code = 1
+    except SourceQcError as exc:
+        report = {
+            "status": "error",
+            "reason": "source_qc_mismatch",
+            "message": str(exc),
+            "srt_path": str(args.srt),
+            "source_srt_path": str(source_srt_path),
+            "source_qc_report_path": str(source_qc_report_path),
         }
         exit_code = 1
     except (OSError, UnicodeError, ValueError) as exc:

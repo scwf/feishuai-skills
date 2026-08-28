@@ -53,6 +53,68 @@ def write_source_metadata(
     )
 
 
+def write_source_qc_report(
+    path: Path,
+    source_srt: Path,
+    *,
+    relaxed: bool = False,
+    authorized: bool = False,
+) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "ok": True,
+                "action": "qc",
+                "status": "ok",
+                "exit_code": 0,
+                "source_path": str(source_srt.resolve()),
+                "source_sha256": hashlib.sha256(source_srt.read_bytes()).hexdigest(),
+                "default_limits": {
+                    "max_words_en": 21,
+                    "max_display_chars_en": 79,
+                },
+                "effective_limits": {
+                    "max_words_en": 40 if relaxed else 21,
+                    "max_display_chars_en": 250 if relaxed else 79,
+                },
+                "limits_relaxed_from_default": relaxed,
+                "relaxed_limits_authorized": authorized,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def write_bilingual_validation_report(
+    path: Path,
+    subtitle: Path,
+    *,
+    coverage_checked: bool = True,
+    relaxed: bool = False,
+    authorized: bool = False,
+    source_line_counts: list[int] | None = None,
+) -> None:
+    cue_count = len(subtitle.read_text(encoding="utf-8-sig").strip().split("\n\n"))
+    path.write_text(
+        json.dumps(
+            {
+                "status": "ok",
+                "coverage_checked": coverage_checked,
+                "srt_path": str(subtitle.resolve()),
+                "srt_sha256": hashlib.sha256(subtitle.read_bytes()).hexdigest(),
+                "source_qc_limits_relaxed_from_default": relaxed,
+                "source_qc_relaxed_limits_authorized": authorized,
+                "source_line_counts": (
+                    source_line_counts
+                    if source_line_counts is not None
+                    else [1] * cue_count
+                ),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 class AuditSubtitleChangesRegressionTests(unittest.TestCase):
     def test_ordinary_punctuation_and_case_remain_non_lexical(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -371,6 +433,8 @@ class BilingualValidationRegressionTests(unittest.TestCase):
         source_text: str | None = None,
         *extra_args: str,
         env: dict[str, str] | None = None,
+        source_qc_relaxed: bool = False,
+        source_qc_authorized: bool = False,
     ) -> tuple[subprocess.CompletedProcess[str], dict]:
         temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(temp_dir.cleanup)
@@ -378,6 +442,7 @@ class BilingualValidationRegressionTests(unittest.TestCase):
         srt = root / "bilingual.srt"
         source = root / "source.srt"
         source_metadata = root / "source.metadata.json"
+        source_qc = root / "source.qc.json"
         report_path = root / "validation.json"
         write_srt(srt, srt_text)
         write_srt(
@@ -390,6 +455,12 @@ Welcome to Databricks Lakehouse.
 """,
         )
         write_source_metadata(source_metadata, source)
+        write_source_qc_report(
+            source_qc,
+            source,
+            relaxed=source_qc_relaxed,
+            authorized=source_qc_authorized,
+        )
         result = subprocess.run(
             [
                 sys.executable,
@@ -399,6 +470,8 @@ Welcome to Databricks Lakehouse.
                 str(source),
                 "--source-metadata",
                 str(source_metadata),
+                "--source-qc-report",
+                str(source_qc),
                 "--output",
                 str(report_path),
                 *extra_args,
@@ -423,6 +496,75 @@ Welcome to Databricks Lakehouse.
         self.assertEqual(report["status"], "ok")
         self.assertFalse(report["coverage_checked"])
         self.assertTrue(report["warnings"])
+        self.assertEqual(
+            report["source_qc_effective_limits"],
+            {"max_words_en": 21, "max_display_chars_en": 79},
+        )
+        self.assertEqual(report["source_line_counts"], [1])
+        self.assertFalse(report["source_qc_limits_relaxed_from_default"])
+        self.assertFalse(report["source_qc_relaxed_limits_authorized"])
+
+    def test_unauthorized_relaxed_source_qc_is_rejected(self) -> None:
+        result, report = self.run_validator(
+            """
+1
+00:00:00,000 --> 00:00:01,000
+欢迎使用。
+Welcome.
+""",
+            source_text="""
+1
+00:00:00,000 --> 00:00:01,000
+Welcome.
+""",
+            source_qc_relaxed=True,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(report["reason"], "source_qc_mismatch")
+        self.assertIn("not explicitly authorized", report["message"])
+
+    def test_explicitly_authorized_relaxed_source_qc_is_auditable(self) -> None:
+        result, report = self.run_validator(
+            """
+1
+00:00:00,000 --> 00:00:01,000
+欢迎使用。
+Welcome.
+""",
+            source_text="""
+1
+00:00:00,000 --> 00:00:01,000
+Welcome.
+""",
+            source_qc_relaxed=True,
+            source_qc_authorized=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+        self.assertTrue(report["source_qc_limits_relaxed_from_default"])
+        self.assertTrue(report["source_qc_relaxed_limits_authorized"])
+
+    def test_forged_wider_qc_defaults_are_rejected(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "validate_bilingual_srt_qc_contract_tests", VALIDATE_SCRIPT
+        )
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        with patch.dict(sys.modules, {spec.name: module}):
+            spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source.srt"
+            source_qc = root / "source.qc.json"
+            write_srt(source, "1\n00:00:00,000 --> 00:00:01,000\nWelcome.")
+            write_source_qc_report(source_qc, source)
+            payload = json.loads(source_qc.read_text(encoding="utf-8"))
+            forged = {"max_words_en": 400, "max_display_chars_en": 2500}
+            payload["default_limits"] = forged
+            payload["effective_limits"] = forged
+            source_qc.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaises(module.SourceQcError) as raised:
+                module.validate_source_qc_report(source_qc, source)
+            self.assertIn("21-word / 79-character contract", str(raised.exception))
 
     def test_non_english_source_metadata_fails_even_with_latin_source_text(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -430,10 +572,12 @@ Welcome to Databricks Lakehouse.
             bilingual = root / "bilingual.srt"
             source = root / "source.srt"
             metadata = root / "source.metadata.json"
+            source_qc = root / "source.qc.json"
             report_path = root / "validation.json"
             write_srt(bilingual, "1\n00:00:00,000 --> 00:00:01,000\n你好\nHola")
             write_srt(source, "1\n00:00:00,000 --> 00:00:01,000\nHola")
             metadata.write_text(json.dumps({"source_language": "es"}), encoding="utf-8")
+            write_source_qc_report(source_qc, source)
             result = subprocess.run(
                 [
                     sys.executable,
@@ -443,6 +587,8 @@ Welcome to Databricks Lakehouse.
                     str(source),
                     "--source-metadata",
                     str(metadata),
+                    "--source-qc-report",
+                    str(source_qc),
                     "--output",
                     str(report_path),
                 ],
@@ -462,11 +608,13 @@ Welcome to Databricks Lakehouse.
             source = root / "source.srt"
             unrelated = root / "unrelated.srt"
             metadata = root / "source.metadata.json"
+            source_qc = root / "source.qc.json"
             report_path = root / "validation.json"
             write_srt(bilingual, "1\n00:00:00,000 --> 00:00:01,000\n你好。\nHola.")
             write_srt(source, "1\n00:00:00,000 --> 00:00:01,000\nHola.")
             write_srt(unrelated, "1\n00:00:00,000 --> 00:00:01,000\nHello.")
             write_source_metadata(metadata, unrelated)
+            write_source_qc_report(source_qc, source)
             result = subprocess.run(
                 [
                     sys.executable,
@@ -476,6 +624,8 @@ Welcome to Databricks Lakehouse.
                     str(source),
                     "--source-metadata",
                     str(metadata),
+                    "--source-qc-report",
+                    str(source_qc),
                     "--output",
                     str(report_path),
                 ],
@@ -779,19 +929,27 @@ Welcome to Databricks Lakehouse.
                 self.assertNotIn("Infinity", result.stdout)
 
     def test_report_cannot_alias_any_input(self) -> None:
-        for target in ("srt", "source", "metadata", "video"):
+        for target in ("srt", "source", "metadata", "qc", "video"):
             with self.subTest(target=target):
                 with tempfile.TemporaryDirectory() as temp_dir:
                     root = Path(temp_dir)
                     srt = root / "bilingual.srt"
                     source = root / "source.srt"
                     metadata = root / "source.metadata.json"
+                    source_qc = root / "source.qc.json"
                     video = root / "video.mp4"
                     write_srt(srt, "1\n00:00:00,000 --> 00:00:01,000\n你好\nHello")
                     write_srt(source, "1\n00:00:00,000 --> 00:00:01,000\nHello")
                     write_source_metadata(metadata, source)
+                    write_source_qc_report(source_qc, source)
                     video.write_bytes(b"video")
-                    output = {"srt": srt, "source": source, "metadata": metadata, "video": video}[target]
+                    output = {
+                        "srt": srt,
+                        "source": source,
+                        "metadata": metadata,
+                        "qc": source_qc,
+                        "video": video,
+                    }[target]
                     original = output.read_bytes()
                     result = subprocess.run(
                         [
@@ -802,6 +960,8 @@ Welcome to Databricks Lakehouse.
                             str(source),
                             "--source-metadata",
                             str(metadata),
+                            "--source-qc-report",
+                            str(source_qc),
                             "--video",
                             str(video),
                             "--output",
@@ -820,8 +980,10 @@ Welcome to Databricks Lakehouse.
             root = Path(temp_dir)
             srt = root / "same.srt"
             metadata = root / "source.metadata.json"
+            source_qc = root / "source.qc.json"
             write_srt(srt, "1\n00:00:00,000 --> 00:00:01,000\n你好\nHello")
             write_source_metadata(metadata, srt)
+            write_source_qc_report(source_qc, srt)
             original = srt.read_bytes()
             result = subprocess.run(
                 [
@@ -832,6 +994,8 @@ Welcome to Databricks Lakehouse.
                     str(srt),
                     "--source-metadata",
                     str(metadata),
+                    "--source-qc-report",
+                    str(source_qc),
                 ],
                 capture_output=True,
                 text=True,
@@ -893,10 +1057,14 @@ class ReportChannelRegressionTests(unittest.TestCase):
             bilingual = root / "bilingual.srt"
             after = root / "after.srt"
             metadata = root / "source.metadata.json"
+            source_qc = root / "source.qc.json"
+            validation = root / "validation.json"
             write_srt(source, "1\n00:00:00,000 --> 00:00:01,000\nHello")
             write_srt(bilingual, "1\n00:00:00,000 --> 00:00:01,000\n你好\nHello")
             write_srt(after, "1\n00:00:00,000 --> 00:00:01,000\nHello!")
             write_source_metadata(metadata, source)
+            write_source_qc_report(source_qc, source)
+            write_bilingual_validation_report(validation, bilingual)
             commands = (
                 [sys.executable, str(AUDIT_SCRIPT), str(source), str(after), "--output", str(report)],
                 [
@@ -907,6 +1075,8 @@ class ReportChannelRegressionTests(unittest.TestCase):
                     str(source),
                     "--source-metadata",
                     str(metadata),
+                    "--source-qc-report",
+                    str(source_qc),
                     "--output",
                     str(report),
                 ],
@@ -917,6 +1087,8 @@ class ReportChannelRegressionTests(unittest.TestCase):
                     str(root / "missing.mp4"),
                     "--subtitle",
                     str(bilingual),
+                    "--validation-report",
+                    str(validation),
                     "--output",
                     str(root / "final.mp4"),
                     "--work-dir",
@@ -945,11 +1117,15 @@ class ReportChannelRegressionTests(unittest.TestCase):
             source = root / "source.srt"
             bilingual = root / "bilingual.srt"
             metadata = root / "source.metadata.json"
+            source_qc = root / "source.qc.json"
+            validation = root / "validation.json"
             write_srt(before, "1\n00:00:00,000 --> 00:00:01,000\nAlpha")
             write_srt(after, "1\n00:00:00,000 --> 00:00:01,000\nAlpha!")
             write_srt(source, "1\n00:00:00,000 --> 00:00:01,000\nHello")
             write_srt(bilingual, "1\n00:00:00,000 --> 00:00:01,000\n你好\nHello")
             write_source_metadata(metadata, source)
+            write_source_qc_report(source_qc, source)
+            write_bilingual_validation_report(validation, bilingual)
             commands = (
                 [sys.executable, str(AUDIT_SCRIPT), str(before), str(after)],
                 [
@@ -960,6 +1136,8 @@ class ReportChannelRegressionTests(unittest.TestCase):
                     str(source),
                     "--source-metadata",
                     str(metadata),
+                    "--source-qc-report",
+                    str(source_qc),
                 ],
                 [
                     sys.executable,
@@ -968,6 +1146,8 @@ class ReportChannelRegressionTests(unittest.TestCase):
                     str(root / "missing.mp4"),
                     "--subtitle",
                     str(bilingual),
+                    "--validation-report",
+                    str(validation),
                     "--output",
                     str(root / "final.mp4"),
                     "--work-dir",
@@ -1000,12 +1180,14 @@ class ReportChannelRegressionTests(unittest.TestCase):
             source = root / "source.srt"
             bilingual = root / "bilingual.srt"
             metadata = root / "source.metadata.json"
+            source_qc = root / "source.qc.json"
             validation_report = root / "validation.json"
             write_srt(before, "1\n00:00:00,000 --> 00:00:01,000\nAlpha")
             write_srt(after, "1\n00:00:00,000 --> 00:00:01,000\nBeta")
             write_srt(source, "1\n00:00:00,000 --> 00:00:01,000\nHello")
             write_srt(bilingual, "1\n00:00:00,000 --> 00:00:01,000\n你好\nHello")
             write_source_metadata(metadata, source)
+            write_source_qc_report(source_qc, source)
             commands = (
                 (
                     [sys.executable, str(AUDIT_SCRIPT), str(before), str(after), "--output", str(audit_report)],
@@ -1021,6 +1203,8 @@ class ReportChannelRegressionTests(unittest.TestCase):
                         str(source),
                         "--source-metadata",
                         str(metadata),
+                        "--source-qc-report",
+                        str(source_qc),
                         "--output",
                         str(validation_report),
                     ],
@@ -1050,10 +1234,12 @@ class WindowsDeviceAliasRegressionTests(unittest.TestCase):
             bilingual = root / "bilingual.srt"
             optimized = root / "optimized.srt"
             metadata = root / "source.metadata.json"
+            source_qc = root / "source.qc.json"
             write_srt(source, "1\n00:00:00,000 --> 00:00:01,000\nHello")
             write_srt(bilingual, "1\n00:00:00,000 --> 00:00:01,000\n你好\nHello")
             write_srt(optimized, "1\n00:00:00,000 --> 00:00:01,000\nHello!")
             write_source_metadata(metadata, source)
+            write_source_qc_report(source_qc, source)
 
             cases = (
                 (
@@ -1073,6 +1259,8 @@ class WindowsDeviceAliasRegressionTests(unittest.TestCase):
                         str(source),
                         "--source-metadata",
                         str(metadata),
+                        "--source-qc-report",
+                        str(source_qc),
                         "--output",
                         "\\\\?\\" + str(bilingual),
                     ],
@@ -1098,8 +1286,12 @@ class RenderPathRegressionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             output = root / "final-😀.mp4"
+            subtitle = root / "subtitles.srt"
+            validation = root / "validation.json"
             original = b"existing-video"
             output.write_bytes(original)
+            write_srt(subtitle, "1\n00:00:00,000 --> 00:00:01,000\n你好\nHello")
+            write_bilingual_validation_report(validation, subtitle)
 
             result = subprocess.run(
                 [
@@ -1108,7 +1300,9 @@ class RenderPathRegressionTests(unittest.TestCase):
                     "--input-video",
                     str(root / "source.mp4"),
                     "--subtitle",
-                    str(root / "subtitles.srt"),
+                    str(subtitle),
+                    "--validation-report",
+                    str(validation),
                     "--output",
                     str(output),
                     "--work-dir",
@@ -1138,8 +1332,10 @@ class RenderPathRegressionTests(unittest.TestCase):
                     subtitle = root / "subtitle.srt"
                     output = root / "final.mp4"
                     report = root / "report.json"
+                    validation = root / "validation.json"
                     source.write_bytes(b"source")
                     subtitle.write_bytes(b"subtitle")
+                    write_bilingual_validation_report(validation, subtitle)
                     if case == "report_source":
                         report = source
                     elif case == "report_subtitle":
@@ -1158,6 +1354,8 @@ class RenderPathRegressionTests(unittest.TestCase):
                             str(source),
                             "--subtitle",
                             str(subtitle),
+                            "--validation-report",
+                            str(validation),
                             "--output",
                             str(output),
                             "--work-dir",
@@ -1187,8 +1385,10 @@ class RenderPathRegressionTests(unittest.TestCase):
             source = root / "source.mp4"
             subtitle = root / "subtitle.srt"
             work_dir = root / "render"
+            validation = root / "validation.json"
             source.write_bytes(b"source")
             subtitle.write_bytes(b"subtitle")
+            write_bilingual_validation_report(validation, subtitle)
             result = subprocess.run(
                 [
                     sys.executable,
@@ -1197,6 +1397,8 @@ class RenderPathRegressionTests(unittest.TestCase):
                     str(source),
                     "--subtitle",
                     str(subtitle),
+                    "--validation-report",
+                    str(validation),
                     "--output",
                     str(source),
                     "--work-dir",
@@ -1236,6 +1438,7 @@ class RenderPathRegressionTests(unittest.TestCase):
             subtitle = job_dir / "author's bilingual.srt"
             output = job_dir / "final.mp4"
             report_path = work_dir / "render-report.json"
+            validation = job_dir / "validation.json"
             write_srt(
                 subtitle,
                 """
@@ -1245,6 +1448,7 @@ class RenderPathRegressionTests(unittest.TestCase):
 Hello
 """,
             )
+            write_bilingual_validation_report(validation, subtitle)
             source_result = subprocess.run(
                 [
                     "ffmpeg",
@@ -1287,6 +1491,8 @@ Hello
                     str(source),
                     "--subtitle",
                     str(subtitle),
+                    "--validation-report",
+                    str(validation),
                     "--output",
                     str(output),
                     "--work-dir",
@@ -1323,7 +1529,9 @@ Hello
             subtitle = root / "bilingual.srt"
             output = root / "final.mp4"
             work_dir = root / "render"
+            validation = root / "validation.json"
             write_srt(subtitle, "1\n00:00:00,000 --> 00:00:00,800\n你好\nHello")
+            write_bilingual_validation_report(validation, subtitle)
             source_result = subprocess.run(
                 [
                     "ffmpeg",
@@ -1353,6 +1561,8 @@ Hello
                     str(source),
                     "--subtitle",
                     str(subtitle),
+                    "--validation-report",
+                    str(validation),
                     "--output",
                     str(output),
                     "--work-dir",
@@ -1382,6 +1592,8 @@ Hello
                     str(source),
                     "--subtitle",
                     str(subtitle),
+                    "--validation-report",
+                    str(validation),
                     "--output",
                     str(output),
                     "--work-dir",
@@ -1731,14 +1943,307 @@ class WorkflowContractRegressionTests(unittest.TestCase):
 
 
 class RenderStyleRegressionTests(unittest.TestCase):
-    def test_force_style_allows_automatic_chinese_wrapping(self) -> None:
+    def test_invalid_zero_font_size_is_structured(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report = root / "render-report.json"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(RENDER_SCRIPT),
+                    "--input-video",
+                    str(root / "source.mp4"),
+                    "--subtitle",
+                    str(root / "bilingual.srt"),
+                    "--validation-report",
+                    str(root / "validation.json"),
+                    "--output",
+                    str(root / "final.mp4"),
+                    "--work-dir",
+                    str(root / "work"),
+                    "--font-size",
+                    "0",
+                    "--report",
+                    str(report),
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+            self.assertEqual(result.returncode, 1)
+            payload = json.loads(report.read_text(encoding="utf-8"))
+            self.assertEqual(payload["reason"], "invalid_render_style")
+
+    def test_force_style_records_width_filling_wrap_and_margins(self) -> None:
         spec = importlib.util.spec_from_file_location("render_bilingual_video_for_tests", RENDER_SCRIPT)
         assert spec and spec.loader
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         style = module.subtitle_filter(Path("subtitles.srt"), "Arial", 16, 8, 1.2)
-        self.assertNotIn("WrapStyle=2", style)
+        self.assertIn("WrapStyle=1", style)
+        self.assertIn("MarginL=10", style)
+        self.assertIn("MarginR=10", style)
+        self.assertIn("wrap_unicode=1", style)
         self.assertIn("FontSize=16", style)
+
+    def test_layout_normalization_keeps_only_the_language_separator(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "render_bilingual_video_layout_tests", RENDER_SCRIPT
+        )
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            subtitle = root / "bilingual.srt"
+            original = (
+                "1\n00:00:00,000 --> 00:00:08,000\n"
+                "这是中文的第一部分，\n这是第二部分。\n"
+                "This is a deliberately wrapped\nEnglish source line.\n"
+            )
+            write_srt(subtitle, original)
+            before = subtitle.read_bytes()
+            layout_path, layout_info, metrics = module.prepare_layout_subtitle(
+                subtitle, root / "render", source_line_counts=[2]
+            )
+            self.assertEqual(subtitle.read_bytes(), before)
+            self.assertEqual(
+                layout_path.read_text(encoding="utf-8").splitlines()[2:],
+                [
+                    "这是中文的第一部分，这是第二部分。",
+                    "This is a deliberately wrapped English source line.",
+                ],
+            )
+            self.assertTrue(layout_info["layout_normalized"])
+            self.assertEqual(layout_info["hard_line_normalized_cue_count"], 1)
+            self.assertEqual(metrics[0]["original_hard_line_count"], 4)
+            self.assertEqual(metrics[0]["normalized_line_count"], 2)
+            self.assertEqual(metrics[0]["estimated_chinese_lines"], 1)
+            self.assertEqual(metrics[0]["estimated_english_lines"], 1)
+
+    def test_layout_boundary_uses_validated_source_line_count(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "render_bilingual_video_layout_boundary_tests", RENDER_SCRIPT
+        )
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            subtitle = root / "bilingual.srt"
+            write_srt(
+                subtitle,
+                "1\n00:00:00,000 --> 00:00:01,000\n中文内容\n……\nEnglish.",
+            )
+            layout_path, _, _ = module.prepare_layout_subtitle(
+                subtitle, root / "render", source_line_counts=[1]
+            )
+            self.assertEqual(
+                layout_path.read_text(encoding="utf-8").splitlines()[2:],
+                ["中文内容……", "English."],
+            )
+
+    def test_estimated_line_overflow_requires_layout_review(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "render_bilingual_video_layout_limit_tests", RENDER_SCRIPT
+        )
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            subtitle = root / "bilingual.srt"
+            write_srt(
+                subtitle,
+                "1\n00:00:00,000 --> 00:00:08,000\n"
+                + "中" * 100
+                + "\n"
+                + "English " * 40,
+            )
+            _, _, metrics = module.prepare_layout_subtitle(
+                subtitle, root / "render", source_line_counts=[1]
+            )
+            findings = module.layout_limit_findings(metrics)
+            self.assertEqual([item["cue"] for item in findings], [1])
+            self.assertGreater(metrics[0]["estimated_chinese_lines"], 2)
+            self.assertGreater(metrics[0]["estimated_english_lines"], 2)
+
+    def test_render_review_required_returns_exit_two(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "render_bilingual_video_review_exit_tests", RENDER_SCRIPT
+        )
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report = root / "render-report.json"
+            argv = [
+                str(RENDER_SCRIPT),
+                "--input-video",
+                str(root / "source.mp4"),
+                "--subtitle",
+                str(root / "bilingual.srt"),
+                "--validation-report",
+                str(root / "validation.json"),
+                "--output",
+                str(root / "final.mp4"),
+                "--work-dir",
+                str(root / "work"),
+                "--report",
+                str(report),
+            ]
+            with (
+                patch.object(module.sys, "argv", argv),
+                patch.object(module, "render", return_value={"status": "review_required"}),
+                patch.object(module, "print_report_summary"),
+            ):
+                self.assertEqual(module.main(), 2)
+            self.assertEqual(json.loads(report.read_text(encoding="utf-8"))["status"], "review_required")
+
+    @unittest.skipUnless(
+        shutil.which("ffmpeg") and shutil.which("ffprobe"),
+        "ffmpeg and ffprobe are required",
+    )
+    def test_review_required_render_keeps_existing_final_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source.mp4"
+            subtitle = root / "bilingual.srt"
+            validation = root / "validation.json"
+            output = root / "final.mp4"
+            work_dir = root / "render"
+            report_path = work_dir / "render-report.json"
+            write_srt(
+                subtitle,
+                "1\n00:00:00,000 --> 00:00:00,800\n"
+                + "中" * 100
+                + "\n"
+                + "English " * 40,
+            )
+            write_bilingual_validation_report(validation, subtitle)
+            output.write_bytes(b"existing-deliverable")
+            source_result = subprocess.run(
+                [
+                    "ffmpeg",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "color=c=blue:s=320x180:r=10:d=1",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "sine=frequency=1000:duration=1",
+                    "-shortest",
+                    "-c:v",
+                    "mpeg4",
+                    "-c:a",
+                    "aac",
+                    "-y",
+                    str(source),
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            self.assertEqual(source_result.returncode, 0, source_result.stderr)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(RENDER_SCRIPT),
+                    "--input-video",
+                    str(source),
+                    "--subtitle",
+                    str(subtitle),
+                    "--validation-report",
+                    str(validation),
+                    "--output",
+                    str(output),
+                    "--work-dir",
+                    str(work_dir),
+                    "--encoder",
+                    "libx264",
+                    "--replace-existing",
+                    "--report",
+                    str(report_path),
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            self.assertEqual(result.returncode, 2, result.stderr or result.stdout)
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["status"], "review_required")
+            self.assertIsNone(report["output"])
+            self.assertEqual(output.read_bytes(), b"existing-deliverable")
+            candidate = Path(report["review_candidate"])
+            self.assertTrue(candidate.is_file())
+            self.assertEqual(report["review_candidate_sha256"], hashlib.sha256(candidate.read_bytes()).hexdigest())
+
+    def test_high_load_qa_samples_are_added_without_replacing_ordinary_or_user_times(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "render_bilingual_video_qa_tests", RENDER_SCRIPT
+        )
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        metrics = [
+            {
+                "cue": cue,
+                "start_seconds": float(cue * 10),
+                "end_seconds": float(cue * 10 + 8),
+                "duration_seconds": 8.0,
+                "chinese_display_chars": 20,
+                "chinese_cjk_chars": 20,
+                "english_display_chars": load,
+                "english_word_count": 10,
+                "original_hard_line_count": 2,
+                "normalized_line_count": 2,
+                "estimated_chinese_lines": 1,
+                "estimated_english_lines": 1,
+                "estimated_total_lines": 2,
+                "display_load_score": load,
+            }
+            for cue, load in ((1, 10), (2, 100), (3, 20), (4, 90), (5, 80), (6, 70), (7, 60))
+        ]
+        samples = module.select_qa_samples(100.0, [33.0], metrics)
+        high_load_cues = {
+            item["cue"]
+            for item in samples
+            if "high_subtitle_load" in item["selection_reasons"]
+        }
+        self.assertEqual(high_load_cues, {2, 4, 5, 6, 7})
+        reasons = {
+            reason
+            for item in samples
+            for reason in item["selection_reasons"]
+        }
+        self.assertTrue(
+            {"ordinary_start", "ordinary_middle", "ordinary_end", "user_requested"}.issubset(reasons)
+        )
+
+    def test_render_handoff_rejects_stale_validation_hash(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "render_bilingual_video_validation_tests", RENDER_SCRIPT
+        )
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            subtitle = root / "bilingual.srt"
+            validation = root / "validation.json"
+            write_srt(subtitle, "1\n00:00:00,000 --> 00:00:01,000\n你好\nHello")
+            write_bilingual_validation_report(validation, subtitle)
+            subtitle.write_text(subtitle.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+            with self.assertRaises(module.RenderError) as raised:
+                module.load_validation_report(validation, subtitle)
+            self.assertEqual(raised.exception.reason, "validation_report_mismatch")
 
     def test_same_output_cannot_be_locked_twice(self) -> None:
         spec = importlib.util.spec_from_file_location("render_bilingual_video_lock_tests", RENDER_SCRIPT)
@@ -1812,7 +2317,10 @@ class RenderStyleRegressionTests(unittest.TestCase):
             )
             probe_payload = {
                 "format": {"duration": "1.0"},
-                "streams": [{"codec_type": "video"}, {"codec_type": "audio"}],
+                "streams": [
+                    {"codec_type": "video", "width": 1920, "height": 1080},
+                    {"codec_type": "audio"},
+                ],
             }
             original_replace = Path.replace
 
@@ -1873,7 +2381,10 @@ class RenderStyleRegressionTests(unittest.TestCase):
             )
             probe_payload = {
                 "format": {"duration": "1.0"},
-                "streams": [{"codec_type": "video"}, {"codec_type": "audio"}],
+                "streams": [
+                    {"codec_type": "video", "width": 1920, "height": 1080},
+                    {"codec_type": "audio"},
+                ],
             }
             original_replace = Path.replace
 

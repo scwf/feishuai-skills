@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -350,6 +351,32 @@ def run_qc(args: argparse.Namespace) -> Dict[str, Any]:
             step="validate_input",
             error_type="missing_input",
         )
+    limits_relaxed = (
+        args.max_words_en > DEFAULT_MAX_WORD_COUNT_ENGLISH
+        or args.max_display_chars_en > DEFAULT_MAX_DISPLAY_CHARS_ENGLISH
+    )
+    if limits_relaxed and not args.allow_relaxed_limits:
+        raise SubtitleSkillError(
+            "English QC limits wider than the 21-word / 79-character defaults require "
+            "--allow-relaxed-limits.",
+            action="qc",
+            step="validate_input",
+            error_type="relaxed_limits_not_authorized",
+            suggested_fix=(
+                "Use the default limits for final delivery, or obtain separate explicit "
+                "authorization before passing --allow-relaxed-limits."
+            ),
+            details={
+                "default_limits": {
+                    "max_words_en": DEFAULT_MAX_WORD_COUNT_ENGLISH,
+                    "max_display_chars_en": DEFAULT_MAX_DISPLAY_CHARS_ENGLISH,
+                },
+                "effective_limits": {
+                    "max_words_en": args.max_words_en,
+                    "max_display_chars_en": args.max_display_chars_en,
+                },
+            },
+        )
     output_path = (
         Path(args.output).resolve()
         if args.output
@@ -481,6 +508,8 @@ def run_qc(args: argparse.Namespace) -> Dict[str, Any]:
         if (failure["seam_index"], failure["seam_time_ms"]) not in resolved_seams
     ]
     add_seam_failures_to_report(report, unresolved_failures)
+    report["relaxed_limits_authorized"] = bool(args.allow_relaxed_limits)
+    report["source_sha256"] = hashlib.sha256(input_path.read_bytes()).hexdigest()
     if resolved_seams:
         report["resolved_seam_failures"] = [
             {

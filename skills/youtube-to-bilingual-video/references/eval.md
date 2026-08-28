@@ -19,7 +19,8 @@ Verify that:
 - translation consumes only the final QC-cleared English SRT and produces Chinese above exact English;
 - missing source speech routes to bounded English interval repair before translation;
 - validation checks source/bilingual cue parity, exact English text/timing, language order, media coverage, and finite controls;
-- rendering requires current validation plus viewer QC, preserves audio unless silence was explicitly accepted, and promotes only after stream/duration/decode verification;
+- validation requires a successful hash-bound final-English QC report and rejects contradictory or unauthorized relaxed-limit evidence;
+- rendering requires a current hash-bound, coverage-complete validation report plus viewer QC, preserves audio unless silence was explicitly accepted, and promotes only after stream/duration/decode verification;
 - final reporting lists absolute evidence and artifact paths.
 
 ## Regression Families
@@ -32,6 +33,8 @@ Verify that:
 - Injected verified-render promotion failure restores the previous canonical MP4; incomplete rollback reports the archive.
 - Legacy Windows code-page runs keep structured bounded output.
 - A short real render records streams, duration tolerance, decode result, QA frames, hash, and size.
+- Render layout normalization preserves cue numbering, timing, language order, and non-newline text while keeping only one Chinese/English separator; the report records layout hash, wrap style, margins, and Unicode-wrap support.
+- Load-aware QA preserves ordinary and user-requested times while adding the Top 5 bilingual cue midpoints with cue-level load evidence; estimated Chinese/English/total line overflow returns `review_required` / exit `2`, retains a review candidate, and leaves the final output untouched.
 
 ## Commands
 

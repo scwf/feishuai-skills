@@ -1,0 +1,16 @@
+{
+  "cues": [
+    {
+      "cue": 2,
+      "text": "And right now, for most organizations, that context is scattered, living across wikis, spreadsheets, and the heads of three people on your data team."
+    },
+    {
+      "cue": 4,
+      "text": "Same term gets defined differently across teams, and when your agents give you a confident answer, you have no way to know if it's based on validated definitions or noise."
+    },
+    {
+      "cue": 5,
+      "text": "Databricks is solving this with Genie Ontology, a continuously learned enterprise context layer that Genie draws from to ground every answer it gives."
+    }
+  ]
+}

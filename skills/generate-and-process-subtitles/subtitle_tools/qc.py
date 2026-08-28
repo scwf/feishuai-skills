@@ -511,6 +511,8 @@ def classify_cue_context(
         reasons.append("unpunctuated_continuation")
     if display_line_length(cue.text) > max_display_chars_english:
         reasons.append("overlong_display_line")
+    if cue.word_count > max_word_count_english:
+        reasons.append("overlong_word_count")
 
     short = cue.word_count < SHORT_WORD_LIMIT and cue.duration_ms < SHORT_DURATION_MS
     few_words = cue.word_count < SHORT_WORD_LIMIT
@@ -640,6 +642,14 @@ def inspect_asr_data(
         if "human_approved_complete_utterance" in item["reasons"]
     ]
     review_required = bool(high_risk)
+    default_limits = {
+        "max_words_en": DEFAULT_MAX_WORD_COUNT_ENGLISH,
+        "max_display_chars_en": DEFAULT_MAX_DISPLAY_CHARS_ENGLISH,
+    }
+    effective_limits = {
+        "max_words_en": max_word_count_english,
+        "max_display_chars_en": max_display_chars_english,
+    }
     return {
         "ok": True,
         "action": "qc",
@@ -653,6 +663,13 @@ def inspect_asr_data(
         "ok_short_count": len(ok_short),
         "approved_short_count": len(approved_short),
         "seam_times_ms": seams,
+        "default_limits": default_limits,
+        "effective_limits": effective_limits,
+        "limits_relaxed_from_default": (
+            max_word_count_english > DEFAULT_MAX_WORD_COUNT_ENGLISH
+            or max_display_chars_english > DEFAULT_MAX_DISPLAY_CHARS_ENGLISH
+        ),
+        "relaxed_limits_authorized": False,
         "policy": (
             "Flag semantic or viewer-facing orphans for review. Do not auto-merge "
             "short cues or delete repeated text without source evidence; Yes./Great. "

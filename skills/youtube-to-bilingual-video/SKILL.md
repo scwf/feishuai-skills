@@ -26,19 +26,20 @@ Use one stable job directory. Preserve the first verified English SRT as an immu
 | Audit | immutable baseline + candidate | reviewed English SRT + lexical audit | unresolved lexical change |
 | Final English QC | exact reviewed SRT + seam state | QC exit `0` | any review item or stale approval |
 | Translate | QC-cleared English | Chinese-on-top bilingual pair | translation/structure failure |
-| Validate | bilingual pair + exact source metadata + media | deterministic validation report | mismatch or coverage gap |
-| Render | validated subtitles + source | verified MP4 + report + QA frames | stream, duration, decode, or visual QA failure |
+| Validate | bilingual pair + exact source metadata + final English QC + media | hash-bound validation report | mismatch, stale QC, unauthorized relaxed limits, or coverage gap |
+| Render | validated subtitles + validation report + source | verified MP4 + layout evidence + load-aware QA frames | stale validation, stream, duration, decode, estimated line overflow, or visual QA failure |
 | Deliver | all successful states | absolute artifact paths + warnings | missing evidence |
 
 A command timeout is not itself failure. Inspect process state, reports, partials, and completed artifacts, then resume from the latest valid stage.
 
 ## Hard Stops
 
-- Exit `2` or `review_required` from semantic split, optimization audit, final English QC, or bilingual QC stops the pipeline.
+- Exit `2` or `review_required` from semantic split, optimization audit, final English QC, bilingual QC, or render layout estimation stops the pipeline.
 - Bind source-language metadata by SHA-256 to the exact reviewed English SRT. Rebind only after every change has an auditable lineage and review record.
 - Never translate or repair only the Chinese line to hide an English boundary defect. Fix the reviewed English source, rerun QC, then regenerate the aligned bilingual pair.
 - Route confirmed missing speech to bounded source-language interval transcription before translation.
 - Never render on structural-only confidence. Require source/bilingual parity, viewer-facing QC, media coverage, and current metadata.
+- Semantic-split and optimize choices never authorize relaxed final-English QC limits. A wider final limit requires its own explicit authorization and remains visible in every downstream report.
 - A silent source requires explicit acceptance before `--allow-silent`. Existing outputs require explicit replacement authorization and recoverable archival.
 
 ## Definition Of Done

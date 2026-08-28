@@ -1490,6 +1490,13 @@ class TranscribeControlTests(unittest.TestCase):
             )
             self.assertNotIn(b"\r\n", source.read_bytes())
 
+            source_qc = root / "final-english-qc.json"
+            qc_args = CLI.build_parser().parse_args(
+                ["qc", str(source), "--output", str(source_qc)]
+            )
+            qc_result = CLI.run_qc(qc_args)
+            self.assertEqual(qc_result["exit_code"], 0)
+
             bilingual = root / "bilingual.srt"
             bilingual.write_text(
                 "1\n00:00:00,000 --> 00:00:01,000\n你好。\nHello.\n",
@@ -1505,6 +1512,8 @@ class TranscribeControlTests(unittest.TestCase):
                     str(source),
                     "--source-metadata",
                     str(metadata),
+                    "--source-qc-report",
+                    str(source_qc),
                     "--duration",
                     "1",
                 ],

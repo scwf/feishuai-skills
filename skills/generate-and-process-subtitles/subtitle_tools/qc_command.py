@@ -290,7 +290,9 @@ def load_resolved_seams_file(path: Path) -> Dict[tuple[int, int], str]:
     return resolutions
 
 
-def load_approved_cues_file(path: Path) -> Dict[int, Dict[str, Any]]:
+def load_approved_cues_file(
+    path: Path, *, source_sha256: str
+) -> Dict[int, Dict[str, Any]]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
@@ -308,6 +310,22 @@ def load_approved_cues_file(path: Path) -> Dict[int, Dict[str, Any]]:
             action="qc",
             step="validate_input",
             error_type="invalid_input",
+        )
+
+    reviewed_by = payload.get("reviewed_by")
+    if (
+        payload.get("source_sha256") != source_sha256
+        or not isinstance(reviewed_by, str)
+        or not reviewed_by.startswith(("ai:", "human:"))
+        or not reviewed_by.partition(":")[2].strip()
+    ):
+        raise SubtitleSkillError(
+            "Approved-cues JSON requires the exact input source_sha256 and "
+            "reviewed_by identifying ai:<name> or human:<name>.",
+            action="qc",
+            step="validate_input",
+            error_type="invalid_approval",
+            suggested_fix="Review the current subtitle and regenerate its bound approvals; do not relabel AI review as human review.",
         )
 
     approvals: Dict[int, Dict[str, Any]] = {}
@@ -338,7 +356,11 @@ def load_approved_cues_file(path: Path) -> Dict[int, Dict[str, Any]]:
                 step="validate_input",
                 error_type="invalid_input",
             )
-        approvals[cue] = {"text": text, "reason": reason.strip()}
+        approvals[cue] = {
+            "text": text,
+            "reason": reason.strip(),
+            "reviewed_by": reviewed_by.strip(),
+        }
     return approvals
 
 
@@ -392,6 +414,7 @@ def run_qc(args: argparse.Namespace) -> Dict[str, Any]:
         )
     approved_cues: Optional[Dict[int, Dict[str, Any]]] = None
     approved_path: Optional[Path] = None
+    source_sha256 = hashlib.sha256(input_path.read_bytes()).hexdigest()
     if args.approved_cues_file:
         approved_path = Path(args.approved_cues_file).resolve()
         if not approved_path.exists():
@@ -409,7 +432,7 @@ def run_qc(args: argparse.Namespace) -> Dict[str, Any]:
                 error_type="path_collision",
                 suggested_fix="Choose a distinct JSON report path.",
             )
-        approved_cues = load_approved_cues_file(approved_path)
+        approved_cues = load_approved_cues_file(approved_path, source_sha256=source_sha256)
     seam_times_ms = None
     seam_repair_failures: list[Dict[str, Any]] = []
     seam_path: Optional[Path] = None
@@ -490,8 +513,8 @@ def run_qc(args: argparse.Namespace) -> Dict[str, Any]:
             step="validate_input",
             error_type="invalid_approval",
             suggested_fix=(
-                "Remove stale approvals or update every cue/text entry to exactly match "
-                "a currently approvable short-fragment finding."
+                "Review the current subtitle and regenerate exact approvals for "
+                "approvable short fragments or natural boundaries; repair hard failures."
             ),
         ) from exc
     except (UnicodeError, ValueError) as exc:
@@ -509,7 +532,14 @@ def run_qc(args: argparse.Namespace) -> Dict[str, Any]:
     ]
     add_seam_failures_to_report(report, unresolved_failures)
     report["relaxed_limits_authorized"] = bool(args.allow_relaxed_limits)
-    report["source_sha256"] = hashlib.sha256(input_path.read_bytes()).hexdigest()
+    if hashlib.sha256(input_path.read_bytes()).hexdigest() != source_sha256:
+        raise SubtitleSkillError(
+            "Input SRT changed during QC; rerun review on the current file.",
+            action="qc",
+            step="validate_input",
+            error_type="invalid_approval",
+        )
+    report["source_sha256"] = source_sha256
     if resolved_seams:
         report["resolved_seam_failures"] = [
             {

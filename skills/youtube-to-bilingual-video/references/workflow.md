@@ -46,9 +46,9 @@ For every lexical item, prefer evidence in this order:
 2. official title, description, or supplied source notes;
 3. source audio.
 
-Keep uncertain text unchanged or ask the user. Do not accept a plausible term merely because it appears in the description. Preserve a reviewed English copy and the audit trail from baseline to that exact file.
+The agent reviews each change against available evidence and records its conclusion and evidence location in the existing audit notes. Keep faithful speech, including repetition or speaker errors; a plausible term in a description is not proof. Check uncertain spans locally before asking the user, and stop repeating checks that add no evidence. Preserve a reviewed English copy and its full baseline audit trail.
 
-Rerun the atomic final-English QC after all manual changes. Punctuation or case changes can create a new orphan, so carry forward only still-valid seam and approval artifacts. Translate only after the exact downstream English SRT returns QC exit code `0`.
+Rerun atomic final-English QC after all changes. Use its evidence-review contract for natural boundaries; punctuation or case changes can create a new orphan and invalidate approvals. Translate only after the exact downstream English SRT returns QC exit code `0`.
 
 ## Bind And Validate
 
@@ -58,7 +58,7 @@ If reviewed English bytes differ from transcription output, bind the exact final
 python "{COMPOSITE_SKILL_ROOT}/scripts/bind_reviewed_source_metadata.py"   --source-srt "<reviewed.en.srt>"   --upstream-metadata "<transcription-metadata.json>"   --audit-report "<audit-1.json>"   --reviewed-by "<reviewer>" --review-note "<evidence>"   --accept-reviewed-changes   --output "<job-dir>/audit/reviewed-source.metadata.json"
 ```
 
-Repeat `--audit-report` in byte-hash order when there are multiple stages. `--accept-reviewed-changes` records completed human review; it is never an automatic bypass.
+Repeat `--audit-report` in byte-hash order for multiple stages. `--accept-reviewed-changes` records completed evidence review, not a bypass: resolve every accepted change, name the actual AI or human reviewer in `--reviewed-by`, and cite item-level evidence/conclusions in `--review-note`. AI review is not human authorization to relax limits or expand editorial scope.
 
 Validate bilingual structure and media coverage:
 
@@ -68,7 +68,7 @@ python "{COMPOSITE_SKILL_ROOT}/scripts/validate_bilingual_srt.py"   "<bilingual.
 
 The validator must confirm exact English text/timing parity, sequential cues, Chinese-first ordering, language evidence, metadata hash, final-English QC hash and limit evidence, non-overlap, and material head/tail coverage. It records each cue's verified source-English line count so rendering never guesses the language boundary from character types. A result with `coverage_checked=false` is not render-ready. Do not widen coverage tolerances until the gap is confirmed silent; repair confirmed missing speech in the English source first.
 
-Run atomic `qc --bilingual` on the same bilingual file and require exit `0`.
+Run atomic `qc --bilingual` on the same bilingual file and require exit `0`. After verified exact English text/timing parity, reuse English boundary reasoning with approvals bound to the bilingual file; do not reuse its English-file hash or waive bilingual checks. Changed English requires renewed review.
 
 ## Render And Inspect
 
@@ -82,7 +82,7 @@ The renderer rejects a missing, stale, coverage-incomplete, or hash-mismatched v
 
 Inspect every high-load frame plus at least one ordinary frame and every terminology, coverage, or boundary repair timestamp. `qa_review_required=true` means the MP4 is not yet deliverable even though deterministic render verification passed. If estimated Chinese or English lines exceed 2, or the total exceeds 4, the renderer returns `review_required` / exit `2`, records the affected cues, and keeps the verified MP4 under `render/review/` without creating or replacing the requested final output. Decode success does not prove subtitle readability.
 
-## Manual Revision Loop
+## Revision Loop
 
 After any subtitle edit:
 
@@ -99,7 +99,7 @@ After any subtitle edit:
 - Timeout: inspect live process, reports, partials, and completed stage artifacts; resume instead of deleting or redownloading.
 - Download error: require a coherent media/sidecar pair before transcription.
 - Missing description: skip optimize unless other evidence is supplied.
-- Audit or QC exit `2`: stop, review evidence, update the reviewed English copy, and rerun the same gate.
+- Audit or QC exit `2`: pause downstream work, review evidence, repair the reviewed English copy within authorized scope, and rerun the same gate. Escalate only the remaining concrete question, with span and evidence.
 - Translation error: retain reviewed English and retry only translation.
 - Validation error: repair from reviewed English; never patch only Chinese or widen limits to hide missing speech.
 - Missing source audio: ask whether silent delivery is acceptable.

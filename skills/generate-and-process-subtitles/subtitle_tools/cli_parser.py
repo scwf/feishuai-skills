@@ -175,11 +175,9 @@ def build_parser(
     qc.add_argument(
         "--approved-cues-file",
         help=(
-            "Reviewed JSON with exact cue/text/reason entries for complete short utterances "
-            "or ambiguous dependent attachments. "
-            "Every entry must match a current approvable cue; stale entries are rejected. "
-            "Approvals cannot waive mechanically proven dependent tails, hanging words, "
-            "lowercase continuations, or overlong display lines."
+            "JSON bound by source_sha256 and reviewed_by (ai:<name> or human:<name>), "
+            "with exact cue/text/reason entries for short utterances or natural boundaries. "
+            "Stale entries and waivers of hard dependencies, hanging words or length limits are rejected."
         ),
     )
     qc.add_argument(

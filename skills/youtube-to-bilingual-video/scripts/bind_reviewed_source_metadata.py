@@ -57,7 +57,7 @@ def print_json(payload: dict[str, object]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Create exact-hash metadata for a manually reviewed English source SRT."
+        description="Create exact-hash metadata for an evidence-reviewed English source SRT."
     )
     parser.add_argument("--source-srt", type=Path, required=True)
     parser.add_argument("--upstream-metadata", type=Path, required=True)
@@ -70,8 +70,8 @@ def main() -> int:
     )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--expected-source-language", default="en")
-    parser.add_argument("--reviewed-by", required=True)
-    parser.add_argument("--review-note", required=True)
+    parser.add_argument("--reviewed-by", required=True, help="Actual reviewer, e.g. ai:<name> or human:<name>.")
+    parser.add_argument("--review-note", required=True, help="Evidence and conclusions for every accepted change, or their audit record path.")
     parser.add_argument(
         "--accept-reviewed-changes",
         action="store_true",
@@ -158,7 +158,7 @@ def main() -> int:
             raise ValueError("audit chain does not end at the reviewed source SRT")
         if review_gate and not args.accept_reviewed_changes:
             raise ValueError(
-                "audit report requires review; rerun with --accept-reviewed-changes only after manual review"
+                "audit report requires review; rerun with --accept-reviewed-changes only after evidence review"
             )
         payload = {
             "source_language": args.expected_source_language,

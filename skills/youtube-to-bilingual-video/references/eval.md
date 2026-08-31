@@ -25,7 +25,7 @@ Verify that:
 
 ## Regression Families
 
-- Entity mutation and fluency rewrite require lexical review; punctuation/case-only changes may pass audit but still rerun final English QC.
+- Entity mutation and fluency rewrite require evidence review; record the actual AI/human reviewer and item-level evidence without treating review as scope expansion. Punctuation/case-only changes still rerun final English QC.
 - Numeric punctuation and measurement marks remain semantic where they change meaning.
 - Missing, non-English, low-confidence, stale, or hash-mismatched source metadata blocks bilingual validation.
 - English-first, missing-Chinese, extra-English, misnumbered, overlapping, or source-mismatched bilingual cues fail.

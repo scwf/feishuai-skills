@@ -16,7 +16,7 @@ For a generic YouTube extraction request, no command may run until both semantic
 - Agent Memory: `tests/fixtures/agent_memory_viewer_clusters.json` contains five original viewer failures and their reviewed replacements. Every original cluster must block; every reviewed cluster must pass.
 - DeepSeek: `tests/fixtures/deepseek_boundaries.json` contains P01-P31 capitalization-bypassed broken boundaries plus 31 healthy controls. Every problem boundary must be detected and no healthy control may receive the capitalization-independent continuation reason.
 - Semantic split: content/order conservation, cue limits, positive duration, seam isolation, and failed-seam persistence.
-- Healthy short speech: complete utterances remain legal; exact approvals can resolve only currently approvable findings.
+- Healthy short speech and natural boundaries: hash-bound AI/human reviews resolve only approvable findings, retain original reasons and identity, and fail on changed text, timing or neighbors. No review means no automatic clearance; hard failures remain unapprovable.
 - Long bilingual cues: `tests/fixtures/long_bilingual_cues.json` must block under defaults, and a cue above 21 words but below 79 characters must report `overlong_word_count`.
 
 ## Deterministic Contracts

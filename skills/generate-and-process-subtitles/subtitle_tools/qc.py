@@ -25,6 +25,10 @@ APPROVABLE_SHORT_REASONS = {
     "chunk_seam_fragment",
     "short_fragment",
 }
+APPROVABLE_BOUNDARY_REASONS = {
+    "lowercase_continuation",
+    "unpunctuated_continuation",
+}
 HANGING_ENDINGS = {
     "a",
     "an",
@@ -596,14 +600,17 @@ def inspect_asr_data(
             reasons
             and approval is not None
             and approval.get("text") == cue.text
-            and set(reasons).issubset(APPROVABLE_SHORT_REASONS)
+            and set(reasons).issubset(APPROVABLE_SHORT_REASONS | APPROVABLE_BOUNDARY_REASONS)
         ):
+            boundary_review = bool(set(reasons) & APPROVABLE_BOUNDARY_REASONS)
             approved = make_context_finding(
                 cue,
-                severity="ok_short",
-                reasons=["human_approved_complete_utterance"],
+                severity="reviewed" if boundary_review else "ok_short",
+                reasons=["reviewed_natural_boundary" if boundary_review else "reviewed_complete_utterance"],
             )
             approved["approval_reason"] = approval.get("reason")
+            approved["reviewed_by"] = approval.get("reviewed_by", "unspecified")
+            approved["reviewed_reasons"] = reasons
             findings.append(approved)
             consumed_approvals.add(cue.cue)
             continue
@@ -639,7 +646,7 @@ def inspect_asr_data(
     approved_short = [
         item
         for item in ok_short
-        if "human_approved_complete_utterance" in item["reasons"]
+        if "reviewed_complete_utterance" in item["reasons"]
     ]
     review_required = bool(high_risk)
     default_limits = {
@@ -662,6 +669,7 @@ def inspect_asr_data(
         "high_risk_count": len(high_risk),
         "ok_short_count": len(ok_short),
         "approved_short_count": len(approved_short),
+        "reviewed_count": len(consumed_approvals),
         "seam_times_ms": seams,
         "default_limits": default_limits,
         "effective_limits": effective_limits,

@@ -680,16 +680,57 @@ Welcome.
             ]
             blocked = subprocess.run(command, capture_output=True, text=True, encoding="utf-8")
             self.assertEqual(blocked.returncode, 1)
-            accepted = subprocess.run(
-                [*command, "--accept-reviewed-changes"],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-            )
-            self.assertEqual(accepted.returncode, 0, accepted.stderr or accepted.stdout)
-            payload = json.loads(output.read_text(encoding="utf-8"))
-            self.assertEqual(payload["source_language_origin"], "reviewed_source_handoff")
-            self.assertEqual(payload["source_srt_sha256"], hashlib.sha256(source.read_bytes()).hexdigest())
+            for reviewer in ("human:test", "ai:test"):
+                with self.subTest(reviewer=reviewer):
+                    command[command.index("--reviewed-by") + 1] = reviewer
+                    accepted = subprocess.run(
+                        [*command, "--accept-reviewed-changes"],
+                        capture_output=True, text=True, encoding="utf-8",
+                    )
+                    self.assertEqual(accepted.returncode, 0, accepted.stderr or accepted.stdout)
+                    payload = json.loads(output.read_text(encoding="utf-8"))
+                    self.assertEqual(payload["source_language_origin"], "reviewed_source_handoff")
+                    self.assertEqual(payload["source_srt_sha256"], hashlib.sha256(source.read_bytes()).hexdigest())
+                    self.assertEqual(payload["reviewed_by"], reviewer)
+                    self.assertEqual(payload["review_note"], "Audio and frame evidence checked.")
+
+    def test_real_reviewed_english_qc_handoff_and_bilingual_rebinding(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source, bilingual = root / "source.srt", root / "bilingual.srt"
+            metadata, source_qc = root / "metadata.json", root / "source-qc.json"
+            approvals, validation = root / "approvals.json", root / "validation.json"
+            text = "1\n00:00:00,000 --> 00:00:03,000\nSo when you connect a charger,\n\n2\n00:00:03,000 --> 00:00:06,000\nthe phone controls incoming electricity."
+            write_srt(source, text)
+            write_srt(bilingual, text.replace("So when", "当你连接充电器时，\nSo when").replace("the phone", "手机会控制输入的电流。\nthe phone"))
+            write_source_metadata(metadata, source)
+            payload = {
+                "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+                "reviewed_by": "ai:test",
+                "approved_cues": [{"cue": 1, "text": "So when you connect a charger,", "reason": "Complete condition and following main clause; checked timing and display load."}],
+            }
+            approvals.write_text(json.dumps(payload), encoding="utf-8")
+            qc_command = [sys.executable, str(ATOMIC_CLI), "qc", str(source), "--output", str(source_qc)]
+            blocked = subprocess.run(qc_command, capture_output=True, text=True, encoding="utf-8")
+            self.assertEqual(blocked.returncode, 2, blocked.stdout)
+            passed = subprocess.run(qc_command + ["--approved-cues-file", str(approvals)], capture_output=True, text=True, encoding="utf-8")
+            self.assertEqual(passed.returncode, 0, passed.stderr or passed.stdout)
+            checked = subprocess.run([
+                sys.executable, str(VALIDATE_SCRIPT), str(bilingual),
+                "--source-srt", str(source), "--source-metadata", str(metadata),
+                "--source-qc-report", str(source_qc), "--output", str(validation),
+            ], capture_output=True, text=True, encoding="utf-8")
+            self.assertEqual(checked.returncode, 0, checked.stderr or checked.stdout)
+            bilingual_command = [sys.executable, str(ATOMIC_CLI), "qc", str(bilingual), "--bilingual"]
+            unchecked = subprocess.run(bilingual_command, capture_output=True, text=True, encoding="utf-8")
+            self.assertEqual(unchecked.returncode, 2, unchecked.stdout)
+            stale = subprocess.run(bilingual_command + ["--approved-cues-file", str(approvals)], capture_output=True, text=True, encoding="utf-8")
+            self.assertEqual(stale.returncode, 1, stale.stdout)
+            # Exact English parity above permits reusing the reasoning, not the source-file hash.
+            payload["source_sha256"] = hashlib.sha256(bilingual.read_bytes()).hexdigest()
+            approvals.write_text(json.dumps(payload), encoding="utf-8")
+            reviewed = subprocess.run(bilingual_command + ["--approved-cues-file", str(approvals)], capture_output=True, text=True, encoding="utf-8")
+            self.assertEqual(reviewed.returncode, 0, reviewed.stderr or reviewed.stdout)
 
     def test_reviewed_binding_rejects_unbound_or_unrelated_upstream_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

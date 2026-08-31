@@ -34,7 +34,7 @@ A command timeout is not itself failure. Inspect process state, reports, partial
 
 ## Hard Stops
 
-- Exit `2` or `review_required` from semantic split, optimization audit, final English QC, bilingual QC, or render layout estimation stops the pipeline.
+- Exit `2` / `review_required` blocks downstream production, not evidence review or scoped repair. Resolve findings through the owning Skill and rerun the gate; ask only about remaining material ambiguity or user-only authorization, not the raw QC list.
 - Bind source-language metadata by SHA-256 to the exact reviewed English SRT. Rebind only after every change has an auditable lineage and review record.
 - Never translate or repair only the Chinese line to hide an English boundary defect. Fix the reviewed English source, rerun QC, then regenerate the aligned bilingual pair.
 - Route confirmed missing speech to bounded source-language interval transcription before translation.

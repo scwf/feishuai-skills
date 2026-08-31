@@ -37,6 +37,14 @@ def write_srt(path: Path, text: str) -> None:
     path.write_text(text.strip() + "\n", encoding="utf-8")
 
 
+def write_approvals(path: Path, srt: Path, entries: list, reviewer: str = "ai:test") -> None:
+    path.write_text(json.dumps({
+        "source_sha256": hashlib.sha256(srt.read_bytes()).hexdigest(),
+        "reviewed_by": reviewer,
+        "approved_cues": entries,
+    }), encoding="utf-8")
+
+
 class SemanticOrphanQcTests(unittest.TestCase):
     def test_agent_memory_five_original_clusters_fail_and_reviewed_clusters_pass(self) -> None:
         fixture = json.loads(AGENT_MEMORY_FIXTURE.read_text(encoding="utf-8"))
@@ -285,7 +293,7 @@ class SemanticOrphanQcTests(unittest.TestCase):
         self.assertEqual(approved["exit_code"], 0)
         self.assertEqual(approved["approved_short_count"], 1)
         self.assertIn(
-            "human_approved_complete_utterance",
+            "reviewed_complete_utterance",
             approved["findings"][0]["reasons"],
         )
 
@@ -317,6 +325,8 @@ I agree.
             approvals.write_text(
                 json.dumps(
                     {
+                        "source_sha256": hashlib.sha256(srt.read_bytes()).hexdigest(),
+                        "reviewed_by": "human:test",
                         "approved_cues": [
                             {
                                 "cue": 1,
@@ -341,6 +351,8 @@ I agree.
             approvals.write_text(
                 json.dumps(
                     {
+                        "source_sha256": "0" * 64,
+                        "reviewed_by": "ai:test",
                         "approved_cues": [
                             {
                                 "cue": True,
@@ -354,7 +366,7 @@ I agree.
             )
 
             with self.assertRaises(CLI.SubtitleSkillError) as raised:
-                CLI.load_approved_cues_file(approvals)
+                CLI.load_approved_cues_file(approvals, source_sha256="0" * 64)
             self.assertEqual(raised.exception.error_type, "invalid_input")
 
     def test_stale_or_mismatched_approvals_are_rejected(self) -> None:
@@ -393,10 +405,7 @@ I agree.
             )
             for entries in invalid_entries:
                 with self.subTest(entries=entries):
-                    approvals.write_text(
-                        json.dumps({"approved_cues": entries}),
-                        encoding="utf-8",
-                    )
+                    write_approvals(approvals, srt, entries)
                     args = CLI.build_parser().parse_args(
                         ["qc", str(srt), "--approved-cues-file", str(approvals)]
                     )
@@ -404,6 +413,89 @@ I agree.
                         CLI.run_qc(args)
                     self.assertEqual(raised.exception.error_type, "invalid_approval")
                     self.assertEqual(raised.exception.step, "validate_input")
+
+    def test_cli_reviews_natural_boundaries_without_changing_source(self) -> None:
+        cases = (
+            ("So when you connect a charger,", "the phone controls incoming electricity.", "lowercase_continuation"),
+            ("So CPU is for general heavy computation,", "while GPU handles parallel work.", "lowercase_continuation"),
+            ("We use different tools", "Python for code, SQL for data.", "unpunctuated_continuation"),
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            srt, approvals = root / "reviewed.srt", root / "approvals.json"
+            for first, second, reason in cases:
+                for reviewer in ("ai:test", "human:test"):
+                    for bilingual in (False, True):
+                        with self.subTest(first=first, reviewer=reviewer, bilingual=bilingual):
+                            prefix = "说明。\n" if bilingual else ""
+                            write_srt(srt, f"1\n00:00:00,000 --> 00:00:03,000\n{prefix}{first}\n\n2\n00:00:03,000 --> 00:00:06,000\n{prefix}{second}")
+                            before = srt.read_bytes()
+                            command = ["qc", str(srt)] + (["--bilingual"] if bilingual else [])
+                            blocked = CLI.run_qc(CLI.build_parser().parse_args(command))
+                            self.assertEqual(blocked["exit_code"], 2)
+                            write_approvals(approvals, srt, [{
+                                "cue": 1, "text": first,
+                                "reason": "Both timed blocks form a natural clause or list; checked neighbors and display load.",
+                            }], reviewer)
+                            result = CLI.run_qc(CLI.build_parser().parse_args(command + ["--approved-cues-file", str(approvals)]))
+                            self.assertEqual(result["exit_code"], 0)
+                            self.assertEqual(result["reviewed_count"], 1)
+                            self.assertEqual(result["approved_short_count"], 0)
+                            finding = result["findings"][0]
+                            self.assertEqual(finding["reviewed_by"], reviewer)
+                            self.assertIn(reason, finding["reviewed_reasons"])
+                            self.assertEqual(result["source_sha256"], hashlib.sha256(before).hexdigest())
+                            self.assertEqual(srt.read_bytes(), before)
+
+    def test_cli_rejects_unbound_review_and_changed_context(self) -> None:
+        original = "1\n00:00:00,000 --> 00:00:03,000\nSo when you connect a charger,\n\n2\n00:00:03,000 --> 00:00:06,000\nthe phone controls incoming electricity.\n"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            srt, approvals = root / "input.srt", root / "approvals.json"
+            write_srt(srt, original)
+            write_approvals(approvals, srt, [{"cue": 1, "text": "So when you connect a charger,", "reason": "Complete condition and main clause; timing checked."}])
+            bound = json.loads(approvals.read_text(encoding="utf-8"))
+            args = CLI.build_parser().parse_args(["qc", str(srt), "--approved-cues-file", str(approvals)])
+            for field, bad in (("source_sha256", None), ("source_sha256", "0" * 64), ("reviewed_by", None), ("reviewed_by", "ai:"), ("reviewed_by", "reviewer")):
+                with self.subTest(field=field, bad=bad):
+                    approvals.write_text(json.dumps({**bound, field: bad}), encoding="utf-8")
+                    with self.assertRaises(CLI.SubtitleSkillError) as raised:
+                        CLI.run_qc(args)
+                    self.assertEqual(raised.exception.error_type, "invalid_approval")
+            approvals.write_text(json.dumps(bound), encoding="utf-8")
+            for changed in (
+                original.replace("charger", "battery"),
+                original.replace("incoming", "outgoing"),
+                original.replace("00:00:03,000", "00:00:02,500"),
+                original.replace("So when", "接上充电器后。\nSo when").replace("the phone", "手机调节电流。\nthe phone"),
+            ):
+                with self.subTest(changed=changed):
+                    write_srt(srt, changed)
+                    with self.assertRaises(CLI.SubtitleSkillError) as raised:
+                        CLI.run_qc(args)
+                    self.assertEqual(raised.exception.error_type, "invalid_approval")
+
+    def test_bound_ai_review_cannot_waive_hard_findings(self) -> None:
+        cases = (
+            ("Please help our", "customers around the world.", "hanging_function_word"),
+            ("They said " + "yes " * 20, "and explained their answer.", "overlong_word_count"),
+            ("A detailed explanation " * 4, "and another clause follows.", "overlong_display_line"),
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            srt, approvals = root / "input.srt", root / "approvals.json"
+            for first, second, reason in cases:
+                with self.subTest(reason=reason):
+                    first = first.strip()
+                    write_srt(srt, f"1\n00:00:00,000 --> 00:00:03,000\n{first}\n\n2\n00:00:03,000 --> 00:00:06,000\n{second}")
+                    args = CLI.build_parser().parse_args(["qc", str(srt)])
+                    blocked = CLI.run_qc(args)
+                    self.assertIn(reason, blocked["review_items"][0]["reasons"])
+                    write_approvals(approvals, srt, [{"cue": 1, "text": first, "reason": "Attempted waiver must fail."}])
+                    args.approved_cues_file = str(approvals)
+                    with self.assertRaises(CLI.SubtitleSkillError) as raised:
+                        CLI.run_qc(args)
+                    self.assertEqual(raised.exception.error_type, "invalid_approval")
 
     def test_slow_seam_fragment_is_still_high_risk(self) -> None:
         asr_data = ASRData(

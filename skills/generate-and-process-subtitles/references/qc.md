@@ -12,6 +12,20 @@ QC combines compact structural signals: hanging function words or auxiliaries, s
 
 The default English ceilings are 21 words and 79 display characters. Stricter `--max-words-en` or `--max-display-chars-en` values are ordinary overrides. Any value wider than its default requires a separate explicit `--allow-relaxed-limits`; semantic-split or optimize authorization does not imply it. The JSON report records `default_limits`, `effective_limits`, `limits_relaxed_from_default`, `relaxed_limits_authorized`, and the exact input `source_sha256`.
 
-Exit `2` / `review_required` is a hard stop. Inspect word timestamps, audio, or visible evidence before recutting or removing repetition. Do not auto-merge every short cue: complete utterances such as `Yes.` or `And there you go.` may be valid.
+Exit `2` / `review_required` stops downstream production, not the agent's review. Group related cues; fix clear punctuation/case errors or authorized local cuts on a copy, then rerun QC. Prefer existing context, word timings and visible evidence; check local audio only where wording or delivery remains uncertain. Do not repeat unchanged checks or send the raw QC list to the user. Preserve faithful repetitions and speaker errors rather than rewriting for fluency; escalate only unresolved material ambiguity or a user-only choice.
 
-An exact approved-cues file can resolve only currently approvable ambiguous/short findings and must include cue, unchanged text, and review reason. It cannot waive mechanically proven dependencies, hanging words, duplicate suffixes, long-gap incompleteness, overlong word counts or lines, or capitalization-independent continuation findings. Seam failures require a separate exact `resolved_seams` entry. Stale or unused approvals are input errors.
+Natural clauses, lists and coordinated actions may span screens below the length ceiling. Review semantic completeness of each block, neighbors, timing and display load; do not hard-merge full sentences, add fake punctuation or capitalize only to silence QC. Shortness alone is not an error, and static frames do not prove dynamic readability.
+
+Reuse `--approved-cues-file` for completed AI or human evidence review. Its `source_sha256` must equal the current input SRT hash (including timing and neighbors); identify the actual `reviewed_by` and provide an exact cue/text/reason per retained finding. For example:
+
+```json
+{
+  "source_sha256": "<SHA-256 of the exact input SRT>",
+  "reviewed_by": "ai:<reviewer>",
+  "approved_cues": [
+    {"cue": 1, "text": "So when you connect a charger,", "reason": "Complete condition followed by its main clause; checked both cue timings and display lengths."}
+  ]
+}
+```
+
+This can resolve ambiguous/short findings and `lowercase_continuation` / `unpunctuated_continuation`; it is not bulk permission to retain every boundary. The report preserves original reasons and reviewer identity. It cannot waive hard dependencies, hanging words, duplicate suffixes, long-gap incompleteness, overlong word counts or lines. Seam failures still require exact `resolved_seams` evidence. Missing hash/reviewer, stale text or unused approvals are errors; re-review changed context, never refresh only the hash to suppress an error.

@@ -42,11 +42,11 @@ Ask only for unanswered choices and wait. Neither silence nor a generic “extra
 - Strictly validate SRT structure, positive non-overlapping timelines, configured length ceilings, and SRT/TXT consistency before publication.
 - Publish final SRT/TXT as a transaction. Do not overwrite existing outputs unless the user authorizes `--replace-existing`; reject unsafe targets and locks.
 - Keep final user-facing SRT/TXT in the requested output directory and process evidence under `_subtitle_work/`. Follow [output-contract.md](references/output-contract.md).
-- Treat `review_required` and exit code `2` as a hard stop, not successful completion. Do not continue to optimize, translate, render, or deliver until the exact downstream subtitle passes the required review gate.
+- `review_required` / exit `2` blocks downstream translation, rendering and delivery, not evidence review or scoped repair of a copy. Resolve findings under [qc.md](references/qc.md) and rerun the gate; do not implicitly enable unconfirmed optimize or segmentation.
 - A requested source language must be verified and bound to the exact emitted SRT metadata. Script validation, not Latin-script appearance, is authoritative.
 
 ## Finish
 
-Return the structured command result and absolute final artifact paths. Report unresolved review items and evidence paths. Do not claim completion from green structural checks alone when viewer-facing QC or a required manual review remains open.
+Return the structured command result and absolute final artifact paths. Ask only about unresolved meaning after available evidence checks or user-only authorization; include the exact span, evidence and remaining question. Do not claim completion from green structural checks alone.
 
 For Skill changes, read [eval.md](references/eval.md), run the real CLI contracts, and validate this package with the Skill validator. Tests must assert observable artifacts and failures rather than documentation wording or internal function names.

@@ -6,8 +6,8 @@ Use this reference for dense or visually fragile infographic recreation. Keep th
 
 | Element type | Preferred method | Avoid | Exception |
 |---|---|---|---|
-| Main title, subtitle, body, numbers, labels, conclusions | PPT text boxes | Rasterizing text, typos, broken phrases, under-8-pt text | Tiny decorative text may remain in a slice if disclosed |
-| Cards, panels, borders, blocks, footer bars | PPT shapes | Whole-region screenshots | Complex texture backgrounds may be sliced |
+| Main title, section headings, body, numbers, labels, conclusions | PPT text boxes | Rasterizing text, typos, broken phrases, body text below the default 12 pt minimum | Text integral to a complex visual may remain in a slice if disclosed |
+| Cards, panels, borders, blocks, summary bars | PPT shapes | Whole-region screenshots | Complex texture backgrounds may be sliced |
 | Simple arrows and connectors | PPT connectors / lines | Direction changes, over-simplifying paths | Special glow arrows may use SVG or slices |
 | Loops, flows, flywheels | PPT curves / connectors / SVG / selective slices | Changing node order or arrow direction | Slice the path if native curves are unstable; keep node text editable |
 | Axes, direction scales, braces, grouping lines | PPT lines / shapes | Reducing them to unrelated symbols | Special visual effects may use slices |
@@ -19,12 +19,11 @@ Use this reference for dense or visually fragile infographic recreation. Keep th
 
 ## Text Checks
 
-- Use Microsoft YaHei for Chinese editable text unless the user asks otherwise.
-- Keep readable editable text at least 8 pt; important body text should usually be at least 9 pt.
+- Apply the Default Slide Style in `SKILL.md`. Check slides with dense text and sliced visuals for stray page headers or conversion provenance.
 - Disable shrink-on-overflow. Use fixed sizing, wider text boxes, manual line breaks, line spacing, and padding adjustments.
-- Preserve source terms, fixed phrases, labels, units, punctuation, quotation marks, numbering, and emphasis.
+- Preserve terms, fixed phrases, labels, units, punctuation, quotation marks, numbering, and emphasis in retained source content.
 - Do not split fixed terms, short labels, or technical phrases across lines.
-- For long body text or footers, compare line width rhythm with the source. If a line wraps too early, expand the object to the widest reasonable box whose visible text still stays inside the visual boundary.
+- For long body text or substantive notes, compare line breaks with the source. If a line wraps too early, widen the text box while keeping the text inside its visual boundary.
 
 ## Relation Checks
 
@@ -51,7 +50,7 @@ Use this reference for dense or visually fragile infographic recreation. Keep th
 | Failure | Likely cause | Fix |
 |---|---|---|
 | Text layout drifts | Font mismatch, narrow text boxes, AutoFit shrinking | Use Microsoft YaHei, disable shrinking, widen boxes, tune line breaks |
-| Text is too small | Forced source matching | Keep minimum size, rebalance layout instead |
+| Body text falls below the requested size range | Forced source matching | Rebalance the layout to keep body text within the requested range |
 | Future edits shrink text | Shrink-on-overflow enabled | Disable it and use fixed font sizes |
 | Core icon meaning changes | Approximate icon replacement | Re-check source semantics; crop source icon if needed |
 | Icon matrix looks inconsistent | Mixed icon sets or colors | Normalize color, stroke width, size, and style |

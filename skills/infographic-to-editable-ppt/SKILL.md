@@ -9,6 +9,15 @@ Recreate a source infographic as one editable PowerPoint page while preserving i
 
 Default strategy: editable information layer, native structural layer, SVG/shape simple icons, selective image slices for complex visuals.
 
+## Default Slide Style
+
+Apply these defaults in place of conflicting source styling unless the user requests a different style.
+
+- Use Microsoft YaHei (微软雅黑) for all editable text. Set both Latin and East Asian font properties where the authoring tool exposes them.
+- Use one red main title, set at 24 or 28 pt according to title length and available width. Treat section headings and card titles as subordinate text.
+- Use 12–20 pt for body text, including section headings and card text. Reflow the layout when the source uses smaller body text.
+- Omit page headers and on-slide conversion provenance, including text that names the source infographic or explains that the slide was converted from it. Preserve the main title and source content needed to interpret the slide, such as data citations, chart notes, and conclusions.
+
 ## Definition of Done
 
 Deliver all of these unless the user narrows the request:
@@ -29,10 +38,10 @@ Default outputs: save next to the source image unless the user specifies an outp
    Match the source aspect ratio. Use 16:9 widescreen only when the source is close to 16:9; otherwise set a custom size close to the image ratio.
 
 3. Build the large structure first.
-   Recreate background, title zone, panels/cards, footer or summary zone, major color blocks, borders, dividers, and shadows before adding details.
+   Recreate background, main title zone, panels/cards, substantive summary or note areas, major color blocks, borders, dividers, and shadows before adding details.
 
 4. Rebuild major text as editable PPT text.
-   Use native text boxes for titles, subtitles, section names, card titles, body paragraphs, quotes, conclusions, numbers, units, labels, annotations, and footers.
+   Apply the default slide style. Use native text boxes for the main title, section names, card titles, body paragraphs, quotes, conclusions, numbers, units, labels, and substantive notes.
 
 5. Rebuild structure and relationships.
    Use PowerPoint shapes, connectors, lines, curves, or SVG paths for cards, tables, bars, stair-step lists, rankings, axes, arrows, flow paths, loops, flywheels, braces, and grouping lines.
@@ -41,7 +50,7 @@ Default outputs: save next to the source image unless the user specifies an outp
    Use a single SVG icon family for simple icons when possible. For core icons that must match the source, prefer accurate SVG/shape recreation or crop the original icon. Use image slices for complex illustrations, photos, logos, product UI, 3D objects, textures, glassmorphism, glow, and hard-to-recreate relation paths.
 
 7. Group and name objects.
-   Organize objects by region such as `Header`, `Left Panel`, `Main Visual`, `Right Panel`, `Footer`, `Icons`, and `Decorations` so the slide remains editable.
+   Organize objects by region such as `Title`, `Left Panel`, `Main Visual`, `Right Panel`, and `Icons` so the slide remains editable.
 
 8. Export and compare a preview.
    Render the slide to an image, compare it against the source, fix visible misses, and re-export. Do not finalize before preview verification.
@@ -53,8 +62,7 @@ Also read it for dense text, tables, rankings, small labels, many repeated cards
 
 - Do not deliver the original full infographic as a single slide background.
 - Do not rasterize major readable text.
-- Use Microsoft YaHei (`微软雅黑`) for editable Chinese text unless the user specifies another font.
-- Keep readable editable text at least 8 pt; keep important body text preferably at least 9 pt.
+- Keep supporting text outside the body, such as chart ticks and citations, at least 8 pt.
 - Disable "shrink text on overflow" / AutoFit shrinking for editable text boxes. Fix overflow by adjusting text box width, line breaks, spacing, or layout.
 - Preserve arrow direction, loop order, flywheel sequence, axes direction, bracket opening direction, grouping scope, and connector endpoints.
 - Do not replace core icons, logos, official product UI, people, products, or branded visuals with loose semantic approximations.
@@ -71,8 +79,7 @@ Also read it for dense text, tables, rankings, small labels, many repeated cards
 
 ## Text Layout Rules
 
-- Preserve source wording, emphasis, punctuation, units, numbering, and keyword highlighting.
-- Use Microsoft YaHei for Chinese; use Aptos, Arial, or a close system font for English. For other languages or obvious brand fonts, use the closest available font and disclose the approximation.
+- Preserve wording, emphasis, punctuation, units, numbering, and keyword highlighting for retained source content.
 - Avoid broken words, orphan single-character labels, compressed text, visible overflow, and overlapping text.
 - Match the source line-breaking rhythm for long body text and footers. If a line wraps too early, first widen the text box within the visible boundary before reducing font size.
 - A text box may be wider than its visual container when the visible glyphs still remain inside the intended boundary.
@@ -97,9 +104,9 @@ Before final delivery, perform these verification steps:
 Then verify:
 
 - The slide is not an image-only background.
-- Major text is editable and uses the chosen font.
-- Editable text is not smaller than the allowed threshold and does not rely on shrinking AutoFit.
-- No obvious typos, missing text, duplicated ghost text, overflow, or incoherent overlap appears in the preview.
+- Retained major text is editable. Check the exported slide's font settings for Microsoft YaHei, one red main title at 24 or 28 pt, and body text at 12–20 pt, or the user's explicit overrides. Confirm editable text does not rely on shrinking AutoFit.
+- The preview shows the intended title hierarchy and omits page headers and conversion provenance, including any carried in through image slices.
+- No obvious typos, unintended omissions, duplicated ghost text, overflow, or incoherent overlap appears in the preview.
 - Arrows, axes, braces, loops, flow paths, and direction labels match the source.
 - Core icons keep the source semantics, style, color, line weight, and visual weight.
 - Tables, bars, tags, callouts, and dense labels stay inside their visual parent regions.
@@ -123,7 +130,7 @@ Use a concise table:
 | Main visual | Shape / SVG / slice | Mixed | Name sliced elements |
 | Relationship diagram | Connector / SVG / slice | Mixed | Note path and text handling |
 | Icons | SVG / shape / slice | Mixed | Note core-icon handling |
-| Footer / notes | PPT text / shape | Yes | Note approximation if any |
+| Substantive notes, if present | PPT text / shape | Yes | Note approximation if any |
 
 Always mention:
 
